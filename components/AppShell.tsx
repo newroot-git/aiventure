@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Home, Users, CalendarDays, Compass } from "lucide-react";
 import { Avatar } from "./ui";
 import { QuickMenu } from "./QuickMenu";
-import { NotificationsMenu } from "./NotificationsMenu";
+import { NotificationsMenu, type NotifData } from "./NotificationsMenu";
 import { CURRENT_USER } from "@/lib/mock";
 
 const TABS = [
@@ -15,7 +15,7 @@ const TABS = [
   { href: "/groups", label: "Crew", Icon: Users },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, notifs }: { children: React.ReactNode; notifs: NotifData }) {
   const path = usePathname();
   const isActive = (href: string) => path.startsWith(href);
 
@@ -36,7 +36,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="mt-auto flex flex-col gap-1 border-t-2 border-line pt-4">
-          <NotificationsMenu variant="side" />
+          <NotificationsMenu variant="side" data={notifs} />
           <Link
             href="/profile"
             className={`flex items-center gap-3 rounded-md px-3 py-2 transition ${
@@ -58,7 +58,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               AI<span className="text-primary">venture</span>
             </Link>
             <div className="flex items-center gap-3">
-              <NotificationsMenu variant="icon" />
+              <NotificationsMenu variant="icon" data={notifs} />
               <Link href="/profile" aria-label="Profile">
                 <Avatar name={CURRENT_USER.name} src={CURRENT_USER.avatar} size={32} />
               </Link>

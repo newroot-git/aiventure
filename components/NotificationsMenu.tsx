@@ -4,13 +4,19 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { Inbox, X, Check, Hand, Bell } from "lucide-react";
 import { Avatar } from "./ui";
-import { MOCK_INVITES, MOCK_NUDGES, MOCK_NOTIFICATIONS } from "@/lib/mock";
+import type { InviteCard, NudgeCard, NotificationCard } from "@/lib/db";
 
-export function NotificationsMenu({ variant = "icon" }: { variant?: "icon" | "side" }) {
+export interface NotifData {
+  invites: InviteCard[];
+  nudges: NudgeCard[];
+  notifications: NotificationCard[];
+}
+
+export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon" | "side"; data: NotifData }) {
   const [open, setOpen] = React.useState(false);
-  const [invites, setInvites] = React.useState(MOCK_INVITES);
-  const [nudges, setNudges] = React.useState(MOCK_NUDGES);
-  const [notes, setNotes] = React.useState(MOCK_NOTIFICATIONS);
+  const [invites, setInvites] = React.useState(data.invites);
+  const [nudges, setNudges] = React.useState(data.nudges);
+  const [notes, setNotes] = React.useState(data.notifications);
   const count = invites.length + nudges.length + notes.length;
   const active = usePathActive();
 
@@ -60,7 +66,7 @@ export function NotificationsMenu({ variant = "icon" }: { variant?: "icon" | "si
                   <Section label="Invites">
                     {invites.map((iv) => (
                       <Row key={iv.id} href={`/p/${iv.slug}`} onClose={() => setInvites((s) => s.filter((x) => x.id !== iv.id))} onPick={() => setOpen(false)}
-                        avatar={<Avatar name={iv.fromLabel} src={iv.from.avatar} size={36} />}>
+                        avatar={<Avatar name={iv.fromLabel} size={36} />}>
                         <b>{iv.fromLabel}</b> invited you · <span className="text-muted">{iv.activity}</span>
                       </Row>
                     ))}

@@ -3,8 +3,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Hand, UserPlus, Plus, ChevronRight, X, Boxes } from "lucide-react";
 import { Card, Button, Avatar, AvatarStack } from "./ui";
-import { MOCK_NUDGES } from "@/lib/mock";
-import type { GroupCard } from "@/lib/db";
+import type { GroupCard, NudgeCard } from "@/lib/db";
 import type { Profile } from "@/lib/types";
 
 function Heading({ icon, children, action }: { icon: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
@@ -19,11 +18,13 @@ function Heading({ icon, children, action }: { icon: React.ReactNode; children: 
 export function CrewView({
   groups,
   friends,
+  nudges: initialNudges,
 }: {
   groups: GroupCard[];
   friends: { profile: Profile; shared: string[] }[];
+  nudges: NudgeCard[];
 }) {
-  const [nudges, setNudges] = React.useState(MOCK_NUDGES);
+  const [nudges, setNudges] = React.useState(initialNudges);
 
   return (
     <div>

@@ -2,11 +2,12 @@ import Link from "next/link";
 import { MapPin, CalendarDays, ChevronRight, Sparkles, Users } from "lucide-react";
 import { Card, Pill, AvatarStack } from "@/components/ui";
 import { Countdown } from "@/components/Countdown";
-import { getUserPlans, getCurrentProfile, type PlanCard } from "@/lib/db";
-import { MOCK_INVITES, MOCK_NUDGES, MOCK_OPEN } from "@/lib/mock";
+import { getUserPlans, getCurrentProfile, getInvites, getNudges, getOpenEvents, type PlanCard } from "@/lib/db";
 
 export default async function HomePage() {
-  const [plans, me] = await Promise.all([getUserPlans(), getCurrentProfile()]);
+  const [plans, me, invites, nudges, openEvents] = await Promise.all([
+    getUserPlans(), getCurrentProfile(), getInvites(), getNudges(), getOpenEvents(),
+  ]);
   const upcoming = plans.filter((p) => p.status === "upcoming");
   const next = upcoming.find((p) => p.date);
   const rest = upcoming.filter((p) => p.slug !== next?.slug);
@@ -25,7 +26,7 @@ export default async function HomePage() {
       {/* for you — inbox */}
       <h2 className="mt-7 mb-3 text-xs font-bold uppercase tracking-wider text-muted">For you</h2>
       <div className="flex flex-col gap-2">
-        {MOCK_INVITES.map((iv) => (
+        {invites.map((iv) => (
           <Link key={iv.id} href="/invites" className="block">
             <Card className="flex items-center gap-3 p-3 transition active:scale-[0.99]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -35,7 +36,7 @@ export default async function HomePage() {
             </Card>
           </Link>
         ))}
-        {MOCK_NUDGES.map((n) => (
+        {nudges.map((n) => (
           <Link key={n.id} href="/groups" className="block">
             <Card className="flex items-center gap-3 p-3 transition active:scale-[0.99]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -60,7 +61,7 @@ export default async function HomePage() {
       </h2>
       <p className="mb-3 text-sm text-muted">Open plans near you, picked for your interests.</p>
       <div className="grid gap-3 sm:grid-cols-2">
-        {MOCK_OPEN.map((op) => (
+        {openEvents.map((op) => (
           <Link key={op.id} href={`/p/${op.slug}`} className="block">
             <Card hard className="overflow-hidden p-0 transition active:scale-[0.99]">
               <div className="relative">

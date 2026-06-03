@@ -1,9 +1,13 @@
 import { AppShell } from "@/components/AppShell";
+import { getInvites, getNudges, getNotifications } from "@/lib/db";
 
-export default function AppLayout({
+export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <AppShell>{children}</AppShell>;
+  const [invites, nudges, notifications] = await Promise.all([
+    getInvites(), getNudges(), getNotifications(),
+  ]);
+  return <AppShell notifs={{ invites, nudges, notifications }}>{children}</AppShell>;
 }

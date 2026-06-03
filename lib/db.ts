@@ -293,3 +293,55 @@ export async function getAdventureBySlug(slug: string): Promise<Adventure | null
     activities,
   };
 }
+
+// ---------- communities / events / nudges / invites / notifications ----------
+export interface CommunityCard { id: string; name: string; tag: string; members: string }
+export interface OpenEventCard { id: string; community: string; activity: string; place: string; dateLabel: string; cover: string; going: number; slug: string }
+export interface NudgeCard { id: string; from: Profile; message: string; when: string }
+export interface InviteCard { id: string; fromLabel: string; kind: string; activity: string; slug: string; dateLabel: string; cover: string }
+export interface NotificationCard { id: string; text: string; when: string; slug?: string }
+
+export async function getCommunities(): Promise<CommunityCard[]> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("communities").select("*").order("created_at");
+  return ((data as Row[]) ?? []).map((c) => ({
+    id: c.id as string, name: c.name as string, tag: (c.tag as string) ?? "", members: (c.members_label as string) ?? "0",
+  }));
+}
+
+export async function getOpenEvents(): Promise<OpenEventCard[]> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("open_events").select("*").order("created_at");
+  return ((data as Row[]) ?? []).map((e) => ({
+    id: e.id as string, community: (e.community_name as string) ?? "", activity: e.activity as string,
+    place: (e.place as string) ?? "", dateLabel: (e.date_label as string) ?? "", cover: (e.cover as string) ?? "/img/cover-park.png",
+    going: (e.going as number) ?? 0, slug: (e.plan_slug as string) ?? "wild-otter-42",
+  }));
+}
+
+export async function getNudges(): Promise<NudgeCard[]> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("nudges").select("*, from:profiles!from_id(*)").eq("to_id", DEMO_USER_ID).eq("status", "pending").order("created_at", { ascending: false });
+  return ((data as Row[]) ?? []).map((n) => ({
+    id: n.id as string, from: mapProfile(n.from as Row) ?? ({ name: "Someone" } as Profile),
+    message: n.message as string, when: (n.when_text as string) ?? "",
+  }));
+}
+
+export async function getInvites(): Promise<InviteCard[]> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("invites").select("*").eq("to_id", DEMO_USER_ID).order("created_at", { ascending: false });
+  return ((data as Row[]) ?? []).map((i) => ({
+    id: i.id as string, fromLabel: (i.from_label as string) ?? "Someone", kind: (i.kind as string) ?? "friend",
+    activity: (i.activity as string) ?? "", slug: (i.plan_slug as string) ?? "wild-otter-42",
+    dateLabel: (i.date_label as string) ?? "", cover: (i.cover as string) ?? "/img/cover-hike.png",
+  }));
+}
+
+export async function getNotifications(): Promise<NotificationCard[]> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("notifications").select("*").eq("profile_id", DEMO_USER_ID).eq("acknowledged", false).order("created_at", { ascending: false });
+  return ((data as Row[]) ?? []).map((n) => ({
+    id: n.id as string, text: n.text as string, when: (n.when_text as string) ?? "", slug: (n.plan_slug as string) ?? undefined,
+  }));
+}
