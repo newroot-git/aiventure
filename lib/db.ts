@@ -38,6 +38,7 @@ export async function createPlanFromDrop(input: DropInput): Promise<{ slug: stri
       creator_id: DEMO_USER_ID,
       ai_empowered: true,
       cover_hue: options[0]?.tile ?? "city",
+      place_address: input.location ?? null, // stash search location for later refine
     } as never)
     .select("id")
     .single();
@@ -206,6 +207,48 @@ export async function getGroup(id: string): Promise<{ group: GroupCard; plans: P
     },
     plans: ((plans as Row[]) ?? []).map(mapPlanCard),
   };
+}
+
+/** Regenerate a plan's options, optionally steered by free-text feedback. */
+export async function refinePlanOptions(slug: string, feedback?: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { data: plan } = await db.from("plans").select("id, intent, place_address").eq("slug", slug).maybeSingle();
+  if (!plan) throw new Error("plan not found");
+  const row = plan as Row;
+  const intent = (row.intent as string) || "something good";
+  const location = (row.place_address as string) || "London, UK";
+  const steered = feedback?.trim() ? `${intent}. Important preference: ${feedback.trim()}` : intent;
+
+  const drop = await generateDrop({ scope: "single", intent: steered, location });
+  const options = drop.options ?? [];
+  await db.from("plan_options").delete().eq("plan_id", row.id as string);
+  if (options.length) {
+    const rows = options.map((o) => ({
+      plan_id: row.id as string, kind: "activity", source: "ai",
+      title: o.title, subtitle: o.subtitle ?? null, why: o.why ?? null,
+      source_url: mapsUrl(o.map_query) ?? null, source_label: "AI + Maps",
+      payload: { tile: o.tile, place_name: o.place_name ?? null },
+    }));
+    await db.from("plan_options").insert(rows as never);
+  }
+}
+
+/** Smart-resolve a typed place into a real venue and add it as an option. */
+export async function addCustomOption(slug: string, query: string): Promise<boolean> {
+  const { resolvePlace } = await import("./ai");
+  const db = supabaseAdmin();
+  const { data: plan } = await db.from("plans").select("id, place_address").eq("slug", slug).maybeSingle();
+  if (!plan) throw new Error("plan not found");
+  const row = plan as Row;
+  const resolved = await resolvePlace(query, (row.place_address as string) || "London, UK");
+  if (!resolved) return false;
+  await db.from("plan_options").insert({
+    plan_id: row.id as string, kind: "activity", source: "human",
+    title: resolved.title, subtitle: resolved.subtitle ?? null, why: resolved.why ?? null,
+    source_url: mapsUrl(resolved.map_query) ?? null, source_label: "Added",
+    payload: { tile: resolved.tile, place_name: resolved.place_name ?? null },
+  } as never);
+  return true;
 }
 
 /** Move a plan through its lifecycle: open (planning) → locked → completed. */

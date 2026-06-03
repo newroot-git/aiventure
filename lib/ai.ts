@@ -142,4 +142,26 @@ Make the picks genuinely varied and tailored to the intent above — not a gener
   return { kind: "options", options };
 }
 
+// Resolve a free-typed place/business into one real, specific suggestion (smart "add your own").
+export async function resolvePlace(query: string, location = "London, UK"): Promise<DropOptionOut | null> {
+  const q = (query || "").slice(0, 200);
+  if (!q) return null;
+  const user = `In ${location}, the user typed: "${q}".
+Resolve it to ONE real, specific, named place/venue/activity that best matches (correct the spelling, pick the most likely real place).
+Return STRICT JSON only: {"title","subtitle","why","place_name","map_query","tile"}.
+"tile" = best-fit from: ${TILES.join(", ")}. "subtitle" = short detail (type · area). "why" = one short line.`;
+  try {
+    const raw = await callOpenRouter(SYSTEM, user);
+    const o = parseJson(raw) as DropOptionOut;
+    if (!o?.title) return null;
+    return {
+      ...o,
+      tile: TILES.includes(o.tile as (typeof TILES)[number]) ? o.tile : "city",
+      map_query: o.map_query || o.place_name || o.title,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export { mapsUrl };

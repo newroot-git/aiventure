@@ -8,9 +8,9 @@ const env = readFileSync(join(root, ".env.local"), "utf8");
 const key = env.match(/OPENROUTER_API_KEY=(.+)/)[1].trim();
 const MODEL = "google/gemini-2.5-flash-image";
 
-// THE LOCKED STYLE — lush detailed painterly pixel-art landscapes (Ghibli / lo-fi indie game)
+// THE LOCKED STYLE — calm, lowkey, naturalistic detailed pixel-art (peaceful beauty)
 const STYLE =
-  "Lush highly-detailed pixel-art landscape, high-resolution 32-bit pixel art with fine pixel dithering and smooth colour gradients (NOT chunky low-res blocky pixels), vibrant saturated colours, dramatic sky with big soft cumulus clouds, golden-hour atmospheric lighting, layered depth with hazy distant mountains, rich greens and warm light, delicate wildflowers in the foreground, serene cosy nostalgic mood, Studio Ghibli inspired, beautiful indie-game key-art. No text, no words, no UI, full bleed.";
+  "Detailed pixel-art landscape with calm, peaceful, lowkey beauty. High-resolution 32-bit pixel art with fine dithering and soft gradients (NOT chunky low-res). Naturalistic and grounded — soft natural daylight, gentle muted-warm colours, quiet everyday scenery. NOT dramatic, NOT fantastical, NO glowing magic, no fireflies, no epic skies, no over-saturation. Serene, understated, cosy lo-fi mood like a quiet ordinary afternoon. Subtle, restful, believable. Studio Ghibli calm. No text, no words, no UI, full bleed.";
 
 const SUBJECTS = {
   hike: "A winding dirt trail climbing a green grassy hill toward a summit, a tiny lone hiker, golden-hour light",

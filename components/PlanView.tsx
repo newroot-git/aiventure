@@ -15,6 +15,8 @@ import {
   HeartHandshake,
   Info,
   Loader2,
+  Plus,
+  RotateCw,
 } from "lucide-react";
 import { Pill, Button, AvatarStack } from "./ui";
 import { Reveal } from "./motion";
@@ -110,6 +112,9 @@ export function PlanView({
   const [lockedId, setLockedId] = React.useState<string | null>(null);
   const [copied, setCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [refineText, setRefineText] = React.useState("");
+  const [addText, setAddText] = React.useState("");
+  const [working, setWorking] = React.useState<"refine" | "add" | null>(null);
   const router = useRouter();
 
   const phase = plan.status; // open (planning) | locked | completed
@@ -135,6 +140,29 @@ export function PlanView({
       setVotes((vs) => ({ ...vs, [id]: vs[id] + (now ? 1 : -1) }));
       return { ...v, [id]: now };
     });
+  }
+  async function refine() {
+    setWorking("refine");
+    try {
+      await fetch("/api/plans/refine", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: plan.slug, feedback: refineText }),
+      });
+      setRefineText("");
+      router.refresh();
+    } finally { setWorking(null); }
+  }
+  async function addOwn() {
+    if (!addText.trim()) return;
+    setWorking("add");
+    try {
+      await fetch("/api/plans/add-option", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: plan.slug, query: addText }),
+      });
+      setAddText("");
+      router.refresh();
+    } finally { setWorking(null); }
   }
   async function copyLink() {
     try {
@@ -279,6 +307,34 @@ export function PlanView({
                 />
               </Reveal>
             ))}
+          </div>
+
+          {/* add your own — smart-resolved */}
+          <div className="mt-3 flex gap-2">
+            <input
+              value={addText}
+              onChange={(e) => setAddText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addOwn()}
+              placeholder="Add your own — a place or business…"
+              className="w-full rounded-md border-2 border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-primary"
+            />
+            <Button variant="soft" disabled={working === "add" || !addText.trim()} onClick={addOwn}>
+              {working === "add" ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+            </Button>
+          </div>
+
+          {/* refine with feedback */}
+          <div className="mt-2 flex gap-2">
+            <input
+              value={refineText}
+              onChange={(e) => setRefineText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && refine()}
+              placeholder="Not feeling these? e.g. nothing too active, more chill…"
+              className="w-full rounded-md border-2 border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-primary"
+            />
+            <Button variant="secondary" disabled={working === "refine"} onClick={refine}>
+              {working === "refine" ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
+            </Button>
           </div>
         </section>
       )}
