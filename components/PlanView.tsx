@@ -17,8 +17,10 @@ import {
   Loader2,
   Plus,
   RotateCw,
+  X,
+  UserPlus,
 } from "lucide-react";
-import { Pill, Button, AvatarStack } from "./ui";
+import { Pill, Button, AvatarStack, Avatar } from "./ui";
 import { Reveal } from "./motion";
 import {
   OptionCard,
@@ -27,7 +29,7 @@ import {
   MapEmbed,
   AdventureCard,
 } from "./plan";
-import type { Plan, PlanOption, PlanMember, RSVP } from "@/lib/types";
+import type { Plan, PlanOption, PlanMember, RSVP, Profile } from "@/lib/types";
 
 function fmtDate(iso?: string | null) {
   if (!iso) return null;
@@ -43,6 +45,12 @@ function fmtTime(iso?: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+function toLocalInput(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function googleCalUrl(plan: Plan) {
   if (!plan.starts_at) return "#";
@@ -99,10 +107,12 @@ export function PlanView({
   plan,
   options,
   members,
+  friends = [],
 }: {
   plan: Plan;
   options: PlanOption[];
   members: PlanMember[];
+  friends?: Profile[];
 }) {
   const [rsvp, setRsvp] = React.useState<RSVP>("in");
   const [votes, setVotes] = React.useState<Record<string, number>>(
@@ -115,7 +125,31 @@ export function PlanView({
   const [refineText, setRefineText] = React.useState("");
   const [addText, setAddText] = React.useState("");
   const [working, setWorking] = React.useState<"refine" | "add" | null>(null);
+  const [inviteOpen, setInviteOpen] = React.useState(false);
+  const [pickedFriends, setPickedFriends] = React.useState<string[]>([]);
   const router = useRouter();
+
+  async function persist(body: Record<string, unknown>) {
+    await fetch("/api/plans/edit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: plan.slug, ...body }),
+    });
+    router.refresh();
+  }
+  function choose(id: string) {
+    setLockedId(id);
+    persist({ action: "choose", optionId: id });
+  }
+  async function setWhenDate(local: string) {
+    if (!local) return;
+    await persist({ action: "when", startsAt: new Date(local).toISOString() });
+  }
+  async function doInvite() {
+    if (!pickedFriends.length) return;
+    await persist({ action: "invite", profileIds: pickedFriends });
+    setInviteOpen(false);
+    setPickedFriends([]);
+  }
 
   const phase = plan.status; // open (planning) | locked | completed
   const people = members.map((m) => m.profile ?? { name: "Guest" });
@@ -240,10 +274,16 @@ export function PlanView({
       {/* ---- when / where ---- */}
       <div className="mt-4 grid grid-cols-2 gap-3">
         <Section icon={<Clock size={15} />} label="When" tone="accent">
-          <div className="font-bold leading-tight">{fmtDate(plan.starts_at) ?? "TBC"}</div>
+          <div className="font-bold leading-tight">{fmtDate(plan.starts_at) ?? "Pick a time"}</div>
           {fmtTime(plan.starts_at) && (
             <div className="text-sm text-muted">{fmtTime(plan.starts_at)}</div>
           )}
+          <input
+            type="datetime-local"
+            defaultValue={toLocalInput(plan.starts_at)}
+            onChange={(e) => setWhenDate(e.target.value)}
+            className="mt-2 w-full rounded-md border-2 border-line bg-surface px-2 py-1.5 text-xs text-ink outline-none focus:border-primary"
+          />
         </Section>
         <Section icon={<MapPin size={15} />} label="Where" tone="primary">
           <div className="font-bold leading-tight">{plan.place_name ?? "TBC"}</div>
@@ -270,6 +310,14 @@ export function PlanView({
             </span>
           </div>
           <RSVPControl value={rsvp} onChange={setRsvp} />
+          {friends.length > 0 && (
+            <button
+              onClick={() => setInviteOpen(true)}
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-primary"
+            >
+              <UserPlus size={15} /> Invite people
+            </button>
+          )}
         </Section>
       </div>
 
@@ -303,7 +351,7 @@ export function PlanView({
                   votes={votes[o.id]}
                   voted={voted[o.id]}
                   onVote={() => vote(o.id)}
-                  onSelect={() => setLockedId(o.id)}
+                  onSelect={() => choose(o.id)}
                 />
               </Reveal>
             ))}
@@ -414,6 +462,45 @@ export function PlanView({
       <p className="mt-6 text-center text-xs text-muted">
         No app needed — anyone with this link can join.
       </p>
+
+      {/* invite sheet */}
+      {inviteOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setInviteOpen(false)} />
+          <div className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md p-4">
+            <div className="rounded-xl border-2 border-ink bg-surface p-4 shadow-hard">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="font-display text-lg font-bold">Invite people</span>
+                <button onClick={() => setInviteOpen(false)} className="text-muted">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                {friends.map((f) => {
+                  const on = pickedFriends.includes(f.id);
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() =>
+                        setPickedFriends((p) => (on ? p.filter((x) => x !== f.id) : [...p, f.id]))
+                      }
+                      className="flex flex-col items-center gap-1"
+                    >
+                      <span className={on ? "rounded-md ring-2 ring-primary ring-offset-2 ring-offset-surface" : ""}>
+                        <Avatar name={f.name} src={f.avatar} size={48} />
+                      </span>
+                      <span className="truncate text-xs font-bold">{f.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <Button variant="primary" className="mt-4 w-full" disabled={!pickedFriends.length} onClick={doInvite}>
+                Invite {pickedFriends.length || ""}
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

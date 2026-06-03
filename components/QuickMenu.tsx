@@ -40,7 +40,7 @@ export function QuickMenu({ variant = "fab" }: { variant?: "fab" | "side" }) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="fixed inset-0 z-40 bg-ink/20 backdrop-blur-sm"
+              className="fixed inset-0 z-40 bg-transparent"
               onClick={() => setOpen(false)}
             />
             <motion.div
@@ -48,7 +48,7 @@ export function QuickMenu({ variant = "fab" }: { variant?: "fab" | "side" }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.97 }}
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              className="fixed inset-x-0 bottom-24 z-50 mx-auto w-full max-w-md px-4 md:bottom-6"
+              className="fixed inset-x-0 bottom-32 z-50 mx-auto w-full max-w-md px-4 md:bottom-6"
             >
               <div className="rounded-xl border-2 border-ink bg-surface p-2 shadow-hard">
                 <div className="flex items-center justify-between px-3 py-2">

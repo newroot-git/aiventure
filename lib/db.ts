@@ -9,8 +9,12 @@ export const DEMO_USER_ID = "11111111-1111-1111-1111-111111111111";
 
 // activity categories that have a dedicated lush cover image
 const COVER_CATS = new Set([
-  "hike", "pub", "climb", "park", "gig", "food", "coffee",
-  "games", "beach", "camp", "cycle", "sport", "city", "trip",
+  "hike", "walk", "climb", "cycle", "run", "surf", "swim", "kayak", "ski",
+  "golf", "tennis", "football", "yoga", "camp", "beach", "stargazing", "fishing",
+  "pub", "bar", "cocktails", "wine", "coffee", "brunch", "food", "roast", "bbq", "market", "streetfood",
+  "gig", "festival", "cinema", "theatre", "comedy", "gallery", "museum", "music",
+  "games", "arcade", "bowling", "karaoke",
+  "park", "city", "trip", "spa", "dance",
 ]);
 // cover_hue stores a tile/category key for AI plans → map to its cover image
 function deriveCover(hue?: string | null): string | null {
@@ -247,6 +251,37 @@ export async function addCustomOption(slug: string, query: string): Promise<bool
     payload: { tile: resolved.tile, place_name: resolved.place_name ?? null },
   } as never);
   return true;
+}
+
+/** Choose an option as the plan's locked-in activity (sets activity/place/cover). */
+export async function choosePlanOption(slug: string, optionId: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { data: opt } = await db.from("plan_options").select("*").eq("id", optionId).maybeSingle();
+  if (!opt) throw new Error("option not found");
+  const o = opt as Row;
+  const payload = (o.payload as Row) ?? {};
+  await db.from("plans").update({
+    activity: o.title as string,
+    place_name: (payload.place_name as string) ?? null,
+    place_url: (o.source_url as string) ?? null,
+    cover_hue: (payload.tile as string) ?? "city",
+  } as never).eq("slug", slug);
+}
+
+/** Set the plan's date/time (ISO). */
+export async function setPlanWhen(slug: string, startsAt: string): Promise<void> {
+  const db = supabaseAdmin();
+  await db.from("plans").update({ starts_at: startsAt } as never).eq("slug", slug);
+}
+
+/** Invite people (add them as plan members). */
+export async function invitePeople(slug: string, profileIds: string[]): Promise<void> {
+  const db = supabaseAdmin();
+  const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
+  if (!plan) throw new Error("plan not found");
+  const pid = (plan as Row).id as string;
+  const rows = profileIds.map((id) => ({ plan_id: pid, profile_id: id, rsvp: "in", joined_via: "app" }));
+  if (rows.length) await db.from("plan_members").upsert(rows as never, { onConflict: "plan_id,profile_id" } as never);
 }
 
 /** Move a plan through its lifecycle: open (planning) → locked → completed. */

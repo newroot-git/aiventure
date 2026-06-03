@@ -6,8 +6,17 @@ import "server-only";
 
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 const TILES = [
-  "hike", "pub", "climb", "gig", "park", "beach", "camp",
-  "cycle", "food", "coffee", "games", "sport", "city", "trip",
+  // outdoors / active
+  "hike", "walk", "climb", "cycle", "run", "surf", "swim", "kayak", "ski",
+  "golf", "tennis", "football", "yoga", "camp", "beach", "stargazing", "fishing",
+  // food & drink
+  "pub", "bar", "cocktails", "wine", "coffee", "brunch", "food", "roast", "bbq", "market", "streetfood",
+  // culture & nightlife
+  "gig", "festival", "cinema", "theatre", "comedy", "gallery", "museum", "music",
+  // games / play
+  "games", "arcade", "bowling", "karaoke",
+  // chill / misc
+  "park", "city", "trip", "spa", "dance",
 ] as const;
 
 export interface DropInput {
