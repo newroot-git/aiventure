@@ -66,7 +66,7 @@ async function callOpenRouter(system: string, user: string): Promise<string> {
       body: JSON.stringify({
         model,
         max_tokens: 1500,
-        temperature: 0.7,
+        temperature: 0.95,
         messages: [
           { role: "system", content: system },
           { role: "user", content: user },
@@ -85,7 +85,9 @@ async function callOpenRouter(system: string, user: string): Promise<string> {
 const SYSTEM = `You are AIventure's planning agent. You turn a loose intent into real, specific, doable suggestions for a friend group.
 Rules:
 - Suggest REAL, specific, named places/venues/activities that genuinely exist in the given location. No invented venues.
-- Tailor to the crew's interests, budget and timing.
+- HONOUR THE USER'S EXACT INTENT first — match what they actually asked for before anything generic.
+- VARY your picks. Do NOT default to the same handful of famous tourist spots every time (avoid always suggesting Dishoom, Flat Iron, Hampstead Heath, The Castle, etc.). Favour a fresh mix that leans toward characterful, independent, locally-loved places over the obvious chains.
+- Tailor to the crew's interests, budget and timing, but stay surprising and specific.
 - For each item, set "tile" to the single best-fit category from this exact list: ${TILES.join(", ")}.
 - Keep "why" to one short, warm sentence.
 - "map_query" = a string you'd type into Google Maps to find it (venue name + area).
@@ -126,8 +128,10 @@ Return JSON: {"activities":[{"title","time","place_name","map_query","why","tile
 
   const user = `${ctx}
 
-Suggest 3-4 distinct options for this. Return JSON: {"options":[{"title","subtitle","why","place_name","map_query","tile"}]}.
-"subtitle" = a short detail line (type · rough price · distance feel).`;
+Suggest EXACTLY 3-4 distinct options for this (no more, no fewer). Every option MUST have a "subtitle".
+Return JSON: {"options":[{"title","subtitle","why","place_name","map_query","tile"}]}.
+"subtitle" = a short detail line (type · rough price · area), e.g. "Wine bar · ~£8/glass · Soho".
+Make the picks genuinely varied and tailored to the intent above — not a generic London highlights list.`;
   const raw = await callOpenRouter(SYSTEM, user);
   const parsed = parseJson(raw) as { options?: DropOptionOut[] };
   const options = (parsed.options || []).map((o) => ({
