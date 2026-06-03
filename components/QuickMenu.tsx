@@ -40,7 +40,7 @@ export function QuickMenu({ variant = "fab" }: { variant?: "fab" | "side" }) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="fixed inset-0 z-40 bg-ink/40"
+              className="fixed inset-0 z-40 bg-ink/20 backdrop-blur-sm"
               onClick={() => setOpen(false)}
             />
             <motion.div

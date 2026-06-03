@@ -239,10 +239,10 @@ export function PlanView({
       {options.length > 0 && !lockedId && (
         <section className="mt-6">
           <h2 className="mb-1 flex items-center gap-1.5 font-display text-xl font-bold">
-            <Sparkles size={18} className="text-secondary" /> The drop
+            <Sparkles size={18} className="text-secondary" /> Ideas
           </h2>
           <p className="mb-3 text-sm text-muted">
-            Real spots, tuned to your crew. Tap keen, then lock one in.
+            Real spots, tuned to your crew. Vote on what you fancy.
           </p>
           <div className="flex flex-col gap-3">
             {options.map((o, i) => (

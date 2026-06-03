@@ -43,8 +43,10 @@ function NewPlanFlow() {
 
   // shared config
   const [intent, setIntent] = React.useState("");
+  const [where, setWhere] = React.useState("");
   const [mood, setMood] = React.useState("Anything");
   const [when, setWhen] = React.useState("This weekend");
+  const location = where.trim() || "London, UK";
   const [budget, setBudget] = React.useState("££");
   const [who, setWho] = React.useState("The boys");
   const [nights, setNights] = React.useState(3);
@@ -82,7 +84,7 @@ function NewPlanFlow() {
           budget,
           who,
           interests,
-          location: "London, UK",
+          location,
         }),
       });
       const data = await res.json();
@@ -106,7 +108,7 @@ function NewPlanFlow() {
       const res = await fetch("/api/drop", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope, intent, who, nights, interests, location: "London, UK" }),
+        body: JSON.stringify({ scope, intent, who, nights, interests, location }),
       });
       const data = await res.json();
       if (res.ok && Array.isArray(data.activities) && data.activities.length) {
@@ -291,6 +293,17 @@ function NewPlanFlow() {
         <h1 className="font-display text-2xl font-bold">{meta?.label}</h1>
       </div>
 
+      <div className="mt-5">
+        <Label>Where?</Label>
+        <Input
+          value={where}
+          onChange={(e) => setWhere(e.target.value)}
+          placeholder="City or area — e.g. Manchester, Berlin, your town"
+          className="mt-2"
+        />
+        <p className="mt-1 text-xs text-muted">Defaults to London if left blank.</p>
+      </div>
+
       {/* surprise */}
       {scope === "surprise" && (
         <div className="mt-6">
@@ -317,7 +330,7 @@ function NewPlanFlow() {
           <Chips label="Budget" opts={BUDGET} value={budget} onChange={setBudget} />
           <Chips label="Who" opts={WHO} value={who} onChange={setWho} />
           <Button variant="primary" size="lg" className="mt-9 w-full" disabled={!intent.trim()} onClick={createPlan}>
-            <Sparkles size={18} /> Get the drop
+            <Sparkles size={18} /> Get ideas
           </Button>
         </div>
       )}

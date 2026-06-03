@@ -2,9 +2,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
-import { Inbox, X, Check, Hand, Bell } from "lucide-react";
-import { Avatar } from "./ui";
+import { Inbox, X, Check } from "lucide-react";
 import type { InviteCard, NudgeCard, NotificationCard } from "@/lib/db";
+
+function PixelIcon({ name }: { name: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={`/img/icons/${name}.png`} alt="" className="pixelated h-9 w-9 shrink-0 rounded-md border-2 border-ink/10 object-cover" />;
+}
 
 export interface NotifData {
   invites: InviteCard[];
@@ -43,7 +47,7 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="fixed inset-0 z-40 bg-ink/40" onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40 bg-ink/20 backdrop-blur-sm" onClick={() => setOpen(false)}
             />
             <motion.div
               initial={{ opacity: 0, y: -12, scale: 0.98 }}
@@ -66,7 +70,7 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
                   <Section label="Invites">
                     {invites.map((iv) => (
                       <Row key={iv.id} href={`/p/${iv.slug}`} onClose={() => setInvites((s) => s.filter((x) => x.id !== iv.id))} onPick={() => setOpen(false)}
-                        avatar={<Avatar name={iv.fromLabel} size={36} />}>
+                        avatar={<PixelIcon name="invite" />}>
                         <b>{iv.fromLabel}</b> invited you · <span className="text-muted">{iv.activity}</span>
                       </Row>
                     ))}
@@ -77,7 +81,7 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
                   <Section label="Nudges">
                     {nudges.map((n) => (
                       <Row key={n.id} href="/new" onClose={() => setNudges((s) => s.filter((x) => x.id !== n.id))} onPick={() => setOpen(false)}
-                        avatar={<span className="grid h-9 w-9 place-items-center rounded-md border-2 border-ink/10 bg-accent-soft text-[#8a6512]"><Hand size={16} /></span>}>
+                        avatar={<PixelIcon name="nudge" />}>
                         <b>{n.from.name}</b> nudged you · <span className="text-muted">{n.message}</span>
                       </Row>
                     ))}
@@ -88,7 +92,7 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
                   <Section label="Activity">
                     {notes.map((nt) => (
                       <Row key={nt.id} href={nt.slug ? `/p/${nt.slug}` : undefined} onClose={() => setNotes((s) => s.filter((x) => x.id !== nt.id))} onPick={() => setOpen(false)}
-                        avatar={<span className="grid h-9 w-9 place-items-center rounded-md border-2 border-ink/10 bg-secondary-soft text-secondary"><Bell size={16} /></span>}>
+                        avatar={<PixelIcon name="bell" />}>
                         {nt.text} <span className="text-muted">· {nt.when}</span>
                       </Row>
                     ))}
