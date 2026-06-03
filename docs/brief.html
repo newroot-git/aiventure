@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Touch Grass — Product & Build Brief</title>
+<style>
+  :root{
+    --bg:#0c0f0c; --panel:#131813; --panel2:#171d17; --ink:#e8efe6; --muted:#93a08e;
+    --grass:#7bd64a; --grass-dim:#4f7a33; --line:#26301f; --warn:#e9b949; --bad:#e0654b;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%,#16210f 0%,var(--bg) 55%);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+  header{padding:72px 0 40px}
+  .kicker{color:var(--grass);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:12px}
+  h1{font-size:clamp(40px,7vw,76px);line-height:.98;margin:14px 0 8px;letter-spacing:-.03em;font-weight:800}
+  h1 .green{color:var(--grass)}
+  .sub{font-size:clamp(18px,2.4vw,24px);color:var(--muted);max-width:680px}
+  .tag{display:inline-block;margin-top:22px;padding:7px 14px;border:1px solid var(--line);border-radius:999px;
+    color:var(--muted);font-size:13px}
+  .tag b{color:var(--ink)}
+  nav{position:sticky;top:0;z-index:10;background:rgba(12,15,12,.82);backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);margin-top:30px}
+  nav .wrap{display:flex;gap:22px;overflow-x:auto;padding:14px 24px;font-size:13px}
+  nav a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav a:hover{color:var(--grass)}
+  section{padding:48px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:clamp(26px,4vw,38px);letter-spacing:-.02em;margin:0 0 6px;font-weight:800}
+  h2 .num{color:var(--grass-dim);font-variant-numeric:tabular-nums;margin-right:12px}
+  .lead{color:var(--muted);font-size:18px;max-width:740px;margin:0 0 28px}
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  @media(max-width:760px){.g2,.g3{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:var(--radius);padding:22px}
+  .card h3{margin:0 0 8px;font-size:18px}
+  .card p{margin:0;color:var(--muted);font-size:15px}
+  .pill{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    padding:4px 9px;border-radius:6px;margin-bottom:12px}
+  .p-in{background:rgba(123,214,74,.12);color:var(--grass);border:1px solid var(--grass-dim)}
+  .p-out{background:rgba(224,101,75,.10);color:var(--bad);border:1px solid #5a2b22}
+  .p-warn{background:rgba(233,185,73,.10);color:var(--warn);border:1px solid #5a4a1e}
+  ul.clean{list-style:none;padding:0;margin:0}
+  ul.clean li{padding:10px 0 10px 26px;position:relative;border-bottom:1px solid var(--line);color:var(--muted)}
+  ul.clean li:last-child{border-bottom:0}
+  ul.clean li::before{content:"";position:absolute;left:4px;top:18px;width:7px;height:7px;border-radius:2px;background:var(--grass)}
+  ul.clean li b{color:var(--ink)}
+  .ladder{display:grid;gap:10px}
+  .rung{display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:center;background:var(--panel);
+    border:1px solid var(--line);border-left:3px solid var(--grass);border-radius:10px;padding:14px 18px}
+  .rung .lvl{font-weight:800;color:var(--grass);font-size:14px}
+  .rung .lvl small{display:block;color:var(--muted);font-weight:500;font-size:12px}
+  .rung p{margin:0;color:var(--muted);font-size:14px}
+  .quote{font-size:clamp(22px,3.4vw,32px);font-weight:700;letter-spacing:-.02em;line-height:1.25;
+    border-left:3px solid var(--grass);padding:6px 0 6px 22px;margin:0 0 16px}
+  .quote span{color:var(--grass)}
+  .stat{display:flex;gap:14px;align-items:baseline}
+  .stat .big{font-size:42px;font-weight:800;color:var(--grass);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .stat .lbl{color:var(--muted);font-size:14px}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--grass);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+  td b{color:var(--ink)}
+  .flow{display:flex;flex-wrap:wrap;gap:10px;align-items:stretch}
+  .step{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+  .step .n{color:var(--grass-dim);font-weight:800;font-size:13px}
+  .step h4{margin:6px 0 4px;font-size:15px}
+  .step p{margin:0;color:var(--muted);font-size:13px}
+  .arrow{align-self:center;color:var(--grass-dim);font-size:20px}
+  @media(max-width:760px){.arrow{display:none}.step{min-width:100%}}
+  .timeline{display:grid;gap:12px}
+  .day{display:grid;grid-template-columns:130px 1fr;gap:18px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:16px 18px}
+  .day .d{font-weight:800;color:var(--grass)}
+  .day .d small{display:block;color:var(--muted);font-weight:500;font-size:12px}
+  .day ul{margin:0;padding-left:18px;color:var(--muted);font-size:14px}
+  .decide{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:12px}
+  .decide .q{font-weight:700;margin-bottom:6px}
+  .decide .opts{color:var(--muted);font-size:14px}
+  .decide .rec{color:var(--grass);font-size:13px;margin-top:8px;font-weight:600}
+  footer{padding:48px 0 80px;color:var(--muted);font-size:13px}
+  .acc{color:var(--grass)}
+  .small{font-size:13px;color:var(--muted)}
+  .src{font-size:12px;color:var(--grass-dim)}
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <div class="kicker">Working title · build by Fri Jun 5</div>
+  <h1>Touch <span class="green">Grass</span></h1>
+  <p class="sub">Get out of the group chat. One AI that knows your crew, knows what's on, and tells you what to actually go do — together.</p>
+  <div class="tag"><b>UCWS Singapore Hackathon 2026</b> &nbsp;·&nbsp; Track: <b>Agent</b> &nbsp;·&nbsp; Team: Josh + Conor &nbsp;·&nbsp; Deadline <b>Jun 5, 23:59 SGT</b></div>
+</header>
+
+<nav><div class="wrap">
+  <a href="#thesis">Thesis</a>
+  <a href="#problem">Problem</a>
+  <a href="#whitespace">White space</a>
+  <a href="#engine">The engine</a>
+  <a href="#wedge">Wedge & moat</a>
+  <a href="#mvp">MVP scope</a>
+  <a href="#stack">Build stack</a>
+  <a href="#demo">Demo script</a>
+  <a href="#money">Money</a>
+  <a href="#decisions">Open decisions</a>
+</div></nav>
+
+<main class="wrap">
+
+<section id="thesis">
+  <h2><span class="num">01</span>Thesis</h2>
+  <p class="lead">Friend groups don't fail to hang out because they don't want to. They fail because deciding <em>what</em>, <em>when</em>, and <em>with who</em> is admin hell — and the group chat is the worst possible tool for it. Touch Grass replaces that admin with one agent that turns intent into a real plan.</p>
+  <div class="grid g3">
+    <div class="card"><h3 class="acc">The core move</h3><p>You give it <b>people + a loose intent + your bounds</b> (time, money, distance, novelty). It hands back a few <b>real, grounded</b> things to go do — tuned to what your group actually likes.</p></div>
+    <div class="card"><h3 class="acc">Why now</h3><p>AI can finally do the messy part — merge several people's tastes and ground suggestions in live local data. That wasn't possible two years ago.</p></div>
+    <div class="card"><h3 class="acc">The compounding bit</h3><p>Every plan you run teaches it your crew. Over time "Conor, Jack, Saturday" → four great options instantly. The history <b>is</b> the product.</p></div>
+  </div>
+</section>
+
+<section id="problem">
+  <h2><span class="num">02</span>The problem is real and visceral</h2>
+  <p class="lead">This isn't a productivity gap. It's a connection gap — which is why it's worth leading the marketing with emotion, not features.</p>
+  <p class="quote">"idk, <span>what do you wanna do?</span>" — the four words that kill the weekend.</p>
+  <div class="grid g3" style="margin:24px 0">
+    <div class="card"><div class="stat"><div class="big">40%</div><div class="lbl">feel overwhelmed by group-chat volume. Plans drown under noise.</div></div></div>
+    <div class="card"><div class="stat"><div class="big">56%</div><div class="lbl">of under-30s regularly agree to plans they never follow through on.</div></div></div>
+    <div class="card"><div class="stat"><div class="big">~60%</div><div class="lbl">cancel social plans at least once a month. Friendships fade quietly.</div></div></div>
+  </div>
+  <ul class="clean">
+    <li><b>The "easygoing" deadlock.</b> Everyone says "anywhere's fine" to seem chill. Research (Duke): the people who never pick get invited out <em>less</em>. Politeness quietly erodes the friendship.</li>
+    <li><b>No one owns it.</b> Bigger group = less individual ownership (diffusion of responsibility). The bigger the chat, the <em>less</em> likely anyone locks the plan.</li>
+    <li><b>Death by a thousand apps.</b> When2Meet for time, a poll for place, Splitwise for money, a shared album for photos. Nothing talks to anything.</li>
+    <li><b>The planner friend burns out.</b> One person absorbs all the herding — times, place, money, reminders — and slowly resents it.</li>
+  </ul>
+  <div class="card" style="margin-top:20px"><p class="small"><b style="color:var(--ink)">Lead line for the landing page →</b> &nbsp;"Stop saying <span class="acc">'we should hang out more.'</span> Just hang out." &nbsp; (Hook with the funny one — "idk what do you wanna do" — anchor the meaning in the loneliness data.)</p></div>
+</section>
+
+<section id="whitespace">
+  <h2><span class="num">03</span>The white space — and the graveyard around it</h2>
+  <p class="lead">The exact idea is unoccupied at scale. But the neighbourhood is littered with corpses. Both facts matter.</p>
+  <div class="grid g2">
+    <div class="card">
+      <span class="pill p-in">Unclaimed</span>
+      <h3>No one does this</h3>
+      <p>Every funded player chases <b>making new friends</b> (Pie, Timeleft, Clyx) or <b>trip planning</b> (Mindtrip, Troupe, Wanderlog). Nobody tells your <b>existing</b> group what to do from combined interests + history. The "this Saturday ↔ big trip" seam — basically empty.</p>
+    </div>
+    <div class="card">
+      <span class="pill p-out">Dangerous</span>
+      <h3>Why they died</h3>
+      <p><b>IRL</b> (95% bots, SEC fraud), Cluster, Squad, Down. Three killers: the <b>whole-group install tax</b>, <b>iMessage gravity</b> (free, everyone's already there), and <b>utility ≠ desire</b> (coordinators are "vegetables" — low pull, retention decays).</p>
+    </div>
+  </div>
+  <h3 style="margin:28px 0 6px" class="acc">The AI unlock that beats all three killers</h3>
+  <ul class="clean">
+    <li><b>Deliver value from one person's input</b> before the whole group joins. AI can suggest off your profile alone → defuses the install tax that murdered everyone else.</li>
+    <li><b>The moat is the per-group taste + outcome history</b>, not the suggestions. "AI suggests stuff" is cloneable in a weekend; a compounding record of what your crew liked, vetoed and did is not.</li>
+    <li><b>Grounding is trust.</b> Ungrounded AI hallucinates closed restaurants and impossible geography. Real data + forced source citations = the difference between a toy and a product.</li>
+  </ul>
+</section>
+
+<section id="engine">
+  <h2><span class="num">04</span>The engine — one loop, any scale</h2>
+  <p class="lead">Your five "levels" are not five products. They're one planning agent over <b>{who} + {intent} + {constraints}</b> that can start from any known vertex and fill in the rest.</p>
+
+  <div class="ladder" style="margin-bottom:26px">
+    <div class="rung"><div class="lvl">MICRO<small>tonight, low stakes</small></div><p>"What movie do we watch / game do we play tonight?" — same engine, tiny bounds.</p></div>
+    <div class="rung"><div class="lvl">SOLO<small>just you</small></div><p>"What should I do today?" — recs off your own interests + local options.</p></div>
+    <div class="rung"><div class="lvl">PAIR<small>a date / 1:1</small></div><p>Merge two interest profiles → an itinerary for a date or catch-up.</p></div>
+    <div class="rung"><div class="lvl">GROUP<small>the crew, a day</small></div><p>"Something with the boys Saturday" → 3–4 grounded options the group votes on. <b>← the wedge.</b></p></div>
+    <div class="rung"><div class="lvl">MACRO<small>a whole trip</small></div><p>"Somewhere 2–4hrs away this summer" → a full multi-day plan from the group's shared tastes.</p></div>
+  </div>
+
+  <h3 class="acc" style="margin-bottom:14px">Start from any vertex — the agent fills the gaps</h3>
+  <div class="grid g2">
+    <div class="card"><h3>Know WHAT, not WHO</h3><p>"I wanna golf today — who's keen?" → finds the crew likely to bite + a real tee time.</p></div>
+    <div class="card"><h3>Know WHO, not WHAT</h3><p>"Something with Conor &amp; Jack Saturday" → options tuned to all three.</p></div>
+    <div class="card"><h3>Know NOTHING</h3><p>"I want to do something Saturday" → surfaces both a plan and the people for it.</p></div>
+    <div class="card"><h3>Know the BOUNDS</h3><p>"Somewhere we can fly to for 2 weeks in summer" → destinations first, then who's in.</p></div>
+  </div>
+
+  <h3 class="acc" style="margin:28px 0 12px">Two ways options appear (Conor's point — not everything is AI)</h3>
+  <div class="grid g2">
+    <div class="card"><span class="pill p-in">AI-generate</span><h3>The Drop</h3><p>Agent researches + proposes real options. The wow moment, the premium feature.</p></div>
+    <div class="card"><span class="pill p-warn">Human-drop</span><h3>Throw it in the ring</h3><p>Anyone pastes a course / film / bar they're keen on; app runs the vote or randomiser. Cheap, keeps humans in the loop, covers cases too deep for AI.</p></div>
+  </div>
+</section>
+
+<section id="wedge">
+  <h2><span class="num">05</span>The wedge & the moat</h2>
+  <p class="lead">Every winner in this space narrowed to one sharp recurring job (Partiful = invites, Timeleft = Wednesday dinners). Going broad on day one is the IRL death. So we pick one and own it.</p>
+  <div class="grid g2">
+    <div class="card"><span class="pill p-in">Own this first</span><h3>The weekend group plan</h3><p>"What should &lt;crew&gt; do this weekend?" High frequency (weekly, not 2×/year like trips), instantly relatable, and the magic demo. Earn the weekly habit, <b>then</b> graduate the same crew + taste graph into the occasional big trip — the retention prize no trip-app can match.</p></div>
+    <div class="card"><span class="pill p-warn">Defend with this</span><h3>The taste &amp; history graph</h3><p>Per-group preferences + what you did + what you vetoed, compounding every plan. Suggestions are cloneable; this isn't. Treat it as the actual product — the suggestions are just its surface.</p></div>
+  </div>
+</section>
+
+<section id="mvp">
+  <h2><span class="num">06</span>MVP — what ships Friday</h2>
+  <p class="lead">One loop, done so well it feels like magic. The whole bet is the moment vague intent becomes real, grounded, crew-tuned plans on screen.</p>
+
+  <div class="flow" style="margin-bottom:28px">
+    <div class="step"><div class="n">01</div><h4>Build the crew</h4><p>Add members fast. Each gets a 30-sec interest profile (tap tags or describe yourself, AI extracts).</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">02</div><h4>Drop an intent</h4><p>"Something Saturday afternoon, under £40, &lt;1hr away." Pick the crew or let it suggest.</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">03</div><h4>The Drop</h4><p>Agent returns 3–4 <b>real, grounded</b> options, each with why-you'll-like-it + a source link.</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">04</div><h4>React &amp; lock</h4><p>Group reacts / votes. "Give us something new" refines. Locked option becomes a shareable plan card.</p></div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <span class="pill p-in">In scope</span>
+      <ul class="clean">
+        <li>Crew creation + lightweight interest profiles (AI-extracted)</li>
+        <li><b>The Drop</b>: Claude agent → grounded suggestions across food/drink, events, outdoors</li>
+        <li>Constraints: budget · distance · time · <b>novelty</b> ("something new")</li>
+        <li>Refine loop ("give us something new / cheaper / chiller")</li>
+        <li>Simple reactions/vote on the 3–4 options</li>
+        <li><b>Shareable plan card</b> — the screenshot that drives the community vote</li>
+        <li>Seeded demo crew (real personas) so the magic lands instantly on stage</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="pill p-out">Cut for now</span>
+      <ul class="clean">
+        <li>Real-time chat (let the plan replace the chat, don't rebuild it)</li>
+        <li>Photo sharing / after-album</li>
+        <li>Full social graph, friend requests, discovery of strangers</li>
+        <li>Payments / Splitwise integration</li>
+        <li>Native mobile app — <b>responsive web only</b></li>
+        <li>Full multi-day trip builder (gesture at it as a mode; don't build it)</li>
+        <li>Human-drop voting (v2 — lead with AI generate)</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="stack">
+  <h2><span class="num">07</span>Build stack</h2>
+  <p class="lead">Repo quality is 30% of the score (AI-graded). Grounding is what makes it feel real. ~30 min of API signups buys the whole thing.</p>
+  <table>
+    <tr><th>Layer</th><th>Choice</th><th>Why / notes</th></tr>
+    <tr><td><b>App</b></td><td>Next.js (App Router) on Vercel</td><td>Fast to ship, clean repo, instant deploy URL for the demo-link field.</td></tr>
+    <tr><td><b>Agent</b></td><td>Claude (Anthropic API), tool-use orchestration</td><td>Model picks which data tool to call per request; <b>must echo a source link for every suggestion</b> — the #1 anti-hallucination guardrail.</td></tr>
+    <tr><td><b>Places</b></td><td>Google Places API (New)</td><td>5,000 free searches/mo + $300 trial. Restaurants/bars/parks with ratings, hours, price, coords — the filterable fields constraints need. ~10 min, needs a card.</td></tr>
+    <tr><td><b>Events</b></td><td>Ticketmaster Discovery API</td><td>The only friction-free free events source left. 5,000/day, one key, no card. ~5 min.</td></tr>
+    <tr><td><b>Long tail</b></td><td>Tavily (or Serper) search API</td><td>Grounds hikes, cinema showtimes, indie events, vibe queries — where no good free API exists. Force "only suggest what's in the results." ~5 min, no card.</td></tr>
+    <tr><td><b>Data</b></td><td>Supabase (Postgres)</td><td>Crews, profiles, plans, and the taste/history graph. Cheap, fast, clean.</td></tr>
+    <tr><td><b>Skip</b></td><td>Yelp · Foursquare · Eventbrite · Meetup · AllTrails</td><td>Paywalled, locked-down, or dead. Each is a 2.5-day time sink.</td></tr>
+  </table>
+  <p class="small" style="margin-top:14px"><b style="color:var(--ink)">Repo hygiene for the AI grader:</b> clean README (problem → demo gif → run steps), keys server-side behind <code>/api/*</code> route handlers, sensible commits, a LICENSE you control (All Rights Reserved unless you decide otherwise — see decisions).</p>
+</section>
+
+<section id="demo">
+  <h2><span class="num">08</span>The 2.5-day build + demo</h2>
+  <div class="timeline">
+    <div class="day"><div class="d">Wed<small>foundation</small></div><ul>
+      <li>Scaffold Next.js + Supabase + Vercel deploy. Get the empty URL live early.</li>
+      <li>3 API keys (Google Places, Ticketmaster, Tavily). One <code>/api/*</code> route each.</li>
+      <li>Claude agent loop with tool defs → returns grounded JSON suggestions with sources.</li>
+      <li>Data model: crew, profile, intent, plan.</li>
+    </ul></div>
+    <div class="day"><div class="d">Thu<small>the magic + the face</small></div><ul>
+      <li>The Drop UI: intent input → 3–4 option cards (why + source + map snippet).</li>
+      <li>Constraints (budget/distance/time/novelty) wired into the agent prompt + filters.</li>
+      <li>Refine loop + reactions/vote. Lock → shareable plan card.</li>
+      <li>Crew onboarding + AI interest extraction. Seed the demo crew with real personas.</li>
+      <li>Design pass — make it screenshot-worthy (this is the 30% community vote).</li>
+    </ul></div>
+    <div class="day"><div class="d">Fri<small>polish + ship</small></div><ul>
+      <li>Kill rough edges, handle empty/error states gracefully on stage.</li>
+      <li>README + 60-sec demo video/gif. Title, description, screenshots.</li>
+      <li>Register → apply → submit on evol.epicconnector.ai. Editable till 23:59 SGT.</li>
+    </ul></div>
+  </div>
+  <h3 class="acc" style="margin:26px 0 12px">The 60-second stage moment</h3>
+  <p class="lead" style="margin-bottom:0">Open on a real group chat screenshot — 200 messages, no plan. Cut to Touch Grass: type <em>"something with the boys Saturday, under £40."</em> Three real options appear — a specific bar, a real hike, an actual gig with a ticket link — each tagged <em>"because you all rate craft beer &amp; haven't done a hike in a while."</em> Tap one. Done. Tagline: <b>get out of the group chat.</b></p>
+</section>
+
+<section id="money">
+  <h2><span class="num">09</span>How it makes money (the AI-cost tension, resolved)</h2>
+  <p class="lead">You flagged it: heavy AI = paid. Resolution is freemium that mirrors the research — coordination is table stakes (free, drives the network), AI planning is the premium people pay for.</p>
+  <div class="grid g3">
+    <div class="card"><h3 class="acc">Free</h3><p>Crews, profiles, human-drop voting, basic coordination, a few AI Drops/month. The WhatsApp-killer utility that pulls the whole group in.</p></div>
+    <div class="card"><h3 class="acc">Plus</h3><p>Unlimited Drops, deeper personalisation off the history graph, novelty engine, the date/pair mode.</p></div>
+    <div class="card"><h3 class="acc">Later</h3><p>Trip mode (multi-day itineraries), affiliate/booking commission on tee times, tickets, tables — the OTAs' real game, but as a layer not the headline.</p></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <h2><span class="num">10</span>Open decisions to lock before/while building</h2>
+  <div class="decide">
+    <div class="q">1 · Name — Touch Grass vs Out of the Group Chat?</div>
+    <div class="opts">"Touch Grass" = punchy, memey, screenshot-friendly (good for the community vote). "Out of the Group Chat" = the positioning line.</div>
+    <div class="rec">Lean: <b>Touch Grass</b> as the name, "get out of the group chat" as the tagline. Best of both.</div>
+  </div>
+  <div class="decide">
+    <div class="q">2 · Demo location — where's the crew based?</div>
+    <div class="opts">Grounding quality varies by city. Ticketmaster + Google Places are global; pick a city you both know so you can sanity-check that suggestions are genuinely good on stage.</div>
+    <div class="rec">Lean: a UK city you know well (verifiable on stage) — or Singapore for judge-resonance. Decide Wed.</div>
+  </div>
+  <div class="decide">
+    <div class="q">3 · IP / repo license</div>
+    <div class="opts">Hackathon ToS is gated behind signup (no public terms found). AI grader wants a repo <em>link</em>, not necessarily open source.</div>
+    <div class="rec">Lean: confirm terms at signup, license repo <b>All Rights Reserved</b>, keep core prompts/engine private. Email organisers if unclear.</div>
+  </div>
+  <div class="decide">
+    <div class="q">4 · How much AI in the MVP?</div>
+    <div class="opts">Full AI-generate is the wow but costs more; human-drop voting is cheap.</div>
+    <div class="rec">Lean: MVP leads with <b>AI-generate (The Drop)</b> — it's the differentiator and the demo. Human-drop = v2.</div>
+  </div>
+</section>
+
+<footer class="wrap">
+  <p><b class="acc">Touch Grass</b> — product &amp; build brief · built from 4 research streams (competitive landscape · group travel · data/API feasibility · coordination psychology) · UCWS Singapore Hackathon 2026 · Josh + Conor.</p>
+  <p class="src">Sources behind the claims: The Conversation (group-chat overwhelm), Duke/AMA (easygoing cost), YouGov (flaking), TIME &amp; US Surgeon General (loneliness), Partiful founder thesis. Build feasibility verified against Google Places, Ticketmaster, Tavily/Serper docs (Jun 2026).</p>
+</footer>
+
+</main>
+</body>
+</html>

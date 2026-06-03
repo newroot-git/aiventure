@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+@theme {
+  /* ---- palette: retro 90s primaries on cream (Nostalgia guide) ---- */
+  /* cream / parchment base */
+  --color-bg: #eae1cf;
+  --color-surface: #f5efe1;
+  --color-surface-2: #e3d9c2;
+  --color-ink: #1e1b16;
+  --color-muted: #847b6a;
+  --color-line: #d4c9b0;
+
+  /* retro red — brand / action */
+  --color-primary: #ce3b2a;
+  --color-primary-deep: #ad2c1d;
+  --color-primary-soft: #f4d6cd;
+
+  /* retro blue — AI / info / cool */
+  --color-secondary: #2a56a8;
+  --color-secondary-soft: #d6e0f2;
+
+  /* retro yellow — highlight / achievement (use INK text on it) */
+  --color-accent: #eba92c;
+  --color-accent-soft: #f8e9c4;
+
+  /* retro green — nature, "you're in" */
+  --color-success: #2e7b4e;
+  --color-success-soft: #d6e7d6;
+
+  /* blue avatar tone alias */
+  --color-sky: #2a56a8;
+  --color-sky-soft: #d6e0f2;
+
+  --color-warn: #eba92c;
+  --color-error: #ce3b2a;
+
+  /* deep night for pixel dusk scenes */
+  --color-night: #241f33;
+
+  /* fonts */
+  --font-display: var(--font-pixel), ui-monospace, monospace;
+  --font-heading: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  /* radii — chunky, not bubbly */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-2xl: 24px;
+
+  /* shadows — hard pixel offsets + soft option */
+  --shadow-soft: 0 2px 10px rgba(43, 36, 54, 0.06), 0 12px 30px rgba(43, 36, 54, 0.06);
+  --shadow-pop: 0 10px 30px rgba(194, 105, 58, 0.25);
+}
+
+@layer base {
+  * {
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+  }
+  html,
+  body {
+    min-height: 100dvh;
+    margin: 0;
+  }
+  body {
+    background-color: var(--color-bg);
+    /* subtle grain baked into the page background, BEHIND all content */
+    background-image:
+      linear-gradient(rgba(234, 225, 207, 0.82), rgba(234, 225, 207, 0.82)),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150'%3E%3Cfilter id='b'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23b)'/%3E%3C/svg%3E");
+    background-size: auto, 150px 150px;
+    background-attachment: fixed, fixed;
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: var(--color-accent-soft);
+  }
+  a,
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* ---- pixel-game visual language (top-level so Tailwind v4 always emits) ---- */
+
+/* hard pixel shadow — chunky game-UI depth, no blur */
+.shadow-hard {
+  box-shadow: 4px 4px 0 0 var(--color-ink);
+}
+.shadow-hard-sm {
+  box-shadow: 3px 3px 0 0 var(--color-ink);
+}
+.shadow-hard-primary {
+  box-shadow: 4px 4px 0 0 var(--color-primary-deep);
+}
+/* press: sink into the shadow */
+.press-hard {
+  transition: transform 0.06s linear, box-shadow 0.06s linear;
+}
+.press-hard:active {
+  transform: translate(4px, 4px);
+  box-shadow: 0 0 0 0 var(--color-ink);
+}
+
+.pixelated {
+  image-rendering: pixelated;
+}
+
+/* dusk-forest title-screen gradient (purple night -> dusk -> gold -> forest) */
+.aurora {
+  background: linear-gradient(
+    180deg,
+    #241f33 0%,
+    #3b2f4e 26%,
+    #6b4a52 50%,
+    #b06a3f 68%,
+    #cf9a44 80%,
+    #5e7b4e 100%
+  );
+}
+.aurora-soft {
+  background: linear-gradient(170deg, #f4ead7 0%, #ecdcc2 55%, #dcc9a8 100%);
+}
+
+/* film grain overlay — pure SVG turbulence, no asset */
+.grain {
+  position: relative;
+}
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* keyframes */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+@keyframes fade-up {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
