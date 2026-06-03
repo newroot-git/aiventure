@@ -208,6 +208,15 @@ export async function getGroup(id: string): Promise<{ group: GroupCard; plans: P
   };
 }
 
+/** Move a plan through its lifecycle: open (planning) → locked → completed. */
+export async function updatePlanStatus(slug: string, status: "open" | "locked" | "completed"): Promise<void> {
+  const db = supabaseAdmin();
+  const patch: Record<string, unknown> = { status };
+  patch.completed_at = status === "completed" ? new Date().toISOString() : null;
+  const { error } = await db.from("plans").update(patch as never).eq("slug", slug);
+  if (error) throw new Error(error.message);
+}
+
 // ---------- adventures (multi-activity) — stored as a plan + activity-options ----------
 export interface AdventureInput {
   intent: string;

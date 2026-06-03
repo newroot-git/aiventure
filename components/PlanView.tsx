@@ -1,6 +1,7 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Users,
   Link2,
@@ -13,6 +14,7 @@ import {
   Share2,
   HeartHandshake,
   Info,
+  Loader2,
 } from "lucide-react";
 import { Pill, Button, AvatarStack } from "./ui";
 import { Reveal } from "./motion";
@@ -106,10 +108,26 @@ export function PlanView({
   );
   const [voted, setVoted] = React.useState<Record<string, boolean>>({});
   const [lockedId, setLockedId] = React.useState<string | null>(null);
-  const [completed, setCompleted] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const router = useRouter();
 
+  const phase = plan.status; // open (planning) | locked | completed
   const people = members.map((m) => m.profile ?? { name: "Guest" });
+
+  async function move(status: "open" | "locked" | "completed") {
+    setBusy(true);
+    try {
+      await fetch("/api/plans/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: plan.slug, status }),
+      });
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function vote(id: string) {
     setVoted((v) => {
@@ -126,7 +144,7 @@ export function PlanView({
     } catch {}
   }
 
-  if (completed) {
+  if (phase === "completed") {
     return (
       <div className="mx-auto w-full max-w-lg px-5 py-12">
         <p className="mb-5 text-center font-display text-2xl font-bold">
@@ -144,8 +162,8 @@ export function PlanView({
           <Button variant="primary" className="flex-1" onClick={copyLink}>
             <Share2 size={17} /> {copied ? "Copied" : "Share"}
           </Button>
-          <Button variant="soft" onClick={() => setCompleted(false)}>
-            Back
+          <Button variant="soft" disabled={busy} onClick={() => move("locked")}>
+            Reopen
           </Button>
         </div>
         <Link
@@ -173,10 +191,11 @@ export function PlanView({
           <div className="aurora h-52 w-full" />
         )}
         <div className="absolute inset-x-0 top-0 flex gap-2 p-3">
-          <Pill tone="primary" className="border-2 border-ink/10">
-            <Users size={13} />
-            {plan.visibility === "group" ? "The boys" : "Invite only"}
-          </Pill>
+          {phase === "locked" ? (
+            <Pill tone="success" className="border-2 border-ink/10"><Lock size={13} /> Locked in</Pill>
+          ) : (
+            <Pill tone="accent" className="border-2 border-ink/10"><Sparkles size={13} /> Planning</Pill>
+          )}
           {plan.ai_empowered && (
             <Pill tone="secondary" className="border-2 border-ink/10">
               <Sparkles size={13} /> AI-planned
@@ -300,26 +319,40 @@ export function PlanView({
         </div>
       )}
 
-      {/* ---- actions ---- */}
+      {/* ---- actions (phase-aware) ---- */}
       <section className="mt-6 flex flex-col gap-3">
         <div className="flex gap-3">
           <Button variant="soft" className="flex-1" onClick={copyLink}>
             <Link2 size={17} /> {copied ? "Link copied" : "Invite"}
           </Button>
-          <a
-            href={googleCalUrl(plan)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1"
-          >
-            <Button variant="soft" className="w-full">
-              <CalendarDays size={17} /> Calendar
-            </Button>
+          <a href={googleCalUrl(plan)} target="_blank" rel="noopener noreferrer" className="flex-1">
+            <Button variant="soft" className="w-full"><CalendarDays size={17} /> Calendar</Button>
           </a>
         </div>
-        <Button variant="primary" onClick={() => setCompleted(true)}>
-          <Check size={18} /> Mark as done — get your Adventure card
-        </Button>
+
+        {phase === "open" ? (
+          <>
+            <Button variant="primary" disabled={busy} onClick={() => move("locked")}>
+              {busy ? <Loader2 size={18} className="animate-spin" /> : <Lock size={18} />} Lock it in
+            </Button>
+            <p className="text-center text-xs text-muted">
+              Everyone&apos;s agreed? Lock it in — it goes in calendars. You can still tweak after.
+            </p>
+          </>
+        ) : (
+          <>
+            <Button variant="primary" disabled={busy} onClick={() => move("completed")}>
+              {busy ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} Mark as done — get your Adventure card
+            </Button>
+            <button
+              onClick={() => move("open")}
+              disabled={busy}
+              className="text-center text-sm font-bold text-muted underline"
+            >
+              Back to planning
+            </button>
+          </>
+        )}
       </section>
 
       <p className="mt-6 text-center text-xs text-muted">
