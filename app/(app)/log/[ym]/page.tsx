@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, Award, MapPin, CalendarDays, ChevronRight } from "lucide-react";
 import { Card, Pill, AvatarStack } from "@/components/ui";
-import { MOCK_PLANS, type PlanSummary } from "@/lib/mock";
+import { getUserPlans, type PlanCard } from "@/lib/db";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -16,7 +16,8 @@ export default async function LogMonth({
   const { ym } = await params;
   const [y, m] = ym.split("-");
   const label = m ? `${MONTHS[+m - 1]} ${y}` : ym;
-  const items = MOCK_PLANS.filter((p) => p.status === "past" && p.date.startsWith(ym));
+  const all = await getUserPlans();
+  const items = all.filter((p) => p.status === "past" && p.date.startsWith(ym));
 
   return (
     <div>
@@ -37,7 +38,7 @@ export default async function LogMonth({
   );
 }
 
-function LogCard({ plan }: { plan: PlanSummary }) {
+function LogCard({ plan }: { plan: PlanCard }) {
   return (
     <Link href={`/p/${plan.slug}`} className="block">
       <Card hard className="overflow-hidden p-0 transition active:scale-[0.99]">

@@ -2,7 +2,10 @@ import "server-only";
 import { supabaseAdmin } from "./supabase/admin";
 import { generateDrop, mapsUrl, type DropInput } from "./ai";
 import { planSlug } from "./slug";
-import type { Plan, PlanOption, PlanMember } from "./types";
+import type { Plan, PlanOption, PlanMember, Profile, Adventure, Activity } from "./types";
+
+// Demo identity (stands in for auth) — the seeded "Josh" profile.
+export const DEMO_USER_ID = "11111111-1111-1111-1111-111111111111";
 
 const COVERS: Record<string, string> = {
   hike: "/img/cover-hike.png",
@@ -32,6 +35,7 @@ export async function createPlanFromDrop(input: DropInput): Promise<{ slug: stri
       intent: input.intent,
       status: "open",
       visibility: "invite",
+      creator_id: DEMO_USER_ID,
       ai_empowered: true,
       cover_hue: options[0]?.tile ?? "city",
     } as never)
@@ -85,6 +89,207 @@ export async function getPlanBySlug(slug: string): Promise<{
       cover_url: deriveCover(row.cover_hue as string | null),
     },
     options: (options ?? []) as unknown as PlanOption[],
-    members: (members ?? []) as unknown as PlanMember[],
+    members: ((members ?? []) as Record<string, unknown>[]).map((m) => ({
+      ...m,
+      profile: mapProfile(m.profile as Record<string, unknown>),
+    })) as unknown as PlanMember[],
+  };
+}
+
+// ---------- read helpers (map DB rows → app types) ----------
+type Row = Record<string, unknown>;
+
+function mapProfile(r: Row | null | undefined): Profile | null {
+  if (!r) return null;
+  return {
+    id: r.id as string,
+    auth_id: (r.auth_id as string) ?? null,
+    name: r.name as string,
+    email: (r.email as string) ?? null,
+    avatar: (r.avatar_emoji as string) ?? null, // avatar path repurposed into avatar_emoji
+    interests: (r.interests as string[]) ?? [],
+    interest_notes: (r.interest_notes as string) ?? null,
+    is_paid: (r.is_paid as boolean) ?? false,
+    created_at: (r.created_at as string) ?? "",
+  };
+}
+
+function fmtDateLabel(iso?: string | null): string {
+  if (!iso) return "To be planned";
+  const d = new Date(iso);
+  const day = d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "long" });
+  const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+  const hasTime = iso.includes("T") && !iso.endsWith("00:00:00Z");
+  return hasTime ? `${day} · ${time}` : day;
+}
+
+export interface PlanCard {
+  slug: string; activity: string; dateLabel: string; date: string; place: string;
+  groupName: string; members: Profile[]; status: "upcoming" | "past"; adventureNo?: number;
+  cover: string; tile: string;
+}
+
+function mapPlanCard(r: Row): PlanCard {
+  const members = ((r.plan_members as Row[]) ?? [])
+    .map((m) => mapProfile(m.profile as Row))
+    .filter((p): p is Profile => !!p);
+  const hue = (r.cover_hue as string) || "city";
+  return {
+    slug: r.slug as string,
+    activity: (r.activity as string) || (r.title as string),
+    date: r.starts_at ? (r.starts_at as string).slice(0, 10) : "",
+    dateLabel: fmtDateLabel(r.starts_at as string),
+    place: (r.place_name as string) || "TBC",
+    groupName: ((r.group as Row)?.name as string) || "You",
+    members,
+    status: r.completed_at ? "past" : "upcoming",
+    adventureNo: (r.adventure_no as number) ?? undefined,
+    cover: deriveCover(hue) || "/img/cover-hike.png",
+    tile: hue,
+  };
+}
+
+const PLAN_SELECT = "*, group:groups(name), plan_members(rsvp, profile:profiles(*))";
+
+export async function getUserPlans(): Promise<PlanCard[]> {
+  const db = supabaseAdmin();
+  const { data: mem } = await db.from("plan_members").select("plan_id").eq("profile_id", DEMO_USER_ID);
+  const ids = ((mem as Row[]) ?? []).map((m) => m.plan_id as string);
+  const orFilter = ids.length
+    ? `creator_id.eq.${DEMO_USER_ID},id.in.(${ids.join(",")})`
+    : `creator_id.eq.${DEMO_USER_ID}`;
+  const { data } = await db.from("plans").select(PLAN_SELECT).or(orFilter).order("created_at", { ascending: false });
+  return ((data as Row[]) ?? []).map(mapPlanCard);
+}
+
+export async function getCurrentProfile(): Promise<Profile | null> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("profiles").select("*").eq("id", DEMO_USER_ID).maybeSingle();
+  return mapProfile(data as Row | null);
+}
+
+export async function getFriends(): Promise<{ profile: Profile; shared: string[] }[]> {
+  const db = supabaseAdmin();
+  const { data: profiles } = await db.from("profiles").select("*").neq("id", DEMO_USER_ID);
+  const groups = await getUserGroups();
+  return ((profiles as Row[]) ?? [])
+    .map((r) => mapProfile(r))
+    .filter((p): p is Profile => !!p)
+    .map((p) => ({ profile: p, shared: groups.filter((g) => g.members.some((m) => m.id === p.id)).map((g) => g.name) }));
+}
+
+export interface GroupCard { id: string; name: string; members: Profile[] }
+
+export async function getUserGroups(): Promise<GroupCard[]> {
+  const db = supabaseAdmin();
+  const { data: gm } = await db.from("group_members").select("group_id").eq("profile_id", DEMO_USER_ID);
+  const ids = ((gm as Row[]) ?? []).map((g) => g.group_id as string);
+  if (!ids.length) return [];
+  const { data } = await db.from("groups").select("*, group_members(profile:profiles(*))").in("id", ids);
+  return ((data as Row[]) ?? []).map((g) => ({
+    id: g.id as string,
+    name: g.name as string,
+    members: ((g.group_members as Row[]) ?? []).map((m) => mapProfile(m.profile as Row)).filter((p): p is Profile => !!p),
+  }));
+}
+
+export async function getGroup(id: string): Promise<{ group: GroupCard; plans: PlanCard[] } | null> {
+  const db = supabaseAdmin();
+  const { data: g } = await db.from("groups").select("*, group_members(profile:profiles(*))").eq("id", id).maybeSingle();
+  if (!g) return null;
+  const gr = g as Row;
+  const { data: plans } = await db.from("plans").select(PLAN_SELECT).eq("group_id", id).order("created_at", { ascending: false });
+  return {
+    group: {
+      id: gr.id as string, name: gr.name as string,
+      members: ((gr.group_members as Row[]) ?? []).map((m) => mapProfile(m.profile as Row)).filter((p): p is Profile => !!p),
+    },
+    plans: ((plans as Row[]) ?? []).map(mapPlanCard),
+  };
+}
+
+// ---------- adventures (multi-activity) — stored as a plan + activity-options ----------
+export interface AdventureInput {
+  intent: string;
+  scope: "adventure" | "trip";
+  who?: string;
+  nights?: number;
+  activities: {
+    title: string; subtitle?: string; time?: string; day?: number;
+    place_name?: string; map_query?: string; why?: string; tile: string;
+  }[];
+}
+
+export async function createAdventure(input: AdventureInput): Promise<{ slug: string }> {
+  const db = supabaseAdmin();
+  const acts = input.activities ?? [];
+  const slug = planSlug(`${Date.now()}-${input.intent}-adv`);
+  const { data: plan, error } = await db
+    .from("plans")
+    .insert({
+      slug,
+      title: input.intent.slice(0, 140),
+      intent: input.intent,
+      status: "open",
+      visibility: "group",
+      creator_id: DEMO_USER_ID,
+      ai_empowered: true,
+      cover_hue: acts[0]?.tile ?? "trip",
+    } as never)
+    .select("id")
+    .single();
+  if (error || !plan) throw new Error(error?.message ?? "insert adventure failed");
+
+  if (acts.length) {
+    const rows = acts.map((a, i) => ({
+      plan_id: (plan as { id: string }).id,
+      kind: "activity",
+      source: "ai",
+      title: a.title,
+      subtitle: a.subtitle ?? null,
+      why: a.why ?? null,
+      source_url: mapsUrl(a.map_query || a.place_name) ?? null,
+      source_label: "AI + Maps",
+      payload: { time: a.time ?? null, day: a.day ?? 1, tile: a.tile, place_name: a.place_name ?? null, order: i },
+    }));
+    const { error: e2 } = await db.from("plan_options").insert(rows as never);
+    if (e2) throw new Error(e2.message);
+  }
+  return { slug };
+}
+
+export async function getAdventureBySlug(slug: string): Promise<Adventure | null> {
+  const db = supabaseAdmin();
+  const { data: plan } = await db.from("plans").select("*").eq("slug", slug).maybeSingle();
+  if (!plan) return null;
+  const row = plan as Row;
+  const { data: opts } = await db.from("plan_options").select("*").eq("plan_id", row.id as string).order("created_at");
+
+  const activities: Activity[] = ((opts as Row[]) ?? []).map((o) => {
+    const p = (o.payload as Row) ?? {};
+    return {
+      id: o.id as string,
+      title: o.title as string,
+      subtitle: (o.subtitle as string) ?? undefined,
+      time: (p.time as string) ?? undefined,
+      day: (p.day as number) ?? 1,
+      place_name: (p.place_name as string) ?? undefined,
+      why: (o.why as string) ?? undefined,
+      source_label: (o.source_label as string) ?? undefined,
+      source_url: (o.source_url as string) ?? undefined,
+      tile: (p.tile as string) ?? "city",
+    };
+  });
+  const days = Math.max(1, ...activities.map((a) => a.day ?? 1));
+  return {
+    slug: row.slug as string,
+    title: (row.activity as string) || (row.title as string),
+    scope: days > 1 ? "trip" : "adventure",
+    days,
+    who: "Your crew",
+    cover: deriveCover(row.cover_hue as string) || "/img/cover-hike.png",
+    ai_empowered: true,
+    members: [],
+    activities,
   };
 }

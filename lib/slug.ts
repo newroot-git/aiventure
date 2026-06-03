@@ -14,7 +14,7 @@ export function planSlug(seed: string): string {
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
   const adj = ADJ[h % ADJ.length];
-  const noun = NOUN[(h >> 8) % NOUN.length];
-  const num = (h >> 16) % 90 + 10; // 10–99
+  const noun = NOUN[(h >>> 8) % NOUN.length];
+  const num = ((h >>> 16) % 90) + 10; // 10–99
   return `${adj}-${noun}-${num}`;
 }

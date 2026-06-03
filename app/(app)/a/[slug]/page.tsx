@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AdventureView } from "@/components/AdventureView";
+import { getAdventureBySlug } from "@/lib/db";
 import { MOCK_ADVENTURE } from "@/lib/mock";
 
 export default async function AdventurePage({
@@ -9,7 +10,7 @@ export default async function AdventurePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const adventure = { ...MOCK_ADVENTURE, slug };
+  const adventure = (await getAdventureBySlug(slug).catch(() => null)) ?? { ...MOCK_ADVENTURE, slug };
 
   return (
     <div className="mx-auto w-full max-w-lg">

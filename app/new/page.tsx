@@ -62,10 +62,6 @@ function NewPlanFlow() {
 
   const meta = SCOPES.find((s) => s.id === scope);
 
-  function go(target: string, ms = 3600) {
-    setPhase("loading");
-    setTimeout(() => router.push(target), ms);
-  }
   // single + surprise: call the real AI agent, persist the plan, open it
   async function createPlan() {
     setPhase("loading");
@@ -99,8 +95,60 @@ function NewPlanFlow() {
       router.push("/p/wild-otter-42"); // graceful fallback so it never dead-ends
     }
   }
-  function aiBuild() {
-    setActivities(AI_ACTIVITY_POOL.slice(0, scope === "trip" ? 5 : 4));
+  const [building, setBuilding] = React.useState(false);
+  async function aiBuild() {
+    setBuilding(true);
+    let interests: string[] = [];
+    try {
+      interests = JSON.parse(localStorage.getItem("aiventure_profile") || "{}").interests || [];
+    } catch {}
+    try {
+      const res = await fetch("/api/drop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope, intent, who, nights, interests, location: "London, UK" }),
+      });
+      const data = await res.json();
+      if (res.ok && Array.isArray(data.activities) && data.activities.length) {
+        setActivities(
+          data.activities.map((a: Record<string, unknown>, i: number) => ({
+            id: `ai${i}`,
+            title: a.title as string,
+            subtitle: a.subtitle as string | undefined,
+            time: a.time as string | undefined,
+            day: (a.day as number) ?? 1,
+            place_name: a.place_name as string | undefined,
+            why: a.why as string | undefined,
+            tile: (a.tile as string) ?? "city",
+          })),
+        );
+      } else {
+        setActivities(AI_ACTIVITY_POOL.slice(0, scope === "trip" ? 5 : 4));
+      }
+    } catch {
+      setActivities(AI_ACTIVITY_POOL.slice(0, scope === "trip" ? 5 : 4));
+    } finally {
+      setBuilding(false);
+    }
+  }
+  // persist the built itinerary as an adventure, then open it
+  async function createAdventure() {
+    setPhase("loading");
+    try {
+      const res = await fetch("/api/adventures/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope, intent, who, nights, activities }),
+      });
+      const data = await res.json();
+      if (res.ok && data.slug) {
+        router.push(`/a/${data.slug}`);
+        return;
+      }
+      throw new Error(data.error || "failed");
+    } catch {
+      router.push("/a/epic-saturday");
+    }
   }
   function addManual() {
     if (!newAct.trim()) return;
@@ -176,8 +224,9 @@ function NewPlanFlow() {
           Each stop is one activity. Let AI build it, or add your own.
         </p>
 
-        <Button variant="secondary" className="mt-5 w-full" onClick={aiBuild}>
-          <Wand2 size={17} /> Let AI build it
+        <Button variant="secondary" className="mt-5 w-full" onClick={aiBuild} disabled={building}>
+          {building ? <Loader2 size={17} className="animate-spin" /> : <Wand2 size={17} />}
+          {building ? "Building your itinerary…" : "Let AI build it"}
         </Button>
 
         {activities.length > 0 && (
@@ -219,7 +268,7 @@ function NewPlanFlow() {
           size="lg"
           className="mt-8 w-full"
           disabled={activities.length === 0}
-          onClick={() => go("/a/epic-saturday")}
+          onClick={createAdventure}
         >
           Create {scope === "trip" ? "trip" : "adventure"} ({activities.length})
         </Button>

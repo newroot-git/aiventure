@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { Card } from "@/components/ui";
 import { Tile } from "@/components/Tile";
-import { MOCK_PLANS, type PlanSummary } from "@/lib/mock";
+import { getUserPlans, type PlanCard } from "@/lib/db";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -17,11 +17,12 @@ function monthLabel(key: string) {
   return `${MONTHS[+m - 1]} ${y}`;
 }
 
-export default function LogPage() {
-  const past = MOCK_PLANS.filter((p) => p.status === "past");
+export default async function LogPage() {
+  const all = await getUserPlans();
+  const past = all.filter((p) => p.status === "past" && p.date);
 
   // group by month, newest first
-  const groups: Record<string, PlanSummary[]> = {};
+  const groups: Record<string, PlanCard[]> = {};
   for (const p of past) (groups[monthKey(p.date)] ??= []).push(p);
   const keys = Object.keys(groups).sort().reverse();
 
