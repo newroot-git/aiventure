@@ -7,17 +7,15 @@ import type { Plan, PlanOption, PlanMember, Profile, Adventure, Activity } from 
 // Demo identity (stands in for auth) — the seeded "Josh" profile.
 export const DEMO_USER_ID = "11111111-1111-1111-1111-111111111111";
 
-const COVERS: Record<string, string> = {
-  hike: "/img/cover-hike.png",
-  pub: "/img/cover-pub.png",
-  climb: "/img/cover-climb.png",
-  park: "/img/cover-park.png",
-  gig: "/img/cover-gig.png",
-};
-// cover_hue stores a tile key for AI-generated plans → map to a cover image
+// activity categories that have a dedicated lush cover image
+const COVER_CATS = new Set([
+  "hike", "pub", "climb", "park", "gig", "food", "coffee",
+  "games", "beach", "camp", "cycle", "sport", "city", "trip",
+]);
+// cover_hue stores a tile/category key for AI plans → map to its cover image
 function deriveCover(hue?: string | null): string | null {
   if (!hue) return null;
-  return COVERS[hue] ?? `/img/tiles/${hue}.png`;
+  return COVER_CATS.has(hue) ? `/img/cover-${hue}.png` : "/img/cover-park.png";
 }
 
 /** Generate options via the AI agent, persist the plan + options, return its slug. */
