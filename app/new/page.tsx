@@ -66,6 +66,39 @@ function NewPlanFlow() {
     setPhase("loading");
     setTimeout(() => router.push(target), ms);
   }
+  // single + surprise: call the real AI agent, persist the plan, open it
+  async function createPlan() {
+    setPhase("loading");
+    let interests: string[] = [];
+    try {
+      interests = JSON.parse(localStorage.getItem("aiventure_profile") || "{}").interests || [];
+    } catch {}
+    const intentText =
+      scope === "surprise" ? `Something ${mood.toLowerCase()} to do ${when.toLowerCase()}` : intent;
+    try {
+      const res = await fetch("/api/plans/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scope: "single",
+          intent: intentText,
+          when,
+          budget,
+          who,
+          interests,
+          location: "London, UK",
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.slug) {
+        router.push(`/p/${data.slug}`);
+        return;
+      }
+      throw new Error(data.error || "failed");
+    } catch {
+      router.push("/p/wild-otter-42"); // graceful fallback so it never dead-ends
+    }
+  }
   function aiBuild() {
     setActivities(AI_ACTIVITY_POOL.slice(0, scope === "trip" ? 5 : 4));
   }
@@ -215,7 +248,7 @@ function NewPlanFlow() {
           <Label>What mood?</Label>
           <Chips opts={MOODS} value={mood} onChange={setMood} />
           <Chips label="When" opts={["Right now", "Today", "Tonight"]} value={when} onChange={setWhen} />
-          <Button variant="primary" size="lg" className="mt-9 w-full" onClick={() => go("/p/wild-otter-42")}>
+          <Button variant="primary" size="lg" className="mt-9 w-full" onClick={createPlan}>
             <Sparkles size={18} /> Surprise me
           </Button>
         </div>
@@ -234,7 +267,7 @@ function NewPlanFlow() {
           <Chips label="When" opts={WHEN} value={when} onChange={setWhen} />
           <Chips label="Budget" opts={BUDGET} value={budget} onChange={setBudget} />
           <Chips label="Who" opts={WHO} value={who} onChange={setWho} />
-          <Button variant="primary" size="lg" className="mt-9 w-full" disabled={!intent.trim()} onClick={() => go("/p/wild-otter-42")}>
+          <Button variant="primary" size="lg" className="mt-9 w-full" disabled={!intent.trim()} onClick={createPlan}>
             <Sparkles size={18} /> Get the drop
           </Button>
         </div>

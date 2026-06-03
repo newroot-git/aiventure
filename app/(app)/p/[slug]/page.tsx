@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PlanView } from "@/components/PlanView";
+import { getPlanBySlug } from "@/lib/db";
 import { MOCK_PLAN, MOCK_OPTIONS, MOCK_MEMBERS } from "@/lib/mock";
 
 export default async function PlanPage({
@@ -9,14 +10,17 @@ export default async function PlanPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const plan = { ...MOCK_PLAN, slug };
+
+  // live plan from the DB; fall back to the mock demo plan for seeded slugs
+  const live = await getPlanBySlug(slug).catch(() => null);
+  const data = live ?? { plan: { ...MOCK_PLAN, slug }, options: MOCK_OPTIONS, members: MOCK_MEMBERS };
 
   return (
     <div className="mx-auto w-full max-w-lg">
       <Link href="/plans" className="inline-flex items-center gap-1 text-sm font-bold text-muted">
         <ArrowLeft size={15} /> Home
       </Link>
-      <PlanView plan={plan} options={MOCK_OPTIONS} members={MOCK_MEMBERS} />
+      <PlanView plan={data.plan} options={data.options} members={data.members} />
     </div>
   );
 }
