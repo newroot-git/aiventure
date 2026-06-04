@@ -16,14 +16,24 @@ export default async function PlanPage({
     getPlanBySlug(slug).catch(() => null),
     getFriends().catch(() => []),
   ]);
-  const data = live ?? { plan: { ...MOCK_PLAN, slug }, options: MOCK_OPTIONS, members: MOCK_MEMBERS };
+  const data = live ?? {
+    plan: { ...MOCK_PLAN, slug }, options: MOCK_OPTIONS, members: MOCK_MEMBERS,
+    scaffold: [], recurrence: null,
+  };
 
   return (
     <div className="mx-auto w-full max-w-lg">
       <Link href="/plans" className="inline-flex items-center gap-1 text-sm font-bold text-muted">
         <ArrowLeft size={15} /> Home
       </Link>
-      <PlanView plan={data.plan} options={data.options} members={data.members} friends={friends.map((f) => f.profile)} />
+      <PlanView
+        plan={data.plan}
+        options={data.options}
+        members={data.members}
+        friends={friends.map((f) => f.profile)}
+        scaffold={data.scaffold}
+        recurrence={data.recurrence}
+      />
     </div>
   );
 }

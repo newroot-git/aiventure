@@ -168,6 +168,122 @@ export function MapEmbed({
   );
 }
 
+/* ---------- On-brand date + time picker (replaces raw datetime-local) ---------- */
+const WK = ["M", "T", "W", "T", "F", "S", "S"];
+const MO = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const TIMES = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "16:00", "18:00", "19:00", "20:00", "21:00", "22:00"];
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+export function WhenPicker({
+  value,
+  onChange,
+}: {
+  value?: string | null;
+  onChange: (iso: string) => void;
+}) {
+  const init = value ? new Date(value) : null;
+  const now = new Date();
+  const [open, setOpen] = React.useState(false);
+  const [view, setView] = React.useState(() => {
+    const d = init ?? new Date();
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
+  const [day, setDay] = React.useState<number | null>(init ? init.getDate() : null);
+  const [time, setTime] = React.useState<string>(init ? `${pad2(init.getHours())}:${pad2(init.getMinutes())}` : "19:00");
+
+  const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
+  const firstWk = (new Date(view.y, view.m, 1).getDay() + 6) % 7;
+  const cells: (number | null)[] = [...Array(firstWk).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  const isToday = (d: number) => view.y === now.getFullYear() && view.m === now.getMonth() && d === now.getDate();
+
+  function shift(dir: number) {
+    setView((v) => {
+      const m = v.m + dir;
+      if (m < 0) return { y: v.y - 1, m: 11 };
+      if (m > 11) return { y: v.y + 1, m: 0 };
+      return { y: v.y, m };
+    });
+  }
+  function commit(d: number, t: string) {
+    const [h, min] = t.split(":").map(Number);
+    onChange(new Date(view.y, view.m, d, h, min).toISOString());
+  }
+  const label = value
+    ? new Date(value).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    : "Pick a date & time";
+
+  return (
+    <div className="relative mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 rounded-md border-2 border-line bg-surface px-3 py-2 text-left text-sm font-bold text-ink transition hover:border-primary"
+      >
+        <CalendarDays size={15} className="text-primary" />
+        <span className="truncate">{label}</span>
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40 bg-night/30" onClick={() => setOpen(false)} />
+          <div className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,380px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-ink bg-surface p-4 shadow-hard">
+            <div className="mb-3 flex items-center justify-between">
+              <button type="button" onClick={() => shift(-1)} className="grid h-9 w-9 place-items-center rounded-md border-2 border-line text-ink hover:border-primary">‹</button>
+              <span className="font-display text-base font-bold">{MO[view.m]} {view.y}</span>
+              <button type="button" onClick={() => shift(1)} className="grid h-9 w-9 place-items-center rounded-md border-2 border-line text-ink hover:border-primary">›</button>
+            </div>
+            <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-bold text-muted">
+              {WK.map((d, i) => <div key={i}>{d}</div>)}
+            </div>
+            <div className="mt-1.5 grid grid-cols-7 gap-1.5">
+              {cells.map((d, i) =>
+                d === null ? <div key={i} /> : (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => { setDay(d); commit(d, time); }}
+                    className={cx(
+                      "grid aspect-square place-items-center rounded-md border-2 text-sm font-bold transition",
+                      day === d
+                        ? "border-ink bg-primary text-white"
+                        : isToday(d)
+                          ? "border-primary text-primary-deep"
+                          : "border-transparent text-ink hover:bg-surface-2",
+                    )}
+                  >
+                    {d}
+                  </button>
+                ),
+              )}
+            </div>
+            <div className="mt-4 border-t-2 border-line pt-3">
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Time</div>
+              <div className="flex flex-wrap gap-2">
+                {TIMES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => { setTime(t); if (day) commit(day, t); }}
+                    className={cx(
+                      "rounded-md border-2 px-3 py-1.5 text-sm font-bold transition",
+                      time === t ? "border-ink bg-secondary text-white" : "border-line text-ink hover:border-secondary",
+                    )}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Button variant="primary" size="md" className="mt-4 w-full" onClick={() => setOpen(false)}>
+              {day ? "Done" : "Pick a day"}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ---------- The signature: completion Adventure card ---------- */
 export function AdventureCard({
   number,

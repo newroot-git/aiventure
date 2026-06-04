@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { Sparkles, Pencil, ChevronRight, UserPlus } from "lucide-react";
+import { Sparkles, Pencil, ChevronRight } from "lucide-react";
 import { Card, Pill, Button, Avatar } from "@/components/ui";
 import { ResetButton } from "@/components/ResetButton";
-import { getCurrentProfile, getUserPlans, getUserGroups, getFriends } from "@/lib/db";
+import { getCurrentProfile, getUserPlans, getUserGroups } from "@/lib/db";
 
 export default async function ProfilePage() {
-  const [me, plans, groups, friends] = await Promise.all([
-    getCurrentProfile(), getUserPlans(), getUserGroups(), getFriends(),
+  const [me, plans, groups] = await Promise.all([
+    getCurrentProfile(), getUserPlans(), getUserGroups(),
   ]);
   const adventures = plans.filter((p) => p.status === "past").length;
   const name = me?.name ?? "You";
@@ -47,20 +47,6 @@ export default async function ProfilePage() {
           <ChevronRight size={22} className="text-muted" />
         </Card>
       </Link>
-
-      {/* friends */}
-      <div className="mt-7 flex items-center justify-between">
-        <h2 className="font-heading text-lg font-bold">Friends</h2>
-        <button className="inline-flex items-center gap-1 text-sm font-bold text-primary"><UserPlus size={14} /> Add</button>
-      </div>
-      <div className="mt-3 grid grid-cols-4 gap-3 sm:grid-cols-6">
-        {friends.map(({ profile: f }) => (
-          <div key={f.id} className="flex flex-col items-center gap-1">
-            <Avatar name={f.name} src={f.avatar} size={52} />
-            <span className="truncate text-xs font-bold">{f.name}</span>
-          </div>
-        ))}
-      </div>
 
       {/* interests */}
       <div className="mt-7 flex items-center justify-between">

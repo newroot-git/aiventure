@@ -2,7 +2,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
-import { Inbox, X, Check } from "lucide-react";
+import { Inbox, X } from "lucide-react";
 import type { InviteCard, NudgeCard, NotificationCard } from "@/lib/db";
 
 function PixelIcon({ name }: { name: string }) {
@@ -18,11 +18,17 @@ export interface NotifData {
 
 export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon" | "side"; data: NotifData }) {
   const [open, setOpen] = React.useState(false);
-  const [invites, setInvites] = React.useState(data.invites);
-  const [nudges, setNudges] = React.useState(data.nudges);
+  const [invites] = React.useState(data.invites);
+  const [nudges] = React.useState(data.nudges);
   const [notes, setNotes] = React.useState(data.notifications);
   const count = invites.length + nudges.length + notes.length;
   const active = usePathActive();
+
+  // activity items are read-only — once the panel has been opened, they're seen and clear out
+  const close = () => {
+    setOpen(false);
+    setNotes([]);
+  };
 
   return (
     <>
@@ -47,7 +53,7 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="fixed inset-0 z-40 bg-transparent" onClick={() => setOpen(false)}
+              className="fixed inset-0 z-40 bg-transparent" onClick={close}
             />
             <motion.div
               initial={{ opacity: 0, y: -12, scale: 0.98 }}
@@ -59,7 +65,7 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
               <div className="max-h-[80vh] overflow-y-auto rounded-xl border-2 border-ink bg-surface p-2 shadow-hard">
                 <div className="flex items-center justify-between px-3 py-2">
                   <span className="font-display text-lg font-bold">Notifications</span>
-                  <button onClick={() => setOpen(false)} className="text-muted"><X size={20} /></button>
+                  <button onClick={close} className="text-muted"><X size={20} /></button>
                 </div>
 
                 {count === 0 && (
@@ -69,9 +75,8 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
                 {invites.length > 0 && (
                   <Section label="Invites">
                     {invites.map((iv) => (
-                      <Row key={iv.id} href={`/p/${iv.slug}`} onClose={() => setInvites((s) => s.filter((x) => x.id !== iv.id))} onPick={() => setOpen(false)}
-                        avatar={<PixelIcon name="invite" />}>
-                        <b>{iv.fromLabel}</b> invited you · <span className="text-muted">{iv.activity}</span>
+                      <Row key={iv.id} href={`/p/${iv.slug}`} onPick={close} avatar={<PixelIcon name="invite" />}>
+                        <b>{iv.fromLabel}</b> invited you
                       </Row>
                     ))}
                   </Section>
@@ -80,9 +85,8 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
                 {nudges.length > 0 && (
                   <Section label="Nudges">
                     {nudges.map((n) => (
-                      <Row key={n.id} href="/new" onClose={() => setNudges((s) => s.filter((x) => x.id !== n.id))} onPick={() => setOpen(false)}
-                        avatar={<PixelIcon name="nudge" />}>
-                        <b>{n.from.name}</b> nudged you · <span className="text-muted">{n.message}</span>
+                      <Row key={n.id} href="/new" onPick={close} avatar={<PixelIcon name="nudge" />}>
+                        <b>{n.from.name}</b> nudged you
                       </Row>
                     ))}
                   </Section>
@@ -91,9 +95,8 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
                 {notes.length > 0 && (
                   <Section label="Activity">
                     {notes.map((nt) => (
-                      <Row key={nt.id} href={nt.slug ? `/p/${nt.slug}` : undefined} onClose={() => setNotes((s) => s.filter((x) => x.id !== nt.id))} onPick={() => setOpen(false)}
-                        avatar={<PixelIcon name="bell" />}>
-                        {nt.text} <span className="text-muted">· {nt.when}</span>
+                      <Row key={nt.id} href={nt.slug ? `/p/${nt.slug}` : undefined} onPick={close} avatar={<PixelIcon name="bell" />}>
+                        {nt.text}
                       </Row>
                     ))}
                   </Section>
@@ -124,16 +127,13 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function Row({ children, avatar, href, onClose, onPick }: {
-  children: React.ReactNode; avatar: React.ReactNode; href?: string; onClose: () => void; onPick: () => void;
+function Row({ children, avatar, href, onPick }: {
+  children: React.ReactNode; avatar: React.ReactNode; href?: string; onPick: () => void;
 }) {
   const inner = (
     <div className="flex items-center gap-3 rounded-md px-3 py-2.5 hover:bg-surface-2">
       <span className="shrink-0">{avatar}</span>
-      <div className="min-w-0 flex-1 text-sm">{children}</div>
-      <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }} aria-label="Acknowledge" className="shrink-0 text-muted hover:text-ink">
-        <Check size={18} />
-      </button>
+      <div className="min-w-0 flex-1 truncate text-sm">{children}</div>
     </div>
   );
   return href ? <Link href={href} onClick={onPick}>{inner}</Link> : inner;

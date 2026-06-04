@@ -15,12 +15,27 @@ const pad = (n: number) => String(n).padStart(2, "0");
 export function CalendarView({ plans }: { plans: PlanCard[] }) {
   const byDate = React.useMemo(() => {
     const m: Record<string, PlanCard[]> = {};
-    for (const p of plans) if (p.date) (m[p.date] ??= []).push(p);
+    // one-off plans land on their date
+    for (const p of plans) if (p.date && !p.recurrence) (m[p.date] ??= []).push(p);
+    // recurring plans repeat weekly across a window (−4 wks … +26 wks)
+    const recur = plans.filter((p) => p.recurrence);
+    if (recur.length) {
+      const start = new Date();
+      start.setDate(start.getDate() - 28);
+      for (let i = 0; i < 210; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        for (const p of recur) if (p.recurrence!.weekday === d.getDay()) (m[ds] ??= []).push(p);
+      }
+    }
     return m;
   }, [plans]);
 
-  const [view, setView] = React.useState({ y: 2026, m: 5 });
-  const [selected, setSelected] = React.useState<string | null>("2026-06-06");
+  const today = new Date();
+  const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+  const [view, setView] = React.useState({ y: today.getFullYear(), m: today.getMonth() });
+  const [selected, setSelected] = React.useState<string | null>(todayStr);
 
   const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
   const firstWeekday = (new Date(view.y, view.m, 1).getDay() + 6) % 7;
@@ -62,13 +77,14 @@ export function CalendarView({ plans }: { plans: PlanCard[] }) {
             const ds = `${view.y}-${pad(view.m + 1)}-${pad(d)}`;
             const dayPlans = byDate[ds];
             const isSel = selected === ds;
+            const isToday = ds === todayStr;
             if (dayPlans) {
-              const tile = dayPlans[0].tile;
+              const cover = dayPlans[0].cover;
               return (
                 <button key={i} onClick={() => setSelected(ds)}
-                  className={`relative grid aspect-square place-items-center overflow-hidden rounded-md border-2 ${isSel ? "border-primary ring-2 ring-primary" : "border-ink"}`}>
+                  className={`relative grid aspect-square place-items-center overflow-hidden rounded-md border-2 ${isSel ? "border-primary ring-2 ring-primary" : isToday ? "border-accent ring-2 ring-accent" : "border-ink"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`/img/tiles/${tile}.png`} alt="" className="pixelated absolute inset-0 h-full w-full scale-[1.04] object-cover" />
+                  <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" />
                   <div className="absolute inset-0 bg-night/45" />
                   <span className="relative text-sm font-bold text-white drop-shadow-[1px_1px_0_rgba(0,0,0,0.6)]">{d}</span>
                 </button>
@@ -76,7 +92,7 @@ export function CalendarView({ plans }: { plans: PlanCard[] }) {
             }
             return (
               <button key={i} onClick={() => setSelected(ds)}
-                className={`grid aspect-square place-items-center rounded-md border-2 text-sm font-bold transition ${isSel ? "border-ink bg-primary text-white" : "border-transparent hover:bg-surface-2"}`}>
+                className={`grid aspect-square place-items-center rounded-md border-2 text-sm font-bold transition ${isSel ? "border-ink bg-primary text-white" : isToday ? "border-accent text-primary-deep" : "border-transparent hover:bg-surface-2"}`}>
                 {d}
               </button>
             );

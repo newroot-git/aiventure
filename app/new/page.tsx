@@ -2,20 +2,18 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Loader2, Sparkles, MapPin, Route, Tent, ArrowLeft, Plus, X, Wand2, Clock,
+  Loader2, Sparkles, MapPin, Route, Tent, ArrowLeft, Plus, X, Navigation,
 } from "lucide-react";
 import { Button, Textarea, SelectTag, Label, Input } from "@/components/ui";
-import { Tile } from "@/components/Tile";
-import { AI_ACTIVITY_POOL } from "@/lib/mock";
-import type { Activity, PlanScope } from "@/lib/types";
+import type { PlanScope } from "@/lib/types";
 
 const SCOPES: {
-  id: PlanScope; label: string; desc: string; Icon: typeof Sparkles; build?: boolean;
+  id: PlanScope; label: string; desc: string; Icon: typeof Sparkles;
 }[] = [
   { id: "surprise", label: "Surprise me", desc: "Solo — I'm in the mood for something today.", Icon: Sparkles },
   { id: "single", label: "One thing", desc: "A single activity — a hike, dinner, a date.", Icon: MapPin },
-  { id: "adventure", label: "An adventure", desc: "A day of activities, back to back.", Icon: Route, build: true },
-  { id: "trip", label: "A trip", desc: "Multiple days away with the crew.", Icon: Tent, build: true },
+  { id: "adventure", label: "An adventure", desc: "A day of activities, back to back.", Icon: Route },
+  { id: "trip", label: "A trip", desc: "Multiple days away with the crew.", Icon: Tent },
 ];
 
 const MOODS = ["Active", "Chilled", "Foodie", "Cultured", "Social", "Anything"];
@@ -39,22 +37,23 @@ function NewPlanFlow() {
   const router = useRouter();
   const scopeParam = useSearchParams().get("scope") as PlanScope | null;
   const [scope, setScope] = React.useState<PlanScope | null>(scopeParam);
-  const [phase, setPhase] = React.useState<"config" | "builder" | "loading">("config");
+  const [phase, setPhase] = React.useState<"config" | "loading">("config");
 
   // shared config
   const [intent, setIntent] = React.useState("");
-  const [where, setWhere] = React.useState("");
+  const [areas, setAreas] = React.useState<string[]>([]);
+  const [areaInput, setAreaInput] = React.useState("");
+  const [results, setResults] = React.useState<string[]>([]);
+  const [searching, setSearching] = React.useState(false);
+  const [geo, setGeo] = React.useState<"idle" | "locating">("idle");
   const [mood, setMood] = React.useState("Anything");
   const [when, setWhen] = React.useState("This weekend");
-  const location = where.trim() || "London, UK";
   const [budget, setBudget] = React.useState("££");
   const [who, setWho] = React.useState("The boys");
   const [nights, setNights] = React.useState(3);
-
-  // itinerary
-  const [activities, setActivities] = React.useState<Activity[]>([]);
-  const [newAct, setNewAct] = React.useState("");
   const [tick, setTick] = React.useState(0);
+
+  const location = areas.length ? areas.join(", ") : "London, UK";
 
   React.useEffect(() => {
     if (phase !== "loading") return;
@@ -64,8 +63,62 @@ function NewPlanFlow() {
 
   const meta = SCOPES.find((s) => s.id === scope);
 
-  // single + surprise: call the real AI agent, persist the plan, open it
-  async function createPlan() {
+  function addArea(a: string) {
+    const v = a.trim();
+    if (!v || areas.includes(v)) return;
+    setAreas((p) => [...p, v]);
+    setAreaInput("");
+    setResults([]);
+  }
+
+  // debounced OSM Nominatim search for the area typeahead
+  React.useEffect(() => {
+    const q = areaInput.trim();
+    if (q.length < 3) { setResults([]); setSearching(false); return; }
+    setSearching(true);
+    const id = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`,
+          { headers: { "Accept-Language": "en" } },
+        );
+        const j = await res.json();
+        const labels: string[] = Array.isArray(j)
+          ? j.map((r: { display_name: string }) => r.display_name.split(",").slice(0, 3).map((s) => s.trim()).join(", "))
+          : [];
+        setResults([...new Set(labels)]);
+      } catch { setResults([]); } finally { setSearching(false); }
+    }, 400);
+    return () => clearTimeout(id);
+  }, [areaInput]);
+  function useMyLocation() {
+    if (!("geolocation" in navigator)) return;
+    setGeo("locating");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=12`,
+            { headers: { "Accept-Language": "en" } },
+          );
+          const j = await res.json();
+          const a = j.address ?? {};
+          const place = a.city || a.town || a.village || a.suburb || a.county || j.name;
+          addArea(place ? `${place}${a.country_code ? `, ${a.country_code.toUpperCase()}` : ""}` : "Near me");
+        } catch {
+          addArea("Near me");
+        } finally {
+          setGeo("idle");
+        }
+      },
+      () => setGeo("idle"),
+      { enableHighAccuracy: false, timeout: 8000 },
+    );
+  }
+
+  // create a plan — aiBuild=true fills slots via AI, false = empty named skeleton
+  async function createPlan(aiBuild: boolean) {
     setPhase("loading");
     let interests: string[] = [];
     try {
@@ -78,13 +131,15 @@ function NewPlanFlow() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          scope: "single",
+          scope: scope ?? "single",
           intent: intentText,
           when,
           budget,
           who,
+          nights,
           interests,
           location,
+          aiBuild,
         }),
       });
       const data = await res.json();
@@ -96,69 +151,6 @@ function NewPlanFlow() {
     } catch {
       router.push("/p/wild-otter-42"); // graceful fallback so it never dead-ends
     }
-  }
-  const [building, setBuilding] = React.useState(false);
-  async function aiBuild() {
-    setBuilding(true);
-    let interests: string[] = [];
-    try {
-      interests = JSON.parse(localStorage.getItem("aiventure_profile") || "{}").interests || [];
-    } catch {}
-    try {
-      const res = await fetch("/api/drop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope, intent, who, nights, interests, location }),
-      });
-      const data = await res.json();
-      if (res.ok && Array.isArray(data.activities) && data.activities.length) {
-        setActivities(
-          data.activities.map((a: Record<string, unknown>, i: number) => ({
-            id: `ai${i}`,
-            title: a.title as string,
-            subtitle: a.subtitle as string | undefined,
-            time: a.time as string | undefined,
-            day: (a.day as number) ?? 1,
-            place_name: a.place_name as string | undefined,
-            why: a.why as string | undefined,
-            tile: (a.tile as string) ?? "city",
-          })),
-        );
-      } else {
-        setActivities(AI_ACTIVITY_POOL.slice(0, scope === "trip" ? 5 : 4));
-      }
-    } catch {
-      setActivities(AI_ACTIVITY_POOL.slice(0, scope === "trip" ? 5 : 4));
-    } finally {
-      setBuilding(false);
-    }
-  }
-  // persist the built itinerary as an adventure, then open it
-  async function createAdventure() {
-    setPhase("loading");
-    try {
-      const res = await fetch("/api/adventures/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope, intent, who, nights, activities }),
-      });
-      const data = await res.json();
-      if (res.ok && data.slug) {
-        router.push(`/a/${data.slug}`);
-        return;
-      }
-      throw new Error(data.error || "failed");
-    } catch {
-      router.push("/a/epic-saturday");
-    }
-  }
-  function addManual() {
-    if (!newAct.trim()) return;
-    setActivities((a) => [
-      ...a,
-      { id: `m${a.length}`, title: newAct.trim(), tile: "food" },
-    ]);
-    setNewAct("");
   }
 
   /* ---------- loading ---------- */
@@ -212,72 +204,6 @@ function NewPlanFlow() {
     );
   }
 
-  /* ---------- itinerary builder (adventure / trip) ---------- */
-  if (phase === "builder") {
-    return (
-      <main className="mx-auto w-full max-w-lg flex-1 px-5 py-8">
-        <button onClick={() => setPhase("config")} className="inline-flex items-center gap-1 text-sm font-bold text-muted">
-          <ArrowLeft size={15} /> Back
-        </button>
-        <h1 className="mt-4 font-display text-3xl font-bold leading-tight">
-          {scope === "trip" ? "Your itinerary" : "Your day"}
-        </h1>
-        <p className="mt-2 text-[15px] text-muted">
-          Each stop is one activity. Let AI build it, or add your own.
-        </p>
-
-        <Button variant="secondary" className="mt-5 w-full" onClick={aiBuild} disabled={building}>
-          {building ? <Loader2 size={17} className="animate-spin" /> : <Wand2 size={17} />}
-          {building ? "Building your itinerary…" : "Let AI build it"}
-        </Button>
-
-        {activities.length > 0 && (
-          <div className="mt-5 flex flex-col gap-2">
-            {activities.map((a, i) => (
-              <div key={a.id} className="flex items-center gap-3 rounded-xl border-2 border-ink/10 bg-surface p-3">
-                <Tile name={a.tile} className="h-14 w-14 shrink-0 border-2 border-ink/10" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-xs font-bold text-muted">
-                    <span className="grid h-5 w-5 place-items-center rounded-full bg-primary text-[10px] text-white">{i + 1}</span>
-                    {a.time && <span className="inline-flex items-center gap-1"><Clock size={11} /> {a.time}</span>}
-                  </div>
-                  <div className="truncate font-bold leading-tight">{a.title}</div>
-                  {a.place_name && <div className="truncate text-sm text-muted">{a.place_name}</div>}
-                </div>
-                <button onClick={() => setActivities((x) => x.filter((y) => y.id !== a.id))} className="text-muted">
-                  <X size={18} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* manual add */}
-        <div className="mt-4 flex gap-2">
-          <Input
-            value={newAct}
-            onChange={(e) => setNewAct(e.target.value)}
-            placeholder="Add an activity…"
-            onKeyDown={(e) => e.key === "Enter" && addManual()}
-          />
-          <Button variant="soft" onClick={addManual}>
-            <Plus size={17} />
-          </Button>
-        </div>
-
-        <Button
-          variant="primary"
-          size="lg"
-          className="mt-8 w-full"
-          disabled={activities.length === 0}
-          onClick={createAdventure}
-        >
-          Create {scope === "trip" ? "trip" : "adventure"} ({activities.length})
-        </Button>
-      </main>
-    );
-  }
-
   /* ---------- config (per scope) ---------- */
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-5 py-8">
@@ -293,15 +219,59 @@ function NewPlanFlow() {
         <h1 className="font-display text-2xl font-bold">{meta?.label}</h1>
       </div>
 
+      {/* where — current location + add more areas */}
       <div className="mt-5">
         <Label>Where?</Label>
-        <Input
-          value={where}
-          onChange={(e) => setWhere(e.target.value)}
-          placeholder="City or area — e.g. Manchester, Berlin, your town"
-          className="mt-2"
-        />
-        <p className="mt-1 text-xs text-muted">Defaults to London if left blank.</p>
+        <button
+          type="button"
+          onClick={useMyLocation}
+          disabled={geo === "locating"}
+          className="mt-2 inline-flex items-center gap-2 rounded-md border-2 border-ink bg-surface px-3 py-2 text-sm font-bold text-ink shadow-hard-sm transition active:translate-y-0.5 disabled:opacity-60"
+        >
+          {geo === "locating" ? <Loader2 size={15} className="animate-spin" /> : <Navigation size={15} className="text-primary" />}
+          {geo === "locating" ? "Locating…" : "Use my location"}
+        </button>
+        {areas.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {areas.map((a) => (
+              <span key={a} className="inline-flex items-center gap-1.5 rounded-md border-2 border-line bg-surface px-3 py-1.5 text-sm font-bold">
+                <MapPin size={13} className="text-primary" /> {a}
+                <button onClick={() => setAreas((p) => p.filter((x) => x !== a))} className="text-muted"><X size={14} /></button>
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="relative mt-3">
+          <div className="flex gap-2">
+            <div className="relative w-full">
+              <Input
+                value={areaInput}
+                onChange={(e) => setAreaInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addArea(results[0] ?? areaInput))}
+                placeholder="Search a place — town, area, postcode…"
+                className="pr-9"
+              />
+              {searching && <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted" />}
+            </div>
+            <Button variant="soft" onClick={() => addArea(results[0] ?? areaInput)} disabled={!areaInput.trim()}>
+              <Plus size={17} />
+            </Button>
+          </div>
+          {results.length > 0 && (
+            <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border-2 border-ink bg-surface shadow-hard">
+              {results.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => addArea(r)}
+                  className="flex w-full items-center gap-2 border-b border-line px-3 py-2.5 text-left text-sm font-bold last:border-0 hover:bg-surface-2"
+                >
+                  <MapPin size={14} className="shrink-0 text-primary" /> <span className="truncate">{r}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <p className="mt-1 text-xs text-muted">Search and tap a place, or use your location. Defaults to London if blank.</p>
       </div>
 
       {/* surprise */}
@@ -310,7 +280,7 @@ function NewPlanFlow() {
           <Label>What mood?</Label>
           <Chips opts={MOODS} value={mood} onChange={setMood} />
           <Chips label="When" opts={["Right now", "Today", "Tonight"]} value={when} onChange={setWhen} />
-          <Button variant="primary" size="lg" className="mt-9 w-full" onClick={createPlan}>
+          <Button variant="primary" size="lg" className="mt-9 w-full" onClick={() => createPlan(true)}>
             <Sparkles size={18} /> Surprise me
           </Button>
         </div>
@@ -329,9 +299,7 @@ function NewPlanFlow() {
           <Chips label="When" opts={WHEN} value={when} onChange={setWhen} />
           <Chips label="Budget" opts={BUDGET} value={budget} onChange={setBudget} />
           <Chips label="Who" opts={WHO} value={who} onChange={setWho} />
-          <Button variant="primary" size="lg" className="mt-9 w-full" disabled={!intent.trim()} onClick={createPlan}>
-            <Sparkles size={18} /> Get ideas
-          </Button>
+          <DualCTA aiLabel="Build it with AI" aiIcon={<Sparkles size={18} />} disabled={!intent.trim()} onAi={() => createPlan(true)} onManual={() => createPlan(false)} />
         </div>
       )}
 
@@ -347,9 +315,7 @@ function NewPlanFlow() {
           />
           <Chips label="When" opts={WHEN} value={when} onChange={setWhen} />
           <Chips label="Who" opts={WHO} value={who} onChange={setWho} />
-          <Button variant="primary" size="lg" className="mt-9 w-full" disabled={!intent.trim()} onClick={() => setPhase("builder")}>
-            <Route size={18} /> Build the day
-          </Button>
+          <DualCTA aiLabel="Build the day with AI" aiIcon={<Route size={18} />} disabled={!intent.trim()} onAi={() => createPlan(true)} onManual={() => createPlan(false)} />
         </div>
       )}
 
@@ -372,12 +338,29 @@ function NewPlanFlow() {
             </div>
           </div>
           <Chips label="Who" opts={WHO} value={who} onChange={setWho} />
-          <Button variant="primary" size="lg" className="mt-9 w-full" disabled={!intent.trim()} onClick={() => setPhase("builder")}>
-            <Tent size={18} /> Plan the trip
-          </Button>
+          <DualCTA aiLabel="Plan the trip with AI" aiIcon={<Tent size={18} />} disabled={!intent.trim()} onAi={() => createPlan(true)} onManual={() => createPlan(false)} />
         </div>
       )}
     </main>
+  );
+}
+
+function DualCTA({
+  aiLabel, aiIcon, disabled, onAi, onManual,
+}: {
+  aiLabel: string; aiIcon: React.ReactNode; disabled?: boolean;
+  onAi: () => void; onManual: () => void;
+}) {
+  return (
+    <div className="mt-9 flex flex-col gap-2.5">
+      <Button variant="primary" size="lg" className="w-full" disabled={disabled} onClick={onAi}>
+        {aiIcon} {aiLabel}
+      </Button>
+      <Button variant="soft" size="lg" className="w-full" disabled={disabled} onClick={onManual}>
+        I&apos;ll build it myself
+      </Button>
+      <p className="text-center text-xs text-muted">Build it yourself and ask AI for ideas on any step later.</p>
+    </div>
   );
 }
 
