@@ -143,10 +143,14 @@ export async function createPlanFromDrop(input: DropInput & CreateExtras): Promi
   const aiBuild = !!input.aiBuild;
   let title = input.intent.slice(0, 140);
   let slots: DropSlot[] = [];
+  // the area refines/per-slot AI will use — the AI's resolved area beats the
+  // (possibly default "London") form value, so a HK plan stays HK throughout.
+  let area = input.location ?? null;
   if (aiBuild) {
     const drop = await generateDrop(input);
     slots = drop.slots ?? [];
     if (drop.title) title = drop.title;
+    if (drop.area) area = drop.area;
   }
   const scaffold = aiBuild ? scaffoldFromSlots(slots) : defaultScaffold(input.scope, input.nights);
   const slug = planSlug(`${Date.now()}-${input.intent}`);
@@ -167,7 +171,7 @@ export async function createPlanFromDrop(input: DropInput & CreateExtras): Promi
       ai_empowered: true,
       cover_hue: firstTile,
       starts_at: input.startsAt ?? null,
-      place_address: input.location ?? null, // stash search area for later refine + general "where"
+      place_address: area, // the resolved area — keeps later refines in the right place
     } as never)
     .select("id")
     .single();

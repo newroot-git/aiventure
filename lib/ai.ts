@@ -125,16 +125,20 @@ function cleanOption(o: DropOptionOut): DropOptionOut {
 
 // Generate a plan as an ordered list of slots, each holding voteable options.
 // one-thing/surprise → 1 slot · a day → 3-4 slots · a trip → 2-4 slots per day.
-export async function generateDrop(input: DropInput): Promise<{ title: string; slots: DropSlot[] }> {
+export async function generateDrop(input: DropInput): Promise<{ title: string; area: string; slots: DropSlot[] }> {
   const intent = (input.intent || "").slice(0, 500);
   const location = input.location || "London, UK";
   const interests = (input.interests || []).slice(0, 12).join(", ") || "a bit of everything";
-  const ctx = `Location: ${location}
+  const ctx = `Default location: ${location}
 Crew: ${input.who || "a few friends"}
 When: ${input.when || "soon"}
 Budget: ${input.budget || "flexible"}
 Crew interests: ${interests}
-Intent: "${intent}"`;
+Intent: "${intent}"
+
+LOCATION RULE: if the intent names a place/city (e.g. "in Hong Kong", "Lisbon trip"),
+EVERY pick must be in THAT place — it overrides the default location above. Only fall
+back to the default location when the intent names no place.`;
 
   let shape: string;
   if (input.scope === "trip") {
@@ -156,12 +160,13 @@ Each slot offers 2-3 distinct, voteable options for that step. Order slots throu
 ${shape}
 Every option MUST have a "subtitle" — a short detail line (type · rough price · area), e.g. "Wine bar · ~£8/glass · Soho".
 Also give the whole plan a short, evocative "title" (3-6 words) that captures the vibe — NOT just a place name. e.g. "Big Bristol Saturday", "Slow Sunday Roast Run".
-Return STRICT JSON only: {"title","slots":[{"key","label","day","options":[{"title","subtitle","why","place_name","map_query","tile","time"}]}]}.
+Also set "area" to the actual town/city/region ALL these picks are in (e.g. "Hong Kong", "Bristol, UK") — infer it from the location and intent. Every option must be in this same area.
+Return STRICT JSON only: {"title","area","slots":[{"key","label","day","options":[{"title","subtitle","why","place_name","map_query","tile","time"}]}]}.
 "key" = a short lowercase slug for the slot (e.g. "food", "main", "after"). "time" = optional "HH:MM" for that step.
 Make picks genuinely varied and tailored to the intent — not a generic highlights list.`;
 
   const raw = await callOpenRouter(SYSTEM, user, input.scope === "trip" ? 3000 : 2000);
-  const parsed = parseJson(raw) as { title?: string; slots?: DropSlot[] };
+  const parsed = parseJson(raw) as { title?: string; area?: string; slots?: DropSlot[] };
   const slots = (parsed.slots || [])
     .filter((s) => Array.isArray(s.options) && s.options.length > 0)
     .map((s, i) => ({
@@ -171,7 +176,7 @@ Make picks genuinely varied and tailored to the intent — not a generic highlig
       fixed: !!s.fixed,
       options: s.options.map(cleanOption),
     }));
-  return { title: (parsed.title || "").slice(0, 80), slots };
+  return { title: (parsed.title || "").slice(0, 80), area: (parsed.area || "").slice(0, 120), slots };
 }
 
 // Regenerate the voteable options for ONE slot (used by per-slot refine).
@@ -182,7 +187,8 @@ export async function generateSlotOptions(
   feedback?: string,
 ): Promise<DropOptionOut[]> {
   const steer = feedback?.trim() ? `\nImportant preference for this step: ${feedback.trim()}` : "";
-  const user = `In ${location}, for the plan "${intent}".
+  const user = `Location: ${location}. Plan: "${intent}".
+ALL picks MUST be in ${location} (the same place as the rest of this plan — never drift to another city).
 Suggest EXACTLY 3 distinct, voteable options for the "${slotLabel}" step of this plan.${steer}
 Every option MUST have a "subtitle" (type · rough price · area).
 Return STRICT JSON only: {"options":[{"title","subtitle","why","place_name","map_query","tile","time"}]}.
