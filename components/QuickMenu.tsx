@@ -3,15 +3,16 @@ import * as React from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { Plus, Route, Hand, Sparkles, X } from "lucide-react";
+import { NudgeSheet } from "./NudgeSheet";
 
 const ACTIONS = [
   { href: "/new", Icon: Route, title: "Create a plan", sub: "One thing, an adventure, or a trip" },
-  { href: "/nudge", Icon: Hand, title: "Send a nudge", sub: "Get a mate to make plans with you" },
   { href: "/new?scope=surprise", Icon: Sparkles, title: "Give me something now", sub: "AI picks something for today" },
 ];
 
 export function QuickMenu({ variant = "fab" }: { variant?: "fab" | "side" }) {
   const [open, setOpen] = React.useState(false);
+  const [nudgeOpen, setNudgeOpen] = React.useState(false);
 
   return (
     <>
@@ -79,11 +80,27 @@ export function QuickMenu({ variant = "fab" }: { variant?: "fab" | "side" }) {
                     </Link>
                   </motion.div>
                 ))}
+                <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.04 + ACTIONS.length * 0.05, duration: 0.2 }}>
+                  <button
+                    onClick={() => { setOpen(false); setNudgeOpen(true); }}
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-3 text-left transition hover:bg-surface-2 active:scale-[0.99]"
+                  >
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border-2 border-ink bg-primary-soft text-primary-deep">
+                      <Hand size={22} />
+                    </span>
+                    <div>
+                      <div className="font-bold leading-tight">Send a nudge</div>
+                      <div className="text-sm text-muted">Poke a mate — land in a shared plan to figure it out</div>
+                    </div>
+                  </button>
+                </motion.div>
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
+
+      {nudgeOpen && <NudgeSheet onClose={() => setNudgeOpen(false)} />}
     </>
   );
 }

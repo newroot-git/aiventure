@@ -19,15 +19,17 @@ export interface NotifData {
 export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon" | "side"; data: NotifData }) {
   const [open, setOpen] = React.useState(false);
   const [invites] = React.useState(data.invites);
-  const [nudges] = React.useState(data.nudges);
   const [notes, setNotes] = React.useState(data.notifications);
-  const count = invites.length + nudges.length + notes.length;
+  const nudgeNotes = notes.filter((n) => n.kind === "nudge");
+  const otherNotes = notes.filter((n) => n.kind !== "nudge");
+  const count = invites.length + notes.length;
   const active = usePathActive();
 
-  // activity items are read-only — once the panel has been opened, they're seen and clear out
+  // once the panel is opened the items are seen — clear locally + mark read server-side
   const close = () => {
     setOpen(false);
     setNotes([]);
+    fetch("/api/notifications/read", { method: "POST" }).catch(() => {});
   };
 
   return (
@@ -82,19 +84,19 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
                   </Section>
                 )}
 
-                {nudges.length > 0 && (
+                {nudgeNotes.length > 0 && (
                   <Section label="Nudges">
-                    {nudges.map((n) => (
-                      <Row key={n.id} href="/new" onPick={close} avatar={<PixelIcon name="nudge" />}>
-                        <b>{n.from.name}</b> nudged you
+                    {nudgeNotes.map((nt) => (
+                      <Row key={nt.id} href={nt.slug ? `/p/${nt.slug}` : "/crew"} onPick={close} avatar={<PixelIcon name="nudge" />}>
+                        {nt.text}
                       </Row>
                     ))}
                   </Section>
                 )}
 
-                {notes.length > 0 && (
+                {otherNotes.length > 0 && (
                   <Section label="Activity">
-                    {notes.map((nt) => (
+                    {otherNotes.map((nt) => (
                       <Row key={nt.id} href={nt.slug ? `/p/${nt.slug}` : undefined} onPick={close} avatar={<PixelIcon name="bell" />}>
                         {nt.text}
                       </Row>

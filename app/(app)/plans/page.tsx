@@ -12,6 +12,15 @@ export default async function HomePage() {
   const next = upcoming.find((p) => p.date);
   const rest = upcoming.filter((p) => p.slug !== next?.slug);
 
+  const names = next ? next.members.map((m) => m.name).filter((n) => n && n !== me?.name) : [];
+  const nextWho = next
+    ? next.groupName && next.groupName !== "You"
+      ? `with ${next.groupName}`
+      : names.length
+        ? "with " + (names.length <= 2 ? names.join(" & ") : `${names.slice(0, 2).join(", ")} +${names.length - 2}`)
+        : undefined
+    : undefined;
+
   return (
     <div>
       <h1 className="font-display text-3xl font-bold">Hey {me?.name ?? "there"}</h1>
@@ -19,7 +28,7 @@ export default async function HomePage() {
 
       {next && (
         <div className="mt-5">
-          <Countdown slug={next.slug} activity={next.activity} cover={next.cover} place={next.place} targetISO={`${next.date}T16:00:00`} />
+          <Countdown slug={next.slug} activity={next.activity} cover={next.cover} place={next.place} targetISO={`${next.date}T16:00:00`} who={nextWho} />
         </div>
       )}
 

@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { CalendarDays, MapPin } from "lucide-react";
+import { CalendarDays, MapPin, Users } from "lucide-react";
 
 function diff(target: number) {
   const ms = Math.max(0, target - Date.now());
@@ -30,12 +30,14 @@ export function Countdown({
   cover,
   place,
   targetISO,
+  who,
 }: {
   slug: string;
   activity: string;
   cover: string;
   place: string;
   targetISO: string;
+  who?: string;
 }) {
   const target = new Date(targetISO).getTime();
   const [t, setT] = React.useState(() => diff(target));
@@ -58,8 +60,9 @@ export function Countdown({
           <h3 className="mt-1 font-heading text-xl font-extrabold leading-tight text-white">
             {activity}
           </h3>
-          <div className="mt-1 flex items-center gap-1 text-sm text-white/75">
-            <MapPin size={13} /> {place}
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-white/75">
+            <span className="inline-flex items-center gap-1"><MapPin size={13} /> {place}</span>
+            {who && <span className="inline-flex items-center gap-1"><Users size={13} /> {who}</span>}
           </div>
           <div className="mt-4 flex items-center gap-4">
             <Unit v={t.d} label="days" />

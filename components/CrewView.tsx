@@ -1,54 +1,11 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { Hand, UserPlus, Plus, ChevronRight, X, Boxes, Check } from "lucide-react";
-import { Card, Button, Avatar, AvatarStack, SelectTag, Textarea } from "./ui";
+import { Hand, UserPlus, Plus, ChevronRight, X, Boxes } from "lucide-react";
+import { Card, Button, Avatar, AvatarStack } from "./ui";
+import { NudgeSheet } from "./NudgeSheet";
 import type { GroupCard, NudgeCard } from "@/lib/db";
 import type { Profile } from "@/lib/types";
-
-const NUDGE_WHEN = ["Whenever", "This week", "This weekend", "Soon"];
-
-function NudgeSheet({ friend, onClose }: { friend: Profile; onClose: () => void }) {
-  const [when, setWhen] = React.useState("This weekend");
-  const [note, setNote] = React.useState("");
-  const [sent, setSent] = React.useState(false);
-  return (
-    <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md p-4">
-        <div className="rounded-xl border-2 border-ink bg-surface p-4 shadow-hard">
-          {sent ? (
-            <div className="flex flex-col items-center py-6 text-center">
-              <span className="grid h-14 w-14 place-items-center rounded-md border-2 border-ink bg-success-soft text-success shadow-hard"><Check size={28} /></span>
-              <p className="mt-4 font-display text-xl font-bold">Nudge sent to {friend.name}</p>
-              <p className="mt-1 text-sm text-muted">They can suggest, set a condition, or rain-check.</p>
-              <Button variant="soft" className="mt-4" onClick={onClose}>Done</Button>
-            </div>
-          ) : (
-            <>
-              <div className="mb-3 flex items-center justify-between">
-                <span className="flex items-center gap-2 font-display text-lg font-bold">
-                  <Avatar name={friend.name} src={friend.avatar} size={32} /> Nudge {friend.name}
-                </span>
-                <button onClick={onClose} className="text-muted"><X size={20} /></button>
-              </div>
-              <p className="text-sm text-muted">Poke them to make plans with you — vague or specific.</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {NUDGE_WHEN.map((w) => (
-                  <SelectTag key={w} selected={when === w} onClick={() => setWhen(w)}>{w}</SelectTag>
-                ))}
-              </div>
-              <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} className="mt-3" placeholder="Anything specific? (optional)" />
-              <Button variant="primary" className="mt-3 w-full" onClick={() => setSent(true)}>
-                <Hand size={16} /> Send nudge
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
 
 function Heading({ icon, children, action }: { icon: React.ReactNode; children: React.ReactNode; action?: React.ReactNode }) {
   return (

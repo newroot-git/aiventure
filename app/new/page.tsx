@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Loader2, Sparkles, MapPin, Route, Tent, ArrowLeft, Plus, X, Navigation,
 } from "lucide-react";
-import { Button, Textarea, SelectTag, Label, Input } from "@/components/ui";
+import { Button, Textarea, SelectTag, Label, Input, Avatar } from "@/components/ui";
 import type { PlanScope } from "@/lib/types";
 
 const SCOPES: {
@@ -52,6 +52,12 @@ function NewPlanFlow() {
   const [who, setWho] = React.useState("The boys");
   const [nights, setNights] = React.useState(3);
   const [tick, setTick] = React.useState(0);
+  const [friends, setFriends] = React.useState<{ id: string; name: string; avatar?: string | null }[]>([]);
+  const [invited, setInvited] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    fetch("/api/friends").then((r) => r.json()).then((d) => setFriends(d.friends ?? [])).catch(() => {});
+  }, []);
 
   const location = areas.length ? areas.join(", ") : "London, UK";
 
@@ -140,6 +146,7 @@ function NewPlanFlow() {
           interests,
           location,
           aiBuild,
+          inviteIds: invited,
         }),
       });
       const data = await res.json();
@@ -273,6 +280,31 @@ function NewPlanFlow() {
         </div>
         <p className="mt-1 text-xs text-muted">Search and tap a place, or use your location. Defaults to London if blank.</p>
       </div>
+
+      {/* invite friends (optional) */}
+      {scope !== "surprise" && friends.length > 0 && (
+        <div className="mt-6">
+          <Label>Invite anyone? (optional)</Label>
+          <div className="mt-3 flex flex-wrap gap-3">
+            {friends.map((f) => {
+              const on = invited.includes(f.id);
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setInvited((p) => (on ? p.filter((x) => x !== f.id) : [...p, f.id]))}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <span className={on ? "rounded-md ring-2 ring-primary ring-offset-2 ring-offset-bg" : ""}>
+                    <Avatar name={f.name} src={f.avatar} size={44} />
+                  </span>
+                  <span className="truncate text-xs font-bold">{f.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* surprise */}
       {scope === "surprise" && (

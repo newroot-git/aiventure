@@ -1,9 +1,19 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Repeat } from "lucide-react";
 import { Card, Pill, AvatarStack } from "./ui";
 import type { PlanCard } from "@/lib/db";
+
+// pull a HH:MM out of a plan (recurrence time, or the tail of its date label)
+function timeOf(p: PlanCard): string | null {
+  if (p.recurrence?.time) return p.recurrence.time;
+  const m = p.dateLabel?.match(/\b(\d{1,2}:\d{2})\b/);
+  return m ? m[1] : null;
+}
+function cadenceLabel(c: string): string {
+  return c === "biweekly" ? "Fortnightly" : c === "monthly" ? "Monthly" : "Weekly";
+}
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 const MONTHS = [
@@ -17,7 +27,7 @@ export function CalendarView({ plans }: { plans: PlanCard[] }) {
     const m: Record<string, PlanCard[]> = {};
     // one-off plans land on their date
     for (const p of plans) if (p.date && !p.recurrence) (m[p.date] ??= []).push(p);
-    // recurring plans repeat weekly across a window (−4 wks … +26 wks)
+    // recurring plans repeat across a window (−4 wks … +26 wks)
     const recur = plans.filter((p) => p.recurrence);
     if (recur.length) {
       const start = new Date();
@@ -26,7 +36,20 @@ export function CalendarView({ plans }: { plans: PlanCard[] }) {
         const d = new Date(start);
         d.setDate(start.getDate() + i);
         const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-        for (const p of recur) if (p.recurrence!.weekday === d.getDay()) (m[ds] ??= []).push(p);
+        for (const p of recur) {
+          const r = p.recurrence!;
+          let hit = false;
+          if (r.cadence === "monthly") {
+            hit = d.getDate() === (r.monthday ?? 1);
+          } else if (r.weekday === d.getDay()) {
+            if (r.cadence === "biweekly" && r.anchor) {
+              const anchor = new Date(r.anchor);
+              const weeks = Math.round((d.getTime() - anchor.getTime()) / (7 * 864e5));
+              hit = weeks % 2 === 0;
+            } else hit = true; // weekly
+          }
+          if (hit) (m[ds] ??= []).push(p);
+        }
       }
     }
     return m;
@@ -87,6 +110,12 @@ export function CalendarView({ plans }: { plans: PlanCard[] }) {
                   <img src={cover} alt="" className="absolute inset-0 h-full w-full object-cover" />
                   <div className="absolute inset-0 bg-night/45" />
                   <span className="relative text-sm font-bold text-white drop-shadow-[1px_1px_0_rgba(0,0,0,0.6)]">{d}</span>
+                  {dayPlans.length > 1 && (
+                    <span className="absolute right-0.5 top-0.5 grid h-4 w-4 place-items-center rounded-full border border-ink bg-accent text-[9px] font-bold leading-none text-ink">{dayPlans.length}</span>
+                  )}
+                  {timeOf(dayPlans[0]) && (
+                    <span className="absolute inset-x-0 bottom-0 bg-night/55 text-center text-[8px] font-bold leading-tight text-white">{timeOf(dayPlans[0])}</span>
+                  )}
                 </button>
               );
             }
@@ -109,7 +138,11 @@ export function CalendarView({ plans }: { plans: PlanCard[] }) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.cover} alt="" className="h-32 w-full border-b-2 border-ink/10 object-cover" />
                   <div className="p-4">
-                    <Pill tone="secondary" className="mb-2">{p.groupName}</Pill>
+                    <div className="mb-2 flex items-center gap-2">
+                      <Pill tone="secondary">{p.groupName}</Pill>
+                      {p.recurrence && <Pill tone="primary"><Repeat size={12} /> {cadenceLabel(p.recurrence.cadence)}</Pill>}
+                      {timeOf(p) && <span className="inline-flex items-center gap-1 text-sm font-bold text-muted"><Clock size={13} /> {timeOf(p)}</span>}
+                    </div>
                     <h3 className="font-heading text-lg font-bold leading-snug">{p.activity}</h3>
                     <div className="mt-1.5 flex items-center gap-1 text-sm text-muted"><MapPin size={14} /> {p.place}</div>
                     <div className="mt-3"><AvatarStack people={p.members} /></div>

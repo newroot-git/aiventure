@@ -23,6 +23,8 @@ import {
   Wand2,
   Trash2,
   Repeat,
+  Pencil,
+  Hand,
 } from "lucide-react";
 import { Pill, Button, AvatarStack, Avatar } from "./ui";
 import { Reveal } from "./motion";
@@ -141,6 +143,7 @@ export function PlanView({
   friends = [],
   scaffold = [],
   recurrence = null,
+  isOwner = true,
 }: {
   plan: Plan;
   options: PlanOption[];
@@ -148,6 +151,7 @@ export function PlanView({
   friends?: Profile[];
   scaffold?: PlanScaffoldSlot[];
   recurrence?: PlanRecurrence | null;
+  isOwner?: boolean;
 }) {
   const slots = React.useMemo(() => buildSlots(options, scaffold), [options, scaffold]);
   const dayNums = React.useMemo(() => [...new Set(slots.map((s) => s.day))].sort((a, b) => a - b), [slots]);
@@ -187,6 +191,11 @@ export function PlanView({
   const [pickedFriends, setPickedFriends] = React.useState<string[]>([]);
   const [newSlot, setNewSlot] = React.useState<Record<number, string>>({});
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [editTitle, setEditTitle] = React.useState(false);
+  const [titleVal, setTitleVal] = React.useState(plan.activity ?? plan.title);
+  const [editLoc, setEditLoc] = React.useState(false);
+  const [locVal, setLocVal] = React.useState(plan.place_address ?? "");
+  const [poked, setPoked] = React.useState(false);
   const router = useRouter();
 
   const phase = plan.status;
@@ -292,6 +301,22 @@ export function PlanView({
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     } catch {}
+  }
+  async function saveTitle() {
+    setEditTitle(false);
+    if (titleVal.trim() && titleVal.trim() !== (plan.activity ?? plan.title)) await persist({ action: "title", title: titleVal.trim() });
+  }
+  async function saveLocation() {
+    setEditLoc(false);
+    if (locVal.trim() && locVal.trim() !== plan.place_address) await persist({ action: "location", location: locVal.trim() });
+  }
+  async function poke() {
+    setPoked(true);
+    await fetch("/api/plans/edit", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ slug: plan.slug, action: "poke" }),
+    });
+    setTimeout(() => setPoked(false), 2200);
   }
 
   if (phase === "completed") {
@@ -435,9 +460,26 @@ export function PlanView({
           )}
         </div>
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-4 pt-10">
-          <h1 className="font-heading text-2xl font-extrabold leading-tight text-white drop-shadow">
-            {plan.activity ?? plan.title}
-          </h1>
+          {editTitle ? (
+            <div className="flex gap-2">
+              <input
+                autoFocus
+                value={titleVal}
+                onChange={(e) => setTitleVal(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveTitle()}
+                className="w-full rounded-md border-2 border-white/60 bg-black/40 px-2 py-1 font-heading text-xl font-extrabold text-white outline-none"
+              />
+              <button onClick={saveTitle} className="rounded-md border-2 border-white/60 bg-black/40 px-2 text-white"><Check size={18} /></button>
+            </div>
+          ) : (
+            <h1
+              className="flex items-center gap-2 font-heading text-2xl font-extrabold leading-tight text-white drop-shadow"
+              onClick={() => isOwner && planning && (setTitleVal(plan.activity ?? plan.title), setEditTitle(true))}
+            >
+              {plan.activity ?? plan.title}
+              {isOwner && planning && <Pencil size={15} className="shrink-0 opacity-70" />}
+            </h1>
+          )}
         </div>
       </div>
 
@@ -445,7 +487,12 @@ export function PlanView({
       <div className="mt-4 grid grid-cols-2 gap-3">
         <Section icon={<Clock size={15} />} label={recurrence ? "Repeats" : "When"} tone="accent">
           {recurrence ? (
-            <div className="font-bold leading-tight">Every {WEEKDAYS[recurrence.weekday]}{recurrence.time ? ` · ${recurrence.time}` : ""}</div>
+            <div className="font-bold leading-tight">
+              {recurrence.cadence === "monthly"
+                ? `Monthly · ${ordinal(recurrence.monthday ?? 1)}`
+                : `${recurrence.cadence === "biweekly" ? "Fortnightly" : "Weekly"} · ${WEEKDAYS[recurrence.weekday]}`}
+              {recurrence.time ? ` · ${recurrence.time}` : ""}
+            </div>
           ) : (
             <>
               <div className="font-bold leading-tight">{fmtDate(plan.starts_at) ?? "Pick a time"}</div>
@@ -455,10 +502,31 @@ export function PlanView({
           )}
         </Section>
         <Section icon={<MapPin size={15} />} label={multiStep ? "Area" : "Where"} tone="primary">
-          <div className="font-bold leading-tight">{multiStep ? generalArea : (plan.place_name ?? "TBC")}</div>
-          {multiStep
-            ? <div className="text-sm text-muted">{pins.length} stop{pins.length === 1 ? "" : "s"}</div>
-            : plan.place_address && <div className="text-sm text-muted">{plan.place_address}</div>}
+          {editLoc ? (
+            <div className="flex gap-1.5">
+              <input
+                autoFocus
+                value={locVal}
+                onChange={(e) => setLocVal(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && saveLocation()}
+                placeholder="Area or town"
+                className="w-full rounded-md border-2 border-line bg-surface px-2 py-1 text-sm font-bold outline-none focus:border-primary"
+              />
+              <button onClick={saveLocation} className="shrink-0 text-primary"><Check size={16} /></button>
+            </div>
+          ) : (
+            <>
+              <div className="font-bold leading-tight">{multiStep ? generalArea : (plan.place_name ?? "TBC")}</div>
+              {multiStep
+                ? <div className="text-sm text-muted">{pins.length} stop{pins.length === 1 ? "" : "s"}</div>
+                : plan.place_address && <div className="text-sm text-muted">{plan.place_address}</div>}
+              {isOwner && planning && (
+                <button onClick={() => { setLocVal(plan.place_address ?? ""); setEditLoc(true); }} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-primary">
+                  <Pencil size={11} /> Change area
+                </button>
+              )}
+            </>
+          )}
         </Section>
       </div>
 
@@ -543,7 +611,7 @@ export function PlanView({
                     const i = idx++;
                     return (
                       <Reveal key={s.id} delay={Math.min(i, 5) * 0.05}>
-                        <SlotBlock slot={s} index={i} />
+                        {SlotBlock({ slot: s, index: i })}
                       </Reveal>
                     );
                   })}
@@ -588,7 +656,18 @@ export function PlanView({
           </a>
         </div>
 
-        {phase === "open" ? (
+        {/* poke non-voters (owner, planning, others present) */}
+        {isOwner && planning && members.length > 1 && (
+          <Button variant="soft" onClick={poke} disabled={poked}>
+            <Hand size={16} /> {poked ? "Poked everyone" : "Poke people to weigh in"}
+          </Button>
+        )}
+
+        {!isOwner ? (
+          <p className="rounded-xl border-2 border-ink/10 bg-surface-2/50 px-4 py-3 text-center text-sm font-bold text-muted">
+            {phase === "locked" ? "Locked in by the owner." : "Vote and add ideas — the owner locks it in."}
+          </p>
+        ) : phase === "open" ? (
           <>
             <Button variant="primary" disabled={busy} onClick={() => move("locked")}>
               {busy ? <Loader2 size={18} className="animate-spin" /> : <Lock size={18} />} Lock it in
@@ -610,8 +689,8 @@ export function PlanView({
           </>
         )}
 
-        {/* delete */}
-        {confirmDelete ? (
+        {/* delete (owner only) */}
+        {isOwner && (confirmDelete ? (
           <div className="rounded-xl border-2 border-ink bg-surface p-4 text-center shadow-hard">
             <p className="text-sm font-bold">Delete this plan for good? This can&apos;t be undone.</p>
             <div className="mt-3 flex gap-3">
@@ -629,7 +708,7 @@ export function PlanView({
           <button onClick={() => setConfirmDelete(true)} className="mx-auto inline-flex items-center gap-1.5 text-sm font-bold text-muted hover:text-[#c0392b]">
             <Trash2 size={14} /> Delete plan
           </button>
-        )}
+        ))}
       </section>
 
       <p className="mt-6 text-center text-xs text-muted">No app needed — anyone with this link can join.</p>
@@ -745,31 +824,56 @@ function GeneralFeedback({
   );
 }
 
-/* weekly recurrence control */
+/* recurrence control — weekly / fortnightly / monthly */
+const CADENCES: { id: PlanRecurrence["cadence"]; label: string }[] = [
+  { id: "weekly", label: "Weekly" },
+  { id: "biweekly", label: "Fortnightly" },
+  { id: "monthly", label: "Monthly" },
+];
+function ordinal(n: number) {
+  const s = ["th", "st", "nd", "rd"], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
 function RecurringControl({
   recurrence, defaultStart, onChange,
 }: {
   recurrence: PlanRecurrence | null; defaultStart?: string | null; onChange: (r: PlanRecurrence | null) => void;
 }) {
-  const startWeekday = defaultStart ? new Date(defaultStart).getDay() : new Date().getDay();
+  const base = defaultStart ? new Date(defaultStart) : new Date();
+  const time = defaultStart ? base.toTimeString().slice(0, 5) : (recurrence?.time ?? null);
+  function build(cadence: PlanRecurrence["cadence"]): PlanRecurrence {
+    return {
+      cadence,
+      weekday: recurrence?.weekday ?? base.getDay(),
+      monthday: recurrence?.monthday ?? base.getDate(),
+      time: recurrence?.time ?? time,
+      anchor: recurrence?.anchor ?? base.toISOString().slice(0, 10),
+    };
+  }
+  const summary = recurrence
+    ? recurrence.cadence === "monthly"
+      ? `Repeats monthly on the ${ordinal(recurrence.monthday ?? base.getDate())}`
+      : `Repeats ${recurrence.cadence === "biweekly" ? "every two weeks" : "weekly"} on ${WEEKDAYS[recurrence.weekday]}`
+    : null;
   return (
     <Section icon={<Repeat size={15} />} label="Recurring" tone="secondary">
-      {recurrence ? (
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="font-bold">Repeats every {WEEKDAYS[recurrence.weekday]}</div>
-            <p className="text-sm text-muted">Shows weekly — people confirm each time.</p>
-          </div>
-          <Button variant="soft" size="sm" className="shrink-0 whitespace-nowrap" onClick={() => onChange(null)}>Turn off</Button>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted">Make this a weekly thing (e.g. climbing every week).</p>
-          <Button variant="secondary" size="sm" className="shrink-0 whitespace-nowrap" onClick={() => onChange({ cadence: "weekly", weekday: startWeekday, time: defaultStart ? new Date(defaultStart).toTimeString().slice(0, 5) : null })}>
-            <Repeat size={14} /> Make weekly
-          </Button>
-        </div>
-      )}
+      <p className="mb-3 text-sm text-muted">
+        {summary ?? "Make this a regular thing (e.g. climbing every week). People confirm each time."}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        {CADENCES.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => onChange(build(c.id))}
+            className={`rounded-md border-2 px-3 py-1.5 text-sm font-bold transition ${recurrence?.cadence === c.id ? "border-ink bg-secondary text-white" : "border-line text-ink hover:border-secondary"}`}
+          >
+            {c.label}
+          </button>
+        ))}
+        {recurrence && (
+          <Button variant="soft" size="sm" className="ml-auto shrink-0 whitespace-nowrap" onClick={() => onChange(null)}>Turn off</Button>
+        )}
+      </div>
     </Section>
   );
 }

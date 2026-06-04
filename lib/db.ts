@@ -1,4 +1,5 @@
 import "server-only";
+import { cookies } from "next/headers";
 import { supabaseAdmin } from "./supabase/admin";
 import { generateDrop, generateSlotOptions, mapsUrl, type DropInput, type DropSlot } from "./ai";
 import { planSlug } from "./slug";
@@ -6,6 +7,26 @@ import type { Plan, PlanOption, PlanMember, Profile } from "./types";
 
 // Demo identity (stands in for auth) — the seeded "Josh" profile.
 export const DEMO_USER_ID = "11111111-1111-1111-1111-111111111111";
+
+// Current acting user. Reads the `av_uid` cookie (set by the dev profile switcher);
+// defaults to Josh. This is the single seam for real auth later — swap the cookie
+// read for a Supabase auth session and every caller keeps working.
+export async function currentUserId(): Promise<string> {
+  try {
+    const c = await cookies();
+    return c.get("av_uid")?.value || DEMO_USER_ID;
+  } catch {
+    return DEMO_USER_ID;
+  }
+}
+
+/** True if the acting user owns (created) the plan. */
+export async function isPlanOwner(slug: string): Promise<boolean> {
+  const db = supabaseAdmin();
+  const me = await currentUserId();
+  const { data } = await db.from("plans").select("creator_id").eq("slug", slug).maybeSingle();
+  return !!data && (data as Row).creator_id === me;
+}
 
 // activity categories that have a dedicated lush cover image
 const COVER_CATS = new Set([
@@ -26,7 +47,7 @@ function deriveCover(hue?: string | null): string | null {
 // scaffold (so empty slots persist) + any recurrence config. No DDL needed.
 const META_TITLE = "__meta";
 interface ScaffoldSlot { key: string; label: string; day: number; order: number; fixed?: boolean }
-interface Recurrence { cadence: "weekly"; weekday: number; time?: string | null }
+interface Recurrence { cadence: "weekly" | "biweekly" | "monthly"; weekday: number; monthday?: number; time?: string | null; anchor?: string }
 interface PlanMeta { scaffold: ScaffoldSlot[]; recurrence: Recurrence | null }
 
 // default empty skeleton when the user builds it themselves (no AI)
@@ -91,6 +112,7 @@ export async function createPlanFromDrop(input: DropInput): Promise<{ slug: stri
   const scaffold = aiBuild ? scaffoldFromSlots(slots) : defaultScaffold(input.scope, input.nights);
   const slug = planSlug(`${Date.now()}-${input.intent}`);
   const db = supabaseAdmin();
+  const me = await currentUserId();
 
   const firstTile = slots[0]?.options[0]?.tile ?? "city";
   const { data: plan, error } = await db
@@ -101,7 +123,7 @@ export async function createPlanFromDrop(input: DropInput): Promise<{ slug: stri
       intent: input.intent,
       status: "open",
       visibility: "invite",
-      creator_id: DEMO_USER_ID,
+      creator_id: me,
       ai_empowered: true,
       cover_hue: firstTile,
       place_address: input.location ?? null, // stash search area for later refine + general "where"
@@ -119,7 +141,7 @@ export async function createPlanFromDrop(input: DropInput): Promise<{ slug: stri
   await writeMeta(planId, { scaffold });
   // ensure the creator is a member so the plan shows on their home/calendar
   await db.from("plan_members")
-    .upsert({ plan_id: planId, profile_id: DEMO_USER_ID, rsvp: "in", joined_via: "app" } as never,
+    .upsert({ plan_id: planId, profile_id: me, rsvp: "in", joined_via: "app" } as never,
       { onConflict: "plan_id,profile_id" } as never);
   return { slug };
 }
@@ -156,7 +178,7 @@ function flattenSlots(planId: string, slots: DropSlot[]) {
 }
 
 export interface PlanScaffoldSlot { key: string; label: string; day: number; order: number; fixed?: boolean }
-export interface PlanRecurrence { cadence: "weekly"; weekday: number; time?: string | null }
+export interface PlanRecurrence { cadence: "weekly" | "biweekly" | "monthly"; weekday: number; monthday?: number; time?: string | null; anchor?: string }
 
 /** Load a persisted plan + its options + members + meta by slug (null if not found). */
 export async function getPlanBySlug(slug: string): Promise<{
@@ -165,8 +187,11 @@ export async function getPlanBySlug(slug: string): Promise<{
   members: PlanMember[];
   scaffold: PlanScaffoldSlot[];
   recurrence: PlanRecurrence | null;
+  currentUserId: string;
+  isOwner: boolean;
 } | null> {
   const db = supabaseAdmin();
+  const me = await currentUserId();
   const { data: plan } = await db.from("plans").select("*").eq("slug", slug).maybeSingle();
   if (!plan) return null;
 
@@ -198,6 +223,8 @@ export async function getPlanBySlug(slug: string): Promise<{
     })) as unknown as PlanMember[],
     scaffold: meta.scaffold,
     recurrence: meta.recurrence,
+    currentUserId: me,
+    isOwner: (row.creator_id as string) === me,
   };
 }
 
@@ -231,7 +258,7 @@ function fmtDateLabel(iso?: string | null): string {
 export interface PlanCard {
   id: string; slug: string; activity: string; dateLabel: string; date: string; place: string;
   groupName: string; members: Profile[]; status: "upcoming" | "past"; adventureNo?: number;
-  cover: string; tile: string; recurrence?: { weekday: number; time?: string | null } | null;
+  cover: string; tile: string; recurrence?: PlanRecurrence | null;
 }
 
 function mapPlanCard(r: Row): PlanCard {
@@ -259,11 +286,12 @@ const PLAN_SELECT = "*, group:groups(name), plan_members(rsvp, profile:profiles(
 
 export async function getUserPlans(): Promise<PlanCard[]> {
   const db = supabaseAdmin();
-  const { data: mem } = await db.from("plan_members").select("plan_id").eq("profile_id", DEMO_USER_ID);
+  const me = await currentUserId();
+  const { data: mem } = await db.from("plan_members").select("plan_id").eq("profile_id", me);
   const ids = ((mem as Row[]) ?? []).map((m) => m.plan_id as string);
   const orFilter = ids.length
-    ? `creator_id.eq.${DEMO_USER_ID},id.in.(${ids.join(",")})`
-    : `creator_id.eq.${DEMO_USER_ID}`;
+    ? `creator_id.eq.${me},id.in.(${ids.join(",")})`
+    : `creator_id.eq.${me}`;
   const { data } = await db.from("plans").select(PLAN_SELECT).or(orFilter).order("created_at", { ascending: false });
   const cards = ((data as Row[]) ?? []).map(mapPlanCard);
   // attach recurrence from each plan's meta row
@@ -271,10 +299,10 @@ export async function getUserPlans(): Promise<PlanCard[]> {
   if (planIds.length) {
     const { data: metas } = await db.from("plan_options")
       .select("plan_id, payload").eq("title", META_TITLE).in("plan_id", planIds);
-    const recByPlan = new Map<string, { weekday: number; time?: string | null }>();
+    const recByPlan = new Map<string, PlanRecurrence>();
     for (const m of (metas as Row[]) ?? []) {
       const rec = ((m.payload as Row)?.meta as PlanMeta | undefined)?.recurrence;
-      if (rec) recByPlan.set(m.plan_id as string, { weekday: rec.weekday, time: rec.time ?? null });
+      if (rec) recByPlan.set(m.plan_id as string, rec as PlanRecurrence);
     }
     for (const c of cards) c.recurrence = recByPlan.get(c.id) ?? null;
   }
@@ -283,13 +311,21 @@ export async function getUserPlans(): Promise<PlanCard[]> {
 
 export async function getCurrentProfile(): Promise<Profile | null> {
   const db = supabaseAdmin();
-  const { data } = await db.from("profiles").select("*").eq("id", DEMO_USER_ID).maybeSingle();
+  const { data } = await db.from("profiles").select("*").eq("id", await currentUserId()).maybeSingle();
   return mapProfile(data as Row | null);
+}
+
+/** All seeded profiles — used by the dev profile switcher. */
+export async function getAllProfiles(): Promise<Profile[]> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("profiles").select("*").order("created_at");
+  return ((data as Row[]) ?? []).map((r) => mapProfile(r)).filter((p): p is Profile => !!p);
 }
 
 export async function getFriends(): Promise<{ profile: Profile; shared: string[] }[]> {
   const db = supabaseAdmin();
-  const { data: profiles } = await db.from("profiles").select("*").neq("id", DEMO_USER_ID);
+  const me = await currentUserId();
+  const { data: profiles } = await db.from("profiles").select("*").neq("id", me);
   const groups = await getUserGroups();
   return ((profiles as Row[]) ?? [])
     .map((r) => mapProfile(r))
@@ -301,7 +337,7 @@ export interface GroupCard { id: string; name: string; members: Profile[] }
 
 export async function getUserGroups(): Promise<GroupCard[]> {
   const db = supabaseAdmin();
-  const { data: gm } = await db.from("group_members").select("group_id").eq("profile_id", DEMO_USER_ID);
+  const { data: gm } = await db.from("group_members").select("group_id").eq("profile_id", await currentUserId());
   const ids = ((gm as Row[]) ?? []).map((g) => g.group_id as string);
   if (!ids.length) return [];
   const { data } = await db.from("groups").select("*, group_members(profile:profiles(*))").in("id", ids);
@@ -433,8 +469,9 @@ export async function setRecurrence(slug: string, recurrence: PlanRecurrence | n
   await writeMeta((plan as Row).id as string, { recurrence });
 }
 
-/** Delete a plan and all its options/members (irreversible). */
+/** Delete a plan and all its options/members (irreversible). Owner only. */
 export async function deletePlan(slug: string): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
   if (!plan) return;
@@ -550,23 +587,74 @@ export async function setPlanWhen(slug: string, startsAt: string): Promise<void>
   await db.from("plans").update({ starts_at: startsAt } as never).eq("slug", slug);
 }
 
-/** Invite people (add them as plan members). */
-export async function invitePeople(slug: string, profileIds: string[]): Promise<void> {
+/** Rename a plan (owner-editable title). */
+export async function setPlanTitle(slug: string, title: string): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
-  const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
-  if (!plan) throw new Error("plan not found");
-  const pid = (plan as Row).id as string;
-  const rows = profileIds.map((id) => ({ plan_id: pid, profile_id: id, rsvp: "in", joined_via: "app" }));
-  if (rows.length) await db.from("plan_members").upsert(rows as never, { onConflict: "plan_id,profile_id" } as never);
+  await db.from("plans").update({ title: title.slice(0, 140), activity: title.slice(0, 140) } as never).eq("slug", slug);
 }
 
-/** Move a plan through its lifecycle: open (planning) → locked → completed. */
+/** Update the plan's general area/location. */
+export async function setPlanLocation(slug: string, location: string): Promise<void> {
+  const db = supabaseAdmin();
+  await db.from("plans").update({ place_address: location.slice(0, 200) } as never).eq("slug", slug);
+}
+
+/** Invite people: add as members + drop an invite + notification for each. */
+export async function invitePeople(slug: string, profileIds: string[]): Promise<void> {
+  const db = supabaseAdmin();
+  const me = await currentUserId();
+  const { data: plan } = await db.from("plans").select("id, title, activity, cover_hue").eq("slug", slug).maybeSingle();
+  if (!plan) throw new Error("plan not found");
+  const p = plan as Row;
+  const pid = p.id as string;
+  const rows = profileIds.map((id) => ({ plan_id: pid, profile_id: id, rsvp: "in", joined_via: "app" }));
+  if (!rows.length) return;
+  await db.from("plan_members").upsert(rows as never, { onConflict: "plan_id,profile_id" } as never);
+
+  const { data: meProfile } = await db.from("profiles").select("name").eq("id", me).maybeSingle();
+  const myName = (meProfile as Row | null)?.name as string ?? "A friend";
+  const activity = (p.activity as string) || (p.title as string) || "a plan";
+  const cover = deriveCover(p.cover_hue as string) ?? "/img/cover-hike.png";
+  for (const id of profileIds) {
+    await db.from("invites").insert({
+      to_id: id, from_id: me, from_label: myName, kind: "friend", activity, plan_slug: slug, cover,
+    } as never);
+    await notify(id, `${myName} invited you to ${activity}`, "invite", slug);
+  }
+}
+
+/** Move a plan through its lifecycle: open → locked → completed. Owner only. */
 export async function updatePlanStatus(slug: string, status: "open" | "locked" | "completed"): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   const patch: Record<string, unknown> = { status };
   patch.completed_at = status === "completed" ? new Date().toISOString() : null;
   const { error } = await db.from("plans").update(patch as never).eq("slug", slug);
   if (error) throw new Error(error.message);
+
+  // tell members when it's locked in
+  if (status === "locked") {
+    const { data: plan } = await db.from("plans").select("id, title, activity").eq("slug", slug).maybeSingle();
+    if (plan) {
+      const me = await currentUserId();
+      const title = ((plan as Row).activity as string) || ((plan as Row).title as string) || "your plan";
+      const { data: members } = await db.from("plan_members").select("profile_id").eq("plan_id", (plan as Row).id as string);
+      for (const m of (members as Row[]) ?? []) {
+        const id = m.profile_id as string;
+        if (id !== me) await notify(id, `"${title}" is locked in`, "locked", slug);
+      }
+    }
+  }
+}
+
+// Throw unless the acting user owns the plan — guards owner-only actions.
+async function assertOwner(slug: string): Promise<void> {
+  const db = supabaseAdmin();
+  const me = await currentUserId();
+  const { data } = await db.from("plans").select("creator_id").eq("slug", slug).maybeSingle();
+  if (!data) throw new Error("plan not found");
+  if ((data as Row).creator_id !== me) throw new Error("Only the plan owner can do that");
 }
 
 // ---------- communities / events / nudges / invites / notifications ----------
@@ -574,7 +662,7 @@ export interface CommunityCard { id: string; name: string; tag: string; members:
 export interface OpenEventCard { id: string; community: string; activity: string; place: string; dateLabel: string; cover: string; going: number; slug: string }
 export interface NudgeCard { id: string; from: Profile; message: string; when: string }
 export interface InviteCard { id: string; fromLabel: string; kind: string; activity: string; slug: string; dateLabel: string; cover: string }
-export interface NotificationCard { id: string; text: string; when: string; slug?: string }
+export interface NotificationCard { id: string; text: string; when: string; slug?: string; kind?: string }
 
 export async function getCommunities(): Promise<CommunityCard[]> {
   const db = supabaseAdmin();
@@ -596,7 +684,7 @@ export async function getOpenEvents(): Promise<OpenEventCard[]> {
 
 export async function getNudges(): Promise<NudgeCard[]> {
   const db = supabaseAdmin();
-  const { data } = await db.from("nudges").select("*, from:profiles!from_id(*)").eq("to_id", DEMO_USER_ID).eq("status", "pending").order("created_at", { ascending: false });
+  const { data } = await db.from("nudges").select("*, from:profiles!from_id(*)").eq("to_id", await currentUserId()).eq("status", "pending").order("created_at", { ascending: false });
   return ((data as Row[]) ?? []).map((n) => ({
     id: n.id as string, from: mapProfile(n.from as Row) ?? ({ name: "Someone" } as Profile),
     message: n.message as string, when: (n.when_text as string) ?? "",
@@ -605,7 +693,7 @@ export async function getNudges(): Promise<NudgeCard[]> {
 
 export async function getInvites(): Promise<InviteCard[]> {
   const db = supabaseAdmin();
-  const { data } = await db.from("invites").select("*").eq("to_id", DEMO_USER_ID).order("created_at", { ascending: false });
+  const { data } = await db.from("invites").select("*").eq("to_id", await currentUserId()).order("created_at", { ascending: false });
   return ((data as Row[]) ?? []).map((i) => ({
     id: i.id as string, fromLabel: (i.from_label as string) ?? "Someone", kind: (i.kind as string) ?? "friend",
     activity: (i.activity as string) ?? "", slug: (i.plan_slug as string) ?? "wild-otter-42",
@@ -615,8 +703,78 @@ export async function getInvites(): Promise<InviteCard[]> {
 
 export async function getNotifications(): Promise<NotificationCard[]> {
   const db = supabaseAdmin();
-  const { data } = await db.from("notifications").select("*").eq("profile_id", DEMO_USER_ID).eq("acknowledged", false).order("created_at", { ascending: false });
+  const { data } = await db.from("notifications").select("*").eq("profile_id", await currentUserId()).eq("acknowledged", false).order("created_at", { ascending: false });
   return ((data as Row[]) ?? []).map((n) => ({
-    id: n.id as string, text: n.text as string, when: (n.when_text as string) ?? "", slug: (n.plan_slug as string) ?? undefined,
+    id: n.id as string, text: n.text as string, when: (n.when_text as string) ?? "",
+    slug: (n.plan_slug as string) ?? undefined, kind: (n.kind as string) ?? undefined,
   }));
+}
+
+// ---------- writes: notifications, nudges, poke, mark-read ----------
+
+/** Internal: drop a notification for a profile. */
+async function notify(profileId: string, text: string, kind: string, planSlug?: string | null) {
+  const db = supabaseAdmin();
+  await db.from("notifications").insert({
+    profile_id: profileId, text, kind, plan_slug: planSlug ?? null, acknowledged: false,
+  } as never);
+}
+
+/** Mark all of the acting user's notifications read (called when the panel is opened). */
+export async function markNotificationsRead(): Promise<void> {
+  const db = supabaseAdmin();
+  await db.from("notifications").update({ acknowledged: true } as never).eq("profile_id", await currentUserId());
+}
+
+/**
+ * Nudge a friend: the intent to do something. Creates a shared, empty collaborative
+ * plan (both are members) so the recipient lands somewhere to co-build, plus a nudge
+ * row + a notification linking to that plan.
+ */
+export async function sendNudge(toId: string, message: string, whenText: string): Promise<{ slug: string }> {
+  const db = supabaseAdmin();
+  const me = await currentUserId();
+  const { data: meProfile } = await db.from("profiles").select("name").eq("id", me).maybeSingle();
+  const myName = (meProfile as Row | null)?.name as string ?? "A friend";
+
+  // shared empty plan to figure it out together
+  const slug = planSlug(`${Date.now()}-nudge`);
+  const { data: plan } = await db.from("plans").insert({
+    slug,
+    title: message?.trim() ? message.trim().slice(0, 140) : `${myName} wants to do something`,
+    intent: message ?? null,
+    status: "open",
+    visibility: "invite",
+    creator_id: me,
+    ai_empowered: true,
+    cover_hue: "city",
+  } as never).select("id").single();
+  const planId = (plan as unknown as Row | null)?.id as string;
+  if (planId) {
+    await db.from("plan_members").upsert([
+      { plan_id: planId, profile_id: me, rsvp: "in", joined_via: "app" },
+      { plan_id: planId, profile_id: toId, rsvp: "maybe", joined_via: "app" },
+    ] as never, { onConflict: "plan_id,profile_id" } as never);
+    await writeMeta(planId, { scaffold: [{ key: "plan", label: "What shall we do?", day: 1, order: 0 }] });
+  }
+
+  await db.from("nudges").insert({ from_id: me, to_id: toId, message: message ?? null, when_text: whenText, status: "pending" } as never);
+  const detail = message?.trim() ? ` — "${message.trim()}"` : "";
+  await notify(toId, `${myName} nudged you${detail}`, "nudge", slug);
+  return { slug };
+}
+
+/** Poke everyone invited to a plan who hasn't picked/voted yet. Owner action. */
+export async function pokeNonVoters(slug: string): Promise<number> {
+  const db = supabaseAdmin();
+  const me = await currentUserId();
+  const { data: plan } = await db.from("plans").select("id, title").eq("slug", slug).maybeSingle();
+  if (!plan) return 0;
+  const planId = (plan as Row).id as string;
+  const { data: meProfile } = await db.from("profiles").select("name").eq("id", me).maybeSingle();
+  const myName = (meProfile as Row | null)?.name as string ?? "Someone";
+  const { data: members } = await db.from("plan_members").select("profile_id").eq("plan_id", planId);
+  const others = ((members as Row[]) ?? []).map((m) => m.profile_id as string).filter((id) => id !== me);
+  for (const id of others) await notify(id, `${myName} poked you to weigh in on "${(plan as Row).title as string}"`, "poke", slug);
+  return others.length;
 }

@@ -1,12 +1,13 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Home, Users, CalendarDays, Compass } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Home, Users, CalendarDays, Compass, ChevronsUpDown } from "lucide-react";
 import { Avatar } from "./ui";
 import { QuickMenu } from "./QuickMenu";
 import { NotificationsMenu, type NotifData } from "./NotificationsMenu";
 import { CURRENT_USER } from "@/lib/mock";
+import type { Profile } from "@/lib/types";
 
 const TABS = [
   { href: "/plans", label: "Home", Icon: Home },
@@ -15,9 +16,14 @@ const TABS = [
   { href: "/groups", label: "Crew", Icon: Users },
 ];
 
-export function AppShell({ children, notifs }: { children: React.ReactNode; notifs: NotifData }) {
+export function AppShell({
+  children, notifs, me, profiles = [],
+}: {
+  children: React.ReactNode; notifs: NotifData; me?: Profile | null; profiles?: Profile[];
+}) {
   const path = usePathname();
   const isActive = (href: string) => path.startsWith(href);
+  const user = me ?? CURRENT_USER;
 
   return (
     <div className="min-h-dvh">
@@ -43,9 +49,10 @@ export function AppShell({ children, notifs }: { children: React.ReactNode; noti
               isActive("/profile") ? "bg-primary-soft" : "hover:bg-surface-2"
             }`}
           >
-            <Avatar name={CURRENT_USER.name} src={CURRENT_USER.avatar} size={30} />
-            <span className="text-[15px] font-bold">{CURRENT_USER.name}</span>
+            <Avatar name={user.name} src={user.avatar} size={30} />
+            <span className="text-[15px] font-bold">{user.name}</span>
           </Link>
+          {profiles.length > 1 && <ProfileSwitcher me={user} profiles={profiles} />}
         </div>
       </aside>
 
@@ -58,9 +65,10 @@ export function AppShell({ children, notifs }: { children: React.ReactNode; noti
               AI<span className="text-primary">venture</span>
             </Link>
             <div className="flex items-center gap-3">
+              {profiles.length > 1 && <ProfileSwitcher me={user} profiles={profiles} compact />}
               <NotificationsMenu variant="icon" data={notifs} />
               <Link href="/profile" aria-label="Profile">
-                <Avatar name={CURRENT_USER.name} src={CURRENT_USER.avatar} size={32} />
+                <Avatar name={user.name} src={user.avatar} size={32} />
               </Link>
             </div>
           </div>
@@ -83,6 +91,48 @@ export function AppShell({ children, notifs }: { children: React.ReactNode; noti
           </div>
         </nav>
       </div>
+    </div>
+  );
+}
+
+// Dev-only identity switcher — stands in for real auth (sets the av_uid cookie).
+function ProfileSwitcher({ me, profiles, compact }: { me: Profile; profiles: Profile[]; compact?: boolean }) {
+  const [open, setOpen] = React.useState(false);
+  const router = useRouter();
+  async function switchTo(id: string) {
+    setOpen(false);
+    await fetch("/api/whoami", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    router.refresh();
+  }
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className={compact
+          ? "grid h-9 w-9 place-items-center rounded-md border-2 border-line text-muted"
+          : "flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-xs font-bold text-muted hover:bg-surface-2"}
+        title="Switch user (dev)"
+      >
+        <ChevronsUpDown size={compact ? 18 : 14} /> {compact ? null : "Switch user (dev)"}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className={`absolute z-50 w-52 rounded-xl border-2 border-ink bg-surface p-1.5 shadow-hard ${compact ? "right-0 top-11" : "bottom-10 left-0"}`}>
+            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted">Acting as (dev)</div>
+            {profiles.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => switchTo(p.id)}
+                className={`flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-bold transition hover:bg-surface-2 ${p.id === me.id ? "text-primary" : "text-ink"}`}
+              >
+                <Avatar name={p.name} src={p.avatar} size={26} /> {p.name}
+                {p.id === me.id && <span className="ml-auto text-xs">●</span>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

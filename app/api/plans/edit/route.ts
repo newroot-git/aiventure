@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   choosePlanOption, setPlanWhen, invitePeople,
   setSlotTime, addSlot, setRecurrence, deletePlan,
+  setPlanTitle, setPlanLocation, pokeNonVoters,
   type PlanRecurrence,
 } from "@/lib/db";
 
@@ -10,7 +11,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   let body: {
     slug?: string;
-    action?: "choose" | "when" | "invite" | "slotTime" | "addSlot" | "recurrence" | "delete";
+    action?: "choose" | "when" | "invite" | "slotTime" | "addSlot" | "recurrence" | "delete" | "title" | "location" | "poke";
     optionId?: string;
     startsAt?: string;
     profileIds?: string[];
@@ -18,6 +19,8 @@ export async function POST(req: Request) {
     day?: number;
     time?: string | null;
     label?: string;
+    title?: string;
+    location?: string;
     recurrence?: PlanRecurrence | null;
   };
   try {
@@ -36,6 +39,9 @@ export async function POST(req: Request) {
     else if (body.action === "addSlot" && body.label?.trim()) await addSlot(body.slug, body.label, body.day ?? 1);
     else if (body.action === "recurrence") await setRecurrence(body.slug, body.recurrence ?? null);
     else if (body.action === "delete") await deletePlan(body.slug);
+    else if (body.action === "title" && body.title?.trim()) await setPlanTitle(body.slug, body.title);
+    else if (body.action === "location" && body.location?.trim()) await setPlanLocation(body.slug, body.location);
+    else if (body.action === "poke") return NextResponse.json({ ok: true, poked: await pokeNonVoters(body.slug) });
     else return NextResponse.json({ error: "bad action params" }, { status: 400 });
     return NextResponse.json({ ok: true });
   } catch (e) {

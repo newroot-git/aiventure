@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
-import { createPlanFromDrop } from "@/lib/db";
+import { createPlanFromDrop, invitePeople } from "@/lib/db";
 import type { DropInput } from "@/lib/ai";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
 
 export async function POST(req: Request) {
-  let body: DropInput;
+  let body: DropInput & { inviteIds?: string[] };
   try {
-    body = (await req.json()) as DropInput;
+    body = (await req.json()) as DropInput & { inviteIds?: string[] };
   } catch {
     return NextResponse.json({ error: "invalid JSON" }, { status: 400 });
   }
@@ -17,6 +17,9 @@ export async function POST(req: Request) {
   }
   try {
     const { slug } = await createPlanFromDrop(body);
+    if (Array.isArray(body.inviteIds) && body.inviteIds.length) {
+      await invitePeople(slug, body.inviteIds).catch((e) => console.error("[invite on create]", e));
+    }
     return NextResponse.json({ slug });
   } catch (e) {
     console.error("[/api/plans/create]", e);

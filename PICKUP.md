@@ -1,34 +1,41 @@
 # AIventure — Pickup
 
-Last session: 2026-06-04. Hackathon due June 5 (Agent track). Style LOCKED: lush peaceful pixel landscapes, NO emojis, lucide icons + initials/image avatars.
+Last session: 2026-06-04. Hackathon due June 5 (Agent track, submit by 23:59 SGT). Style LOCKED: lush pixel landscapes, NO emojis, lucide icons + initials/image avatars.
 
-## Foundation — Plan = activity-slots model
-A plan is ordered **slots** ("Brunch", "Main thing", "Drinks"), each holding voteable options; pick one per slot. One renderer (`PlanView`) for everything: one-thing = 1 slot, adventure = N slots day 1, trip = slots across days. `/a/[slug]` redirects to `/p/[slug]`. Slots + scaffold + recurrence live entirely in `plan_options` (no DDL).
+## Architecture
+Plans = ordered **slots** (each holds voteable options; pick one per slot). One renderer `PlanView` for one-thing / adventure / trip. Slots + scaffold + recurrence all live in `plan_options` (no DDL — meta row `kind='time', title='__meta'`). `/a/[slug]` → redirects `/p/[slug]`.
 
-## This session — AI opt-in, manual build, recurring, map, polish
-- **AI is opt-in, not default.** `/new` ends in two CTAs: "Build it with AI" vs "I'll build it myself". `createPlanFromDrop(aiBuild)` → AI fills slots OR creates an empty named **scaffold** per scope (single=1, adventure=Food/Main/After, trip=Morning/Lunch/Afternoon/Evening × days). Scaffold persisted in a **meta row** (`plan_options` kind=`time`, title=`__meta`, payload.meta={scaffold,recurrence}).
-- **Per-slot AI on tap** — empty slot shows "Suggest with AI" (`refineSlot` with no feedback); populated slot shows the refine box. Every slot also has "add your own".
-- **Add steps** — per-day "Add a step" appends a slot to the scaffold (`addSlot`).
-- **General feedback** — one box re-rolls the whole plan (single-day) or a whole day (multi-day) in one shot (`refineAll`, `/api/plans/refine` with `all:true`).
-- **Proper titles** — `generateDrop` returns a `title`; multi-slot plans keep it as the hero (never name themselves after the first venue; `deriveHeadline` is scaffold-aware). Single-slot still adopts the chosen venue name.
-- **General-area "where"** — multi-slot plans show the area (`place_address`) + stop count; single shows the venue.
-- **Per-activity times** — each decided slot has an on-brand time chip (`setSlotTime`). AI prose times ("lunch") are sanitized out; only `HH:MM` kept.
-- **Multi-pin map** — `components/PlanMap.tsx`: Leaflet via CDN + OSM tiles (no key), geocodes each chosen activity via Nominatim, numbered pins + fit bounds. Shows when ≥1 located stop.
-- **Recurring weekly series** — `setRecurrence` stores `{cadence:weekly, weekday, time}` in meta. PlanView "Recurring" control + "Weekly" badge + "in this week" RSVP framing. `CalendarView` expands recurring plans across a −4wk…+26wk window so they repeat on each weekday. (Per-occurrence RSVP/time-shift deferred — MVP shares one RSVP/time.)
-- **Delete plans** — confirm-then-delete button (`deletePlan`), routes to /plans.
-- **Location search** — `/new` "add an area" is now a debounced OSM Nominatim typeahead (tap a result) + "Use my location" (geolocation reverse-geocode) + multi-area chips.
-- **Pickers** — `WhenPicker` popout is now a centered ~380px panel; today highlighted in both `WhenPicker` and `CalendarView`. Calendar day thumbnails use `cover-*.png` (all exist).
+## Identity (real owner/participant — auth seam)
+- `currentUserId()` in `lib/db.ts` reads the **`av_uid` cookie** (default Josh). This is the single seam — swap for a Supabase session when magic-link lands; every reader already routes through it.
+- Owner = `plan.creator_id`. **Owner-only (server-enforced via `assertOwner`):** lock / complete / delete / rename. Participants: vote, pick, add options, refine, RSVP.
+- Dev **profile switcher** in `AppShell` (sidebar + mobile header) → `POST /api/whoami` sets the cookie. 7 seeded profiles (Josh, Conor, Jack, Sam, Mia, Tom, Priya).
+- `getPlanBySlug` returns `isOwner`; PlanView hides owner actions for participants ("the owner locks it in").
 
-Verified end-to-end vs live Postgres: manual create (empty scaffold) → AI-suggest empty slot → add step → set recurrence → choose → per-activity time → refineAll (re-rolls all incl manual step) → delete. `next build` green. Test plans cleaned.
+## Nudges (the intent to hang out)
+- QuickMenu "Send a nudge" = inline `NudgeSheet` popup (pick friend → `POST /api/nudge`). Also on Crew (preset friend).
+- Sending a nudge creates a **shared empty plan** (sender=owner, recipient=member, scaffold "What shall we do?") + a notification linking to it. Recipient clicks the notification → lands in that plan to co-build (NOT the from-scratch flow). Sender can pre-build first.
+- **Poke non-voters** (owner): `POST edit {action:"poke"}` notifies members who haven't weighed in.
 
-## Open / next
-- Per-occurrence recurring state (this-week RSVP, per-week time shift) — currently one shared RSVP/time across occurrences.
-- `PlanMap` geocodes client-side each load (Nominatim, ~1 req/place); fine for demo, could cache coords on choose.
-- `log/page.tsx` still uses `<Tile>` (sparse `/img/tiles`) — switch to cover if it matters.
-- Optional: magic-link auth, Vercel deploy.
+## Notifications (real)
+- Created on: invite, nudge, lock-in, poke (`notify()` in db). `getNotifications` returns `kind` + `plan_slug`. NotificationsMenu splits nudges (→ plan link) vs activity; opening the panel marks all read (`POST /api/notifications/read`).
 
-## Stack notes
-- Next 16 / React 19 / Tailwind v4. OpenRouter: chat `anthropic/claude-sonnet-4.5`. No Google Places key → location search + map use free OSM (Nominatim + Leaflet/OSM tiles).
-- Supabase service-role server-only (`lib/supabase/admin.ts`), RLS on, untyped client → `as never`. DEMO_USER_ID = 11111111-1111-1111-1111-111111111111.
-- All slot/scaffold/recurrence data in `plan_options` (meta row pattern, no DDL).
-- Secrets in `.env.local` only. Commit as newroot-git. Dev on :3210.
+## This session also shipped
+- **Typing bug FIXED** — `SlotBlock` was a nested component remounting inputs each keystroke; now called as a function. Multi-char typing works (verified).
+- **Recurring**: weekly / fortnightly / monthly in the Recurring control; calendar expands all three.
+- **Editable plan title** (owner, tap hero). **Update location** (owner, Where section). **Invite friends in `/new`** create form (→ members + notifications). **Calendar**: time + multi-event count on day cells, time/cadence on day cards. **Who-with** label on home "Next adventure" (with Conor / with the boys).
+- Routes: `edit` gained title/location/poke; `/api/nudge`, `/api/whoami`, `/api/notifications/read`, `/api/friends`; create accepts `inviteIds`.
+
+Verified vs live DB: owner gate (Conor blocked, Josh allowed), nudge → shared plan + both members + recipient notification w/ slug, typing fix. `next build` green. Test plans cleaned.
+
+## Deferred — see `docs/PLAN-logistics-availability-polish.md`
+- **Availability**: multi date/time options + overlap (reuse `option_votes` + `date_option` rows). Planned, not built.
+- **Travel/logistics**: crew travel-mode chip + per-leg travel time + ferry/long-hop flags (Josh's HK case); trip flights/accom as fixed slots. Minimized UI. Planned.
+- **Polish**: loading skeletons, optimistic vote/pick, tap haptics, route transitions. Planned.
+- **Add-step**: kept (it's the manual-build affordance, not redundant) — revisit if it clutters AI-built plans.
+- Real **magic-link auth** (cookie switcher is the stand-in).
+- Legacy `/nudge` page now orphaned (QuickMenu uses popup); harmless, can delete.
+
+## Stack
+- Next 16 / React 19 / Tailwind v4. OpenRouter chat `anthropic/claude-sonnet-4.5`. No Google key → location search + map on free OSM (Nominatim + Leaflet).
+- Supabase service-role server-only, RLS on, untyped client → `as never` / `as unknown as Row`. DEMO_USER_ID = 1111…1111.
+- Secrets in `.env.local`. Commit as newroot-git. Dev on :3210.
