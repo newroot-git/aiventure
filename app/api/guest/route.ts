@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { rateLimit, clientIp } from "@/lib/http";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,10 @@ export async function POST(req: NextRequest) {
   if (existing) {
     const { data } = await db.from("profiles").select("id").eq("id", existing).maybeSingle();
     if (data) return NextResponse.json({ ok: true, reused: true });
+  }
+  // only mint-new is rate-limited (reuse above is free) — stops guest-account floods
+  if (!rateLimit(`guest:${clientIp(req)}`, 5, 60 * 60_000)) {
+    return NextResponse.json({ error: "Too many guest sessions. Try again later." }, { status: 429 });
   }
   const n = Math.floor(Math.random() * 9000 + 1000);
   const { data, error } = await db.from("profiles")

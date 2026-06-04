@@ -16,7 +16,6 @@ const SCOPES: { id: PlanScope; label: string; desc: string; Icon: typeof Sparkle
   { id: "trip", label: "A trip", desc: "Multiple days away with the crew.", Icon: Tent },
 ];
 
-const MOODS = ["Active", "Chilled", "Foodie", "Cultured", "Social", "Anything"];
 const THINKING = [
   "Reading the vibe…", "Scanning real spots nearby…", "Checking what's on…",
   "Matching to your crew…", "Grounding every suggestion…",
@@ -44,6 +43,7 @@ function NewPlanFlow() {
   const scopeParam = useSearchParams().get("scope") as PlanScope | null;
   const [scope, setScope] = React.useState<PlanScope | null>(scopeParam);
   const [phase, setPhase] = React.useState<"config" | "loading">("config");
+  const [error, setError] = React.useState<string | null>(null);
 
   // shared config
   const [intent, setIntent] = React.useState("");
@@ -82,8 +82,10 @@ function NewPlanFlow() {
   }
 
   React.useEffect(() => {
-    fetch("/api/friends").then((r) => r.json()).then((d) => setFriends(d.friends ?? [])).catch(() => {});
-    fetch("/api/groups").then((r) => r.json()).then((d) => setGroups(d.groups ?? [])).catch(() => {});
+    const ctrl = new AbortController();
+    fetch("/api/friends", { signal: ctrl.signal }).then((r) => r.json()).then((d) => setFriends(d.friends ?? [])).catch(() => {});
+    fetch("/api/groups", { signal: ctrl.signal }).then((r) => r.json()).then((d) => setGroups(d.groups ?? [])).catch(() => {});
+    return () => ctrl.abort();
   }, []);
 
   // deep-link / quick-menu "surprise" → fire instantly, no questions
@@ -115,15 +117,19 @@ function NewPlanFlow() {
     const q = areaInput.trim();
     if (q.length < 3) { setResults([]); setSearching(false); return; }
     setSearching(true);
+    const ctrl = new AbortController();
     const id = setTimeout(async () => {
       try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`, { headers: { "Accept-Language": "en" } });
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`, { headers: { "Accept-Language": "en" }, signal: ctrl.signal });
         const j = await res.json();
         const labels: string[] = Array.isArray(j) ? j.map((r: { display_name: string }) => r.display_name.split(",").slice(0, 3).map((s) => s.trim()).join(", ")) : [];
         setResults([...new Set(labels)]);
-      } catch { setResults([]); } finally { setSearching(false); }
+        setSearching(false);
+      } catch (e) {
+        if ((e as Error)?.name !== "AbortError") { setResults([]); setSearching(false); }
+      }
     }, 400);
-    return () => clearTimeout(id);
+    return () => { clearTimeout(id); ctrl.abort(); };
   }, [areaInput]);
 
   function useMyLocation() {
@@ -170,6 +176,7 @@ function NewPlanFlow() {
   }
 
   async function createPlan(aiBuild: boolean) {
+    setError(null);
     setPhase("loading");
     let interests: string[] = [];
     try { interests = JSON.parse(localStorage.getItem("aiventure_profile") || "{}").interests || []; } catch {}
@@ -199,9 +206,11 @@ function NewPlanFlow() {
       });
       const data = await res.json();
       if (res.ok && data.slug) { router.push(`/p/${data.slug}`); return; }
-      throw new Error(data.error || "failed");
-    } catch {
-      router.push("/p/wild-otter-42");
+      throw new Error(data.error || "Couldn't create the plan.");
+    } catch (e) {
+      // surface the failure instead of shipping a fake demo plan
+      setError((e as Error)?.message || "Couldn't create the plan. Try again.");
+      setPhase("config");
     }
   }
 
@@ -253,6 +262,12 @@ function NewPlanFlow() {
         {meta && <span className="grid h-9 w-9 place-items-center rounded-md border-2 border-ink bg-primary-soft text-primary-deep"><meta.Icon size={18} /></span>}
         <h1 className="font-display text-2xl font-bold">{meta?.label}</h1>
       </div>
+
+      {error && (
+        <p role="alert" className="mt-4 rounded-md border-2 border-[#c0392b] bg-[#c0392b]/10 px-3 py-2 text-sm font-bold text-[#c0392b]">
+          {error}
+        </p>
+      )}
 
       {/* intent (non-surprise) */}
       {!isSurprise && (
@@ -449,13 +464,3 @@ function DualCTA({
   );
 }
 
-function Chips({ label, opts, value, onChange }: { label?: string; opts: string[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="mt-3">
-      {label && <Label>{label}</Label>}
-      <div className="mt-2 flex flex-wrap gap-2">
-        {opts.map((o) => <SelectTag key={o} selected={value === o} onClick={() => onChange(o)}>{o}</SelectTag>)}
-      </div>
-    </div>
-  );
-}

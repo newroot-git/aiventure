@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
-import { createPlanFromDrop, invitePeople, type CreateExtras } from "@/lib/db";
+import { createPlanFromDrop, invitePeople, currentUserId, type CreateExtras } from "@/lib/db";
 import type { DropInput } from "@/lib/ai";
+import { clientError, rateLimit, clientIp } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
 
 export async function POST(req: Request) {
+  if (!(await currentUserId())) return NextResponse.json({ error: "sign in required" }, { status: 401 });
+  if (!rateLimit(`create:${clientIp(req)}`, 10, 60_000)) {
+    return NextResponse.json({ error: "Slow down a moment, then try again." }, { status: 429 });
+  }
   let body: DropInput & CreateExtras & { inviteIds?: string[] };
   try {
     body = (await req.json()) as DropInput & CreateExtras & { inviteIds?: string[] };
@@ -28,6 +33,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ slug });
   } catch (e) {
     console.error("[/api/plans/create]", e);
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    return NextResponse.json({ error: clientError(e) }, { status: 500 });
   }
 }

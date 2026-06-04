@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { addCustomOption } from "@/lib/db";
+import { clientError } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -19,6 +20,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok });
   } catch (e) {
     console.error("[/api/plans/add-option]", e);
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    return NextResponse.json({ error: clientError(e) }, { status: 500 });
   }
 }

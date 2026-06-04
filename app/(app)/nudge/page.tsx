@@ -29,8 +29,8 @@ export default function NudgePage() {
           We&apos;ll let you know when they bite. They can suggest, set a condition,
           or rain-check.
         </p>
-        <Button variant="primary" className="mt-6" onClick={() => router.push("/social")}>
-          Back to social
+        <Button variant="primary" className="mt-6" onClick={() => router.push("/explore")}>
+          Back to explore
         </Button>
       </div>
     );
@@ -38,8 +38,8 @@ export default function NudgePage() {
 
   return (
     <div>
-      <Link href="/social" className="inline-flex items-center gap-1 text-sm font-bold text-muted">
-        <ArrowLeft size={15} /> Social
+      <Link href="/explore" className="inline-flex items-center gap-1 text-sm font-bold text-muted">
+        <ArrowLeft size={15} /> Explore
       </Link>
       <h1 className="mt-4 font-display text-3xl font-bold leading-tight">Send a nudge</h1>
       <p className="mt-2 text-[15px] text-muted">

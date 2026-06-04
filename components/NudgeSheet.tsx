@@ -19,7 +19,9 @@ export function NudgeSheet({ friend, onClose }: { friend?: Profile; onClose: () 
 
   React.useEffect(() => {
     if (friend) return;
-    fetch("/api/friends").then((r) => r.json()).then((d) => setFriends(d.friends ?? [])).catch(() => {});
+    const ctrl = new AbortController();
+    fetch("/api/friends", { signal: ctrl.signal }).then((r) => r.json()).then((d) => setFriends(d.friends ?? [])).catch(() => {});
+    return () => ctrl.abort();
   }, [friend]);
 
   async function send() {

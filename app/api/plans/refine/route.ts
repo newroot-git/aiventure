@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
-import { refineSlot, refineAll } from "@/lib/db";
+import { refineSlot, refineAll, currentUserId } from "@/lib/db";
+import { clientError, rateLimit, clientIp } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(req: Request) {
+  if (!(await currentUserId())) return NextResponse.json({ error: "sign in required" }, { status: 401 });
+  if (!rateLimit(`refine:${clientIp(req)}`, 20, 60_000)) {
+    return NextResponse.json({ error: "Slow down a moment, then try again." }, { status: 429 });
+  }
   let body: { slug?: string; slotKey?: string; day?: number; feedback?: string; all?: boolean };
   try {
     body = await req.json();
@@ -19,6 +24,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[/api/plans/refine]", e);
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    return NextResponse.json({ error: clientError(e) }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentProfile, updateMyProfile } from "@/lib/db";
+import { clientError } from "@/lib/http";
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,7 @@ export async function POST(req: Request) {
     await updateMyProfile(body);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    console.error("[/api/me]", e);
+    return NextResponse.json({ error: clientError(e) }, { status: 500 });
   }
 }

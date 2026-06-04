@@ -7,6 +7,7 @@ import {
   type PlanRecurrence,
 } from "@/lib/db";
 import type { RSVP } from "@/lib/types";
+import { clientError } from "@/lib/http";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[/api/plans/edit]", e);
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    return NextResponse.json({ error: clientError(e) }, { status: 500 });
   }
 }

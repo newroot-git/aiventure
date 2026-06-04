@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { generateDrop, type DropInput } from "@/lib/ai";
+import { currentUserId } from "@/lib/db";
+import { rateLimit, clientIp } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const maxDuration = 40;
 
 export async function POST(req: Request) {
+  if (!(await currentUserId())) return NextResponse.json({ error: "sign in required" }, { status: 401 });
+  if (!rateLimit(`drop:${clientIp(req)}`, 15, 60_000)) {
+    return NextResponse.json({ error: "Slow down a moment, then try again." }, { status: 429 });
+  }
   let body: DropInput;
   try {
     body = (await req.json()) as DropInput;
@@ -21,6 +27,6 @@ export async function POST(req: Request) {
     return NextResponse.json(result);
   } catch (e) {
     console.error("[/api/drop]", e);
-    return NextResponse.json({ error: "generation failed", detail: (e as Error).message }, { status: 502 });
+    return NextResponse.json({ error: "generation failed" }, { status: 502 });
   }
 }

@@ -7,9 +7,6 @@ import { generateDrop, generateSlotOptions, mapsUrl, type DropInput, type DropSl
 import { planSlug } from "./slug";
 import type { Plan, PlanOption, PlanMember, Profile, RSVP, Visibility } from "./types";
 
-// Demo identity (stands in for auth) — the seeded "Josh" profile.
-export const DEMO_USER_ID = "11111111-1111-1111-1111-111111111111";
-
 // Map a Supabase auth user → our profile id (link by auth_id, then email, else create).
 async function resolveAuthProfile(authId: string, email: string | null): Promise<string> {
   const db = supabaseAdmin();
@@ -46,18 +43,16 @@ export const currentUserId = cache(async (): Promise<string> => {
   try {
     const c = await cookies();
     const uid = c.get("av_uid")?.value;
-    if (uid) return uid;
+    if (uid) {
+      // only honour av_uid for genuine guest profiles (no linked auth account) —
+      // stops a forged cookie from impersonating a real signed-up user.
+      const db = supabaseAdmin();
+      const { data } = await db.from("profiles").select("id, auth_id").eq("id", uid).maybeSingle();
+      if (data && !(data as Row).auth_id) return (data as Row).id as string;
+    }
   } catch {}
   return "";
 });
-
-/** True if the acting user owns (created) the plan. */
-export async function isPlanOwner(slug: string): Promise<boolean> {
-  const db = supabaseAdmin();
-  const me = await currentUserId();
-  const { data } = await db.from("plans").select("creator_id").eq("slug", slug).maybeSingle();
-  return !!data && (data as Row).creator_id === me;
-}
 
 // activity categories that have a dedicated lush cover image
 const COVER_CATS = new Set([
@@ -423,7 +418,10 @@ export async function updateMyProfile(patch: { name?: string; interests?: string
   const db = supabaseAdmin();
   const upd: Record<string, unknown> = {};
   if (typeof patch.name === "string" && patch.name.trim()) upd.name = patch.name.trim().slice(0, 60);
-  if (Array.isArray(patch.interests)) upd.interests = patch.interests;
+  if (Array.isArray(patch.interests)) {
+    // cap count + element length so a caller can't store an unbounded blob
+    upd.interests = patch.interests.filter((x) => typeof x === "string").slice(0, 40).map((x) => x.slice(0, 60));
+  }
   if (typeof patch.interest_notes === "string") upd.interest_notes = patch.interest_notes.slice(0, 500);
   if (Object.keys(upd).length) await db.from("profiles").update(upd as never).eq("id", me);
   // home_area in its own call so a missing column (pre-migration) can't fail the rest
@@ -448,7 +446,8 @@ export async function getFriends(): Promise<{ profile: Profile; shared: string[]
   return ((profiles as Row[]) ?? [])
     .map((r) => mapProfile(r))
     .filter((p): p is Profile => !!p)
-    .map((p) => ({ profile: p, shared: groups.filter((g) => g.members.some((m) => m.id === p.id)).map((g) => g.name) }));
+    // never leak other people's email / private notes to a friend picker
+    .map((p) => ({ profile: { ...p, email: null, interest_notes: null }, shared: groups.filter((g) => g.members.some((m) => m.id === p.id)).map((g) => g.name) }));
 }
 
 export interface GroupCard { id: string; name: string; members: Profile[] }
@@ -495,28 +494,21 @@ function slotMetaFrom(scaffold: ScaffoldSlot[], optRows: Row[], slotKey: string,
   return { label: (p.slot_label as string) || "Pick one", order: (p.slot_order as number) ?? 0 };
 }
 
-/** Regenerate the voteable options for ONE slot, optionally steered by feedback. */
-export async function refineSlot(slug: string, slotKey: string, day: number, feedback?: string): Promise<void> {
-  await assertOwner(slug);
+// Core slot regeneration. Caller must have already authorized + read the option
+// rows; this neither asserts ownership nor re-derives the headline, so refineAll
+// can run many of these in parallel and derive once at the end.
+async function regenSlotOptions(
+  planId: string, intent: string, location: string,
+  slotKey: string, day: number, allRows: Row[], scaffold: ScaffoldSlot[], feedback?: string,
+): Promise<void> {
   const db = supabaseAdmin();
-  const { data: plan } = await db.from("plans").select("id, intent, place_address").eq("slug", slug).maybeSingle();
-  if (!plan) throw new Error("plan not found");
-  const row = plan as Row;
-  const planId = row.id as string;
-  const intent = (row.intent as string) || "something good";
-  const location = (row.place_address as string) || "London, UK";
-
-  const { data: existing } = await db.from("plan_options").select("*").eq("plan_id", planId);
-  const allRows = (existing as Row[]) ?? [];
-  const meta = readMeta(allRows);
-  const { label, order } = slotMetaFrom(meta.scaffold, allRows, slotKey, day);
+  const { label, order } = slotMetaFrom(scaffold, allRows, slotKey, day);
   const slotRows = allRows.filter((o) => {
     const p = (o.payload as Row) ?? {};
     return p.slot === slotKey && ((p.day as number) ?? 1) === day;
   });
   const fresh = await generateSlotOptions(label, `${intent} (the "${label}" step)`, location, feedback);
   if (!fresh.length) return;
-
   const ids = slotRows.map((o) => o.id as string);
   if (ids.length) await db.from("plan_options").delete().in("id", ids);
   const rows = fresh.map((o) => ({
@@ -529,29 +521,48 @@ export async function refineSlot(slug: string, slotKey: string, day: number, fee
     },
   }));
   await db.from("plan_options").insert(rows as never);
+}
+
+// shared: load the plan's refine context (id/intent/location + all option rows)
+async function refineContext(slug: string) {
+  const db = supabaseAdmin();
+  const { data: plan } = await db.from("plans").select("id, intent, place_address").eq("slug", slug).maybeSingle();
+  if (!plan) throw new Error("plan not found");
+  const row = plan as Row;
+  const { data: existing } = await db.from("plan_options").select("*").eq("plan_id", row.id as string);
+  const allRows = (existing as Row[]) ?? [];
+  return {
+    planId: row.id as string,
+    intent: (row.intent as string) || "something good",
+    location: (row.place_address as string) || "London, UK",
+    allRows,
+    meta: readMeta(allRows),
+  };
+}
+
+/** Regenerate the voteable options for ONE slot, optionally steered by feedback. */
+export async function refineSlot(slug: string, slotKey: string, day: number, feedback?: string): Promise<void> {
+  await assertOwner(slug);
+  const { planId, intent, location, allRows, meta } = await refineContext(slug);
+  await regenSlotOptions(planId, intent, location, slotKey, day, allRows, meta.scaffold, feedback);
   await deriveHeadline(planId, slug);
 }
 
 /** Regenerate EVERY slot's options from one feedback note (optionally just one day). */
 export async function refineAll(slug: string, feedback?: string, day?: number): Promise<void> {
   await assertOwner(slug);
-  const db = supabaseAdmin();
-  const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
-  if (!plan) throw new Error("plan not found");
-  const planId = (plan as Row).id as string;
-  const { data: existing } = await db.from("plan_options").select("payload, title").eq("plan_id", planId);
-  const allRows = (existing as Row[]) ?? [];
-  const meta = readMeta(allRows);
+  const { planId, intent, location, allRows, meta } = await refineContext(slug);
   // unique (slot,day) targets — prefer scaffold, fall back to whatever options exist
   const seen = new Set<string>();
   const targets: { key: string; day: number }[] = [];
   const push = (key: string, d: number) => { const id = `${d}:${key}`; if (!seen.has(id)) { seen.add(id); targets.push({ key, day: d }); } };
   meta.scaffold.forEach((s) => push(s.key, s.day));
   allRows.forEach((o) => { const p = (o.payload as Row) ?? {}; if (p.slot) push(p.slot as string, (p.day as number) ?? 1); });
-  const filtered = day ? targets.filter((t) => t.day === day) : targets;
-  for (const t of filtered) {
-    await refineSlot(slug, t.key, t.day, feedback);
-  }
+  // cap LLM fan-out so one request can't trigger unbounded model calls
+  const filtered = (day ? targets.filter((t) => t.day === day) : targets).slice(0, 12);
+  // disjoint row sets → safe to regenerate every slot in parallel, then derive once
+  await Promise.all(filtered.map((t) => regenSlotOptions(planId, intent, location, t.key, t.day, allRows, meta.scaffold, feedback)));
+  await deriveHeadline(planId, slug);
 }
 
 /** Set the time on a slot's chosen option (per-activity time). */
@@ -576,6 +587,16 @@ export async function setSlotTime(slug: string, slotKey: string, day: number, ti
 export async function toggleVote(optionId: string): Promise<boolean> {
   const db = supabaseAdmin();
   const me = await currentUserId();
+  if (!me) throw new Error("sign in required");
+  // the option must belong to a plan the caller can participate in
+  const { data: opt } = await db.from("plan_options").select("plan_id").eq("id", optionId).maybeSingle();
+  if (!opt) throw new Error("option not found");
+  const planId = (opt as Row).plan_id as string;
+  const { data: plan } = await db.from("plans").select("creator_id, visibility").eq("id", planId).maybeSingle();
+  if (!plan) throw new Error("plan not found");
+  const pr = plan as Row;
+  if (pr.creator_id !== me && (pr.visibility as string) !== "open" && !(await isMember(planId, me)))
+    throw new Error("not your plan");
   const { data: existing } = await db.from("option_votes")
     .select("option_id").eq("option_id", optionId).eq("profile_id", me).maybeSingle();
   if (existing) {
@@ -590,10 +611,15 @@ export async function toggleVote(optionId: string): Promise<boolean> {
 export async function setRsvp(slug: string, rsvp: RSVP): Promise<void> {
   const db = supabaseAdmin();
   const me = await currentUserId();
-  const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
-  if (!plan) throw new Error("plan not found");
+  if (!me) throw new Error("sign in required");
+  const plan = await planAuth(slug);
+  // you may RSVP only if you own it, are already in, it's open, or you were invited
+  if (
+    plan.creatorId !== me && plan.visibility !== "open" &&
+    !(await isMember(plan.id, me)) && !(await hasInvite(slug, me))
+  ) throw new Error("not invited to this plan");
   await db.from("plan_members").upsert(
-    { plan_id: (plan as Row).id as string, profile_id: me, rsvp, joined_via: "app" } as never,
+    { plan_id: plan.id, profile_id: me, rsvp, joined_via: "app" } as never,
     { onConflict: "plan_id,profile_id" } as never,
   );
   // declining clears the plan off your lists — also clear its invite + notifications
@@ -606,10 +632,9 @@ export async function setRsvp(slug: string, rsvp: RSVP): Promise<void> {
 /** Propose a candidate date/time for the group to vote availability on. */
 export async function addDateOption(slug: string, iso: string): Promise<void> {
   const db = supabaseAdmin();
-  const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
-  if (!plan) throw new Error("plan not found");
+  const { planId } = await assertParticipant(slug);
   await db.from("plan_options").insert({
-    plan_id: (plan as Row).id as string, kind: "time", source: "human", title: "date",
+    plan_id: planId, kind: "time", source: "human", title: "date",
     payload: { date_option: true, iso },
   } as never);
 }
@@ -643,6 +668,7 @@ export async function addSlot(slug: string, label: string, day = 1): Promise<voi
 
 /** Toggle weekly recurrence on/off for a plan. */
 export async function setRecurrence(slug: string, recurrence: PlanRecurrence | null): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
   if (!plan) throw new Error("plan not found");
@@ -664,9 +690,7 @@ export async function deletePlan(slug: string): Promise<void> {
 /** Add a picked/typed place as a voteable option in a slot (from the maps search). */
 export async function addCustomOption(slug: string, title: string, slotKey: string, day: number, area?: string): Promise<boolean> {
   const db = supabaseAdmin();
-  const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
-  if (!plan) throw new Error("plan not found");
-  const planId = (plan as Row).id as string;
+  const { planId } = await assertParticipant(slug);
   if (!title.trim()) return false;
 
   // inherit slot meta (label / order) from the scaffold or a sibling option
@@ -783,12 +807,14 @@ export async function setPlanTitle(slug: string, title: string): Promise<void> {
 
 /** Update the plan's general area/location. */
 export async function setPlanLocation(slug: string, location: string): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   await db.from("plans").update({ place_address: location.slice(0, 200) } as never).eq("slug", slug);
 }
 
 /** Invite people: add as members + drop an invite + notification for each. */
 export async function invitePeople(slug: string, profileIds: string[]): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   const me = await currentUserId();
   const { data: plan } = await db.from("plans").select("id, title, activity, cover_hue").eq("slug", slug).maybeSingle();
@@ -799,16 +825,16 @@ export async function invitePeople(slug: string, profileIds: string[]): Promise<
   if (!rows.length) return;
   await db.from("plan_members").upsert(rows as never, { onConflict: "plan_id,profile_id" } as never);
 
-  const { data: meProfile } = await db.from("profiles").select("name").eq("id", me).maybeSingle();
-  const myName = (meProfile as Row | null)?.name as string ?? "A friend";
+  const myName = await nameOf(me);
   const activity = (p.activity as string) || (p.title as string) || "a plan";
   const cover = deriveCover(p.cover_hue as string) ?? "/img/cover-hike.png";
-  for (const id of profileIds) {
-    await db.from("invites").insert({
-      to_id: id, from_id: me, from_label: myName, kind: "friend", activity, plan_slug: slug, cover,
-    } as never);
-    await notify(id, `${myName} invited you to ${activity}`, "invite", slug);
-  }
+  // one bulk insert per table instead of 2 round-trips per invitee
+  await db.from("invites").insert(
+    profileIds.map((id) => ({ to_id: id, from_id: me, from_label: myName, kind: "friend", activity, plan_slug: slug, cover })) as never,
+  );
+  await db.from("notifications").insert(
+    profileIds.map((id) => ({ profile_id: id, text: `${myName} invited you to ${activity}`, kind: "invite", plan_slug: slug, acknowledged: false })) as never,
+  );
 }
 
 /** Move a plan through its lifecycle: open → locked → completed. Owner only. */
@@ -955,6 +981,43 @@ async function assertOwner(slug: string): Promise<void> {
   if ((data as Row).creator_id !== me) throw new Error("Only the plan owner can do that");
 }
 
+// Resolve a slug → its core auth fields, or throw "plan not found".
+async function planAuth(slug: string): Promise<{ id: string; creatorId: string; visibility: string }> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("plans").select("id, creator_id, visibility").eq("slug", slug).maybeSingle();
+  if (!data) throw new Error("plan not found");
+  const r = data as Row;
+  return { id: r.id as string, creatorId: (r.creator_id as string) ?? "", visibility: (r.visibility as string) ?? "invite" };
+}
+
+// True if `me` has a plan_members row on this plan.
+async function isMember(planId: string, me: string): Promise<boolean> {
+  if (!me) return false;
+  const db = supabaseAdmin();
+  const { data } = await db.from("plan_members").select("profile_id").eq("plan_id", planId).eq("profile_id", me).maybeSingle();
+  return !!data;
+}
+
+// True if `me` was invited to this plan (has an invite row).
+async function hasInvite(slug: string, me: string): Promise<boolean> {
+  if (!me) return false;
+  const db = supabaseAdmin();
+  const { data } = await db.from("invites").select("id").eq("plan_slug", slug).eq("to_id", me).maybeSingle();
+  return !!data;
+}
+
+/**
+ * Guard participant actions (vote / propose options or dates). The caller must be
+ * the owner, an existing member, or the plan must be open. Returns { planId, me }.
+ */
+async function assertParticipant(slug: string): Promise<{ planId: string; me: string }> {
+  const me = await currentUserId();
+  if (!me) throw new Error("sign in required");
+  const p = await planAuth(slug);
+  if (p.creatorId === me || p.visibility === "open" || (await isMember(p.id, me))) return { planId: p.id, me };
+  throw new Error("not your plan");
+}
+
 // ---------- communities / events / nudges / invites / notifications ----------
 export interface CommunityCard { id: string; name: string; tag: string; members: string }
 export interface OpenEventCard { id: string; community: string; activity: string; place: string; dateLabel: string; cover: string; going: number; slug: string }
@@ -1011,6 +1074,13 @@ export async function getNotifications(): Promise<NotificationCard[]> {
 // ---------- writes: notifications, nudges, poke, mark-read ----------
 
 /** Internal: drop a notification for a profile. */
+// the acting/other user's display name for notification copy (one shared lookup)
+async function nameOf(profileId: string, fallback = "A friend"): Promise<string> {
+  const db = supabaseAdmin();
+  const { data } = await db.from("profiles").select("name").eq("id", profileId).maybeSingle();
+  return ((data as Row | null)?.name as string) || fallback;
+}
+
 async function notify(profileId: string, text: string, kind: string, planSlug?: string | null) {
   const db = supabaseAdmin();
   await db.from("notifications").insert({
@@ -1036,8 +1106,8 @@ export async function markNotificationsRead(): Promise<void> {
 export async function sendNudge(toId: string, message: string, whenText: string): Promise<{ ok: true }> {
   const db = supabaseAdmin();
   const me = await currentUserId();
-  const { data: meProfile } = await db.from("profiles").select("name").eq("id", me).maybeSingle();
-  const myName = (meProfile as Row | null)?.name as string ?? "A friend";
+  if (!me) throw new Error("sign in required");
+  const myName = await nameOf(me);
   await db.from("nudges").insert({ from_id: me, to_id: toId, message: message ?? null, when_text: whenText, status: "pending" } as never);
   const detail = message?.trim() ? ` — "${message.trim()}"` : "";
   await notify(toId, `${myName} nudged you${detail}. Up for it?`, "nudge", null);
@@ -1057,9 +1127,7 @@ export async function respondNudge(nudgeId: string, accept: boolean): Promise<{ 
   if ((nudge.to_id as string) !== me) throw new Error("not your nudge");
   const fromId = nudge.from_id as string;
   const message = (nudge.message as string) || "";
-
-  const { data: meProfile } = await db.from("profiles").select("name").eq("id", me).maybeSingle();
-  const myName = (meProfile as Row | null)?.name as string ?? "Someone";
+  const myName = await nameOf(me, "Someone");
 
   if (!accept) {
     await db.from("nudges").update({ status: "declined" } as never).eq("id", nudgeId);
@@ -1094,15 +1162,19 @@ export async function respondNudge(nudgeId: string, accept: boolean): Promise<{ 
 
 /** Poke everyone invited to a plan who hasn't picked/voted yet. Owner action. */
 export async function pokeNonVoters(slug: string): Promise<number> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   const me = await currentUserId();
   const { data: plan } = await db.from("plans").select("id, title").eq("slug", slug).maybeSingle();
   if (!plan) return 0;
   const planId = (plan as Row).id as string;
-  const { data: meProfile } = await db.from("profiles").select("name").eq("id", me).maybeSingle();
-  const myName = (meProfile as Row | null)?.name as string ?? "Someone";
+  const myName = await nameOf(me, "Someone");
   const { data: members } = await db.from("plan_members").select("profile_id").eq("plan_id", planId);
   const others = ((members as Row[]) ?? []).map((m) => m.profile_id as string).filter((id) => id !== me);
-  for (const id of others) await notify(id, `${myName} poked you to weigh in on "${(plan as Row).title as string}"`, "poke", slug);
+  if (!others.length) return 0;
+  const text = `${myName} poked you to weigh in on "${(plan as Row).title as string}"`;
+  await db.from("notifications").insert(
+    others.map((id) => ({ profile_id: id, text, kind: "poke", plan_slug: slug, acknowledged: false })) as never,
+  );
   return others.length;
 }

@@ -189,15 +189,12 @@ export function PlanView({
   const [voted, setVoted] = React.useState<Record<string, boolean>>(
     Object.fromEntries(options.filter((o) => o.mine).map((o) => [o.id, true])),
   );
-  const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
   const [copied, setCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
-  const [refineText, setRefineText] = React.useState<Record<string, string>>({});
-  const [allFeedback, setAllFeedback] = React.useState<Record<number, string>>({}); // keyed by day (0 = whole plan)
+  // per-slot "working" key (e.g. `${slot.id}:refine`) so only the active slot shows a spinner
   const [working, setWorking] = React.useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [pickedFriends, setPickedFriends] = React.useState<string[]>([]);
-  const [newSlot, setNewSlot] = React.useState<Record<number, string>>({});
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [editTitle, setEditTitle] = React.useState(false);
   const [titleVal, setTitleVal] = React.useState(plan.activity ?? plan.title);
@@ -211,17 +208,14 @@ export function PlanView({
   const people = members.map((m) => m.profile ?? { name: "Guest" });
   const generalArea = plan.place_address || plan.place_name || "TBC";
 
-  async function persist(body: Record<string, unknown>) {
+  const persist = React.useCallback(async (body: Record<string, unknown>) => {
     await fetch("/api/plans/edit", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slug: plan.slug, ...body }),
     });
     router.refresh();
-  }
-  function choose(slotId: string, id: string) {
-    setExpanded((e) => ({ ...e, [slotId]: false }));
-    persist({ action: "choose", optionId: id });
-  }
+  }, [plan.slug, router]);
+  const choose = React.useCallback((id: string) => persist({ action: "choose", optionId: id }), [persist]);
   const setWhenDate = (iso: string) => persist({ action: "when", startsAt: iso });
   async function doInvite() {
     if (!pickedFriends.length) return;
@@ -239,7 +233,7 @@ export function PlanView({
       router.refresh();
     } finally { setBusy(false); }
   }
-  function vote(id: string) {
+  const vote = React.useCallback((id: string) => {
     setVoted((v) => {
       const now = !v[id];
       setVotes((vs) => ({ ...vs, [id]: Math.max(0, (vs[id] ?? 0) + (now ? 1 : -1)) }));
@@ -249,14 +243,14 @@ export function PlanView({
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ optionId: id }),
     }).catch(() => {});
-  }
+  }, []);
   function changeRsvp(v: RSVP) {
     // declining drops the plan off your calendar/home — guard against a misclick
     if (v === "out" && !window.confirm("Can't make it? This plan will drop off your plans. You can still reopen it from the link.")) return;
     setRsvpState(v);
     persist({ action: "rsvp", rsvp: v });
   }
-  const deleteOpt = (optionId: string) => persist({ action: "deleteOption", optionId });
+  const deleteOpt = React.useCallback((optionId: string) => persist({ action: "deleteOption", optionId }), [persist]);
   const addDateOpt = (iso: string) => persist({ action: "addDate", iso });
   const lockDateOpt = (optionId: string) => persist({ action: "lockDate", optionId });
   function voteDate(id: string) {
@@ -266,49 +260,44 @@ export function PlanView({
       body: JSON.stringify({ optionId: id }),
     }).then(() => router.refresh()).catch(() => {});
   }
-  async function refine(slot: Slot, feedback: string) {
-    const key = `${slot.id}:refine`;
-    setWorking(key);
+  const onRefine = React.useCallback(async (slotKey: string, day: number, feedback: string) => {
+    setWorking(`${day}:${slotKey}:refine`);
     try {
       await fetch("/api/plans/refine", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: plan.slug, slotKey: slot.key, day: slot.day, feedback }),
+        body: JSON.stringify({ slug: plan.slug, slotKey, day, feedback }),
       });
-      setRefineText((t) => ({ ...t, [slot.id]: "" }));
       router.refresh();
     } finally { setWorking(null); }
-  }
-  async function refineAll(day: number | undefined, feedback: string) {
-    const key = `all:${day ?? 0}`;
-    setWorking(key);
+  }, [plan.slug, router]);
+  const refineAll = React.useCallback(async (day: number | undefined, feedback: string) => {
+    setWorking(`all:${day ?? 0}`);
     try {
       await fetch("/api/plans/refine", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: plan.slug, all: true, day, feedback }),
       });
-      setAllFeedback((t) => ({ ...t, [day ?? 0]: "" }));
       router.refresh();
     } finally { setWorking(null); }
-  }
-  async function addOwn(slot: Slot, title: string, area?: string) {
+  }, [plan.slug, router]);
+  const onAddOwn = React.useCallback(async (slotKey: string, day: number, title: string, area?: string) => {
     if (!title.trim()) return;
-    setWorking(`${slot.id}:add`);
+    setWorking(`${day}:${slotKey}:add`);
     try {
       await fetch("/api/plans/add-option", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: plan.slug, title, area, slotKey: slot.key, day: slot.day }),
+        body: JSON.stringify({ slug: plan.slug, title, area, slotKey, day }),
       });
       router.refresh();
     } finally { setWorking(null); }
-  }
-  async function addStep(day: number) {
-    const label = (newSlot[day] ?? "").trim();
-    if (!label) return;
-    setNewSlot((t) => ({ ...t, [day]: "" }));
-    await persist({ action: "addSlot", label, day });
-  }
-  const setSlotTime = (slot: Slot, time: string | null) =>
-    persist({ action: "slotTime", slotKey: slot.key, day: slot.day, time });
+  }, [plan.slug, router]);
+  const addStep = React.useCallback(async (day: number, label: string) => {
+    const t = label.trim();
+    if (!t) return;
+    await persist({ action: "addSlot", label: t, day });
+  }, [persist]);
+  const onSetSlotTime = React.useCallback((slotKey: string, day: number, time: string | null) =>
+    persist({ action: "slotTime", slotKey, day, time }), [persist]);
   async function toggleRecurring(next: PlanRecurrence | null) {
     // turning OFF after it's locked (materialised) wipes future instances — confirm
     if (next === null && phase !== "open") {
@@ -372,90 +361,6 @@ export function PlanView({
           See all your adventures
         </Link>
       </div>
-    );
-  }
-
-  /* one slot's card stack */
-  function SlotBlock({ slot, index }: { slot: Slot; index: number }) {
-    const isExpanded = expanded[slot.id];
-    const decided = !!slot.chosen;
-    const empty = slot.options.length === 0;
-
-    if (slot.fixed && slot.options[0]) {
-      const o = slot.options[0];
-      return (
-        <SlotShell slot={slot} index={index} decided>
-          <OptionCard title={o.title} subtitle={o.subtitle} why={o.why} sourceUrl={o.source_url} sourceLabel="Set" selected />
-        </SlotShell>
-      );
-    }
-
-    if (decided && !isExpanded) {
-      const o = slot.chosen!;
-      return (
-        <SlotShell slot={slot} index={index} decided time={chosenTime(slot)}>
-          <OptionCard title={o.title} subtitle={o.subtitle} why={o.why} sourceUrl={o.source_url} sourceLabel={o.source_label} selected />
-          {isOwner && planning && (
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <button onClick={() => setExpanded((e) => ({ ...e, [slot.id]: true }))} className="text-sm font-bold text-muted underline">
-                Change pick
-              </button>
-              <TimeChip value={chosenTime(slot)} onChange={(t) => setSlotTime(slot, t)} />
-            </div>
-          )}
-        </SlotShell>
-      );
-    }
-
-    return (
-      <SlotShell slot={slot} index={index} decided={decided}>
-        {empty ? (
-          <div className="rounded-xl border-2 border-dashed border-line bg-surface-2/40 p-4 text-center">
-            <p className="text-sm font-bold text-muted">Nothing here yet.</p>
-            {isOwner && planning && (
-              <Button variant="secondary" size="sm" className="mt-3" disabled={working === `${slot.id}:refine`} onClick={() => refine(slot, "")}>
-                {working === `${slot.id}:refine` ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />} Suggest with AI
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {slot.options.map((o) => (
-              <OptionCard
-                key={o.id}
-                title={o.title} subtitle={o.subtitle} why={o.why}
-                sourceUrl={o.source_url} sourceLabel={o.source_label}
-                votes={votes[o.id]} voted={voted[o.id]} onVote={() => vote(o.id)}
-                selected={slot.chosen?.id === o.id}
-                onSelect={isOwner && planning ? () => choose(slot.id, o.id) : undefined}
-                onDelete={isOwner && planning ? () => deleteOpt(o.id) : undefined}
-              />
-            ))}
-          </div>
-        )}
-
-        {planning && (
-          <>
-            <div className="mt-3">
-              <PlaceSearch area={plan.place_address} onPick={(title, area) => addOwn(slot, title, area)} />
-            </div>
-            {isOwner && !empty && (
-              <div className="mt-2 flex gap-2">
-                <input
-                  value={refineText[slot.id] ?? ""}
-                  onChange={(e) => setRefineText((t) => ({ ...t, [slot.id]: e.target.value }))}
-                  onKeyDown={(e) => e.key === "Enter" && refine(slot, refineText[slot.id] ?? "")}
-                  placeholder="Ask AI for different ideas — e.g. more chill, cheaper…"
-                  className="w-full rounded-md border-2 border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-primary"
-                />
-                <Button variant="secondary" disabled={working === `${slot.id}:refine`} onClick={() => refine(slot, refineText[slot.id] ?? "")}>
-                  {working === `${slot.id}:refine` ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-      </SlotShell>
     );
   }
 
@@ -653,10 +558,8 @@ export function PlanView({
           {/* whole-plan feedback (single-day) */}
           {isOwner && planning && multiStep && !multiDay && (
             <GeneralFeedback
-              value={allFeedback[0] ?? ""}
               busy={working === "all:0"}
-              onChange={(v) => setAllFeedback((t) => ({ ...t, [0]: v }))}
-              onSubmit={() => refineAll(undefined, allFeedback[0] ?? "")}
+              onSubmit={(v) => refineAll(undefined, v)}
               placeholder="Tweak the whole plan — e.g. keep it cheaper, more outdoorsy…"
             />
           )}
@@ -672,10 +575,8 @@ export function PlanView({
                 )}
                 {isOwner && planning && multiDay && (
                   <GeneralFeedback
-                    value={allFeedback[d] ?? ""}
                     busy={working === `all:${d}`}
-                    onChange={(v) => setAllFeedback((t) => ({ ...t, [d]: v }))}
-                    onSubmit={() => refineAll(d, allFeedback[d] ?? "")}
+                    onSubmit={(v) => refineAll(d, v)}
                     placeholder={`Tweak all of day ${d} at once…`}
                   />
                 )}
@@ -684,25 +585,17 @@ export function PlanView({
                     const i = idx++;
                     return (
                       <Reveal key={s.id} delay={Math.min(i, 5) * 0.05}>
-                        {SlotBlock({ slot: s, index: i })}
+                        <PlanSlot
+                          slot={s} index={i} isOwner={isOwner} planning={planning} working={working}
+                          votes={votes} voted={voted} placeArea={plan.place_address}
+                          onVote={vote} onChoose={choose} onDeleteOpt={deleteOpt}
+                          onRefine={onRefine} onAddOwn={onAddOwn} onSetSlotTime={onSetSlotTime}
+                        />
                       </Reveal>
                     );
                   })}
                 </div>
-                {isOwner && planning && (
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      value={newSlot[d] ?? ""}
-                      onChange={(e) => setNewSlot((t) => ({ ...t, [d]: e.target.value }))}
-                      onKeyDown={(e) => e.key === "Enter" && addStep(d)}
-                      placeholder="Add a step — e.g. Dessert, Nightcap…"
-                      className="w-full rounded-md border-2 border-dashed border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-primary"
-                    />
-                    <Button variant="soft" disabled={!(newSlot[d] ?? "").trim()} onClick={() => addStep(d)}>
-                      <Plus size={16} />
-                    </Button>
-                  </div>
-                )}
+                {isOwner && planning && <AddStepBox onAdd={(label) => addStep(d, label)} />}
               </div>
             ));
           })()}
@@ -875,27 +768,152 @@ function TimeChip({ value, onChange }: { value: string | null; onChange: (t: str
   );
 }
 
-/* one-shot feedback box that re-rolls a whole plan or day */
+/* one-shot feedback box that re-rolls a whole plan or day. Holds its own text
+   state so typing here never re-renders the parent PlanView (the old lag cause). */
 function GeneralFeedback({
-  value, busy, onChange, onSubmit, placeholder,
+  busy, onSubmit, placeholder,
 }: {
-  value: string; busy: boolean; onChange: (v: string) => void; onSubmit: () => void; placeholder: string;
+  busy: boolean; onSubmit: (value: string) => void; placeholder: string;
 }) {
+  const [text, setText] = React.useState("");
+  const submit = () => { onSubmit(text); setText(""); };
   return (
     <div className="mb-3 flex gap-2">
       <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && onSubmit()}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && submit()}
         placeholder={placeholder}
+        aria-label={placeholder}
         className="w-full rounded-md border-2 border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-secondary"
       />
-      <Button variant="secondary" disabled={busy} onClick={onSubmit}>
+      <Button variant="secondary" disabled={busy} onClick={submit}>
         {busy ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
       </Button>
     </div>
   );
 }
+
+/* add-a-step input — self-stating leaf so typing doesn't re-render the plan */
+function AddStepBox({ onAdd }: { onAdd: (label: string) => void }) {
+  const [text, setText] = React.useState("");
+  const add = () => { const t = text.trim(); if (!t) return; onAdd(t); setText(""); };
+  return (
+    <div className="mt-3 flex gap-2">
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && add()}
+        placeholder="Add a step — e.g. Dessert, Nightcap…"
+        aria-label="Add a step"
+        className="w-full rounded-md border-2 border-dashed border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-primary"
+      />
+      <Button variant="soft" disabled={!text.trim()} onClick={add}>
+        <Plus size={16} />
+      </Button>
+    </div>
+  );
+}
+
+/* one slot's card stack — memoized module-scope component with local expand +
+   refine-text state. Lives outside PlanView so React can bail re-renders. */
+const PlanSlot = React.memo(function PlanSlot({
+  slot, index, isOwner, planning, working, votes, voted, placeArea,
+  onVote, onChoose, onDeleteOpt, onRefine, onAddOwn, onSetSlotTime,
+}: {
+  slot: Slot; index: number; isOwner: boolean; planning: boolean; working: string | null;
+  votes: Record<string, number>; voted: Record<string, boolean>; placeArea: string | null;
+  onVote: (id: string) => void; onChoose: (id: string) => void; onDeleteOpt: (id: string) => void;
+  onRefine: (slotKey: string, day: number, feedback: string) => void;
+  onAddOwn: (slotKey: string, day: number, title: string, area?: string) => void;
+  onSetSlotTime: (slotKey: string, day: number, time: string | null) => void;
+}) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [refineText, setRefineText] = React.useState("");
+  const decided = !!slot.chosen;
+  const empty = slot.options.length === 0;
+  const refineKey = `${slot.id}:refine`;
+  const refining = working === refineKey;
+  const pick = (id: string) => { setExpanded(false); onChoose(id); };
+
+  if (slot.fixed && slot.options[0]) {
+    const o = slot.options[0];
+    return (
+      <SlotShell slot={slot} index={index} decided>
+        <OptionCard title={o.title} subtitle={o.subtitle} why={o.why} sourceUrl={o.source_url} sourceLabel="Set" selected />
+      </SlotShell>
+    );
+  }
+
+  if (decided && !expanded) {
+    const o = slot.chosen!;
+    return (
+      <SlotShell slot={slot} index={index} decided time={chosenTime(slot)}>
+        <OptionCard title={o.title} subtitle={o.subtitle} why={o.why} sourceUrl={o.source_url} sourceLabel={o.source_label} selected />
+        {isOwner && planning && (
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button onClick={() => setExpanded(true)} className="text-sm font-bold text-muted underline">
+              Change pick
+            </button>
+            <TimeChip value={chosenTime(slot)} onChange={(t) => onSetSlotTime(slot.key, slot.day, t)} />
+          </div>
+        )}
+      </SlotShell>
+    );
+  }
+
+  return (
+    <SlotShell slot={slot} index={index} decided={decided}>
+      {empty ? (
+        <div className="rounded-xl border-2 border-dashed border-line bg-surface-2/40 p-4 text-center">
+          <p className="text-sm font-bold text-muted">Nothing here yet.</p>
+          {isOwner && planning && (
+            <Button variant="secondary" size="sm" className="mt-3" disabled={refining} onClick={() => onRefine(slot.key, slot.day, "")}>
+              {refining ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />} Suggest with AI
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {slot.options.map((o) => (
+            <OptionCard
+              key={o.id}
+              title={o.title} subtitle={o.subtitle} why={o.why}
+              sourceUrl={o.source_url} sourceLabel={o.source_label}
+              votes={votes[o.id]} voted={voted[o.id]} onVote={() => onVote(o.id)}
+              selected={slot.chosen?.id === o.id}
+              onSelect={isOwner && planning ? () => pick(o.id) : undefined}
+              onDelete={isOwner && planning ? () => onDeleteOpt(o.id) : undefined}
+            />
+          ))}
+        </div>
+      )}
+
+      {planning && (
+        <>
+          <div className="mt-3">
+            <PlaceSearch area={placeArea} onPick={(title, area) => onAddOwn(slot.key, slot.day, title, area)} />
+          </div>
+          {isOwner && !empty && (
+            <div className="mt-2 flex gap-2">
+              <input
+                value={refineText}
+                onChange={(e) => setRefineText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { onRefine(slot.key, slot.day, refineText); setRefineText(""); } }}
+                placeholder="Ask AI for different ideas — e.g. more chill, cheaper…"
+                aria-label="Ask AI for different ideas"
+                className="w-full rounded-md border-2 border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-primary"
+              />
+              <Button variant="secondary" disabled={refining} onClick={() => { onRefine(slot.key, slot.day, refineText); setRefineText(""); }}>
+                {refining ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </SlotShell>
+  );
+});
 
 /* recurrence control — weekly / fortnightly / monthly */
 const CADENCES: { id: PlanRecurrence["cadence"]; label: string }[] = [

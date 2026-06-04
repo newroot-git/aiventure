@@ -151,32 +151,6 @@ export function KeyInfoChips({ items }: { items: KeyInfo[] }) {
   );
 }
 
-/* ---------- Map embed (no API key needed) ---------- */
-export function MapEmbed({
-  lat,
-  lng,
-  query,
-}: {
-  lat?: number | null;
-  lng?: number | null;
-  query?: string | null;
-}) {
-  const q = lat && lng ? `${lat},${lng}` : query ?? "";
-  if (!q) return null;
-  const src = `https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=14&output=embed`;
-  return (
-    <div className="overflow-hidden rounded-2xl border border-line">
-      <iframe
-        title="map"
-        src={src}
-        className="h-44 w-full"
-        loading="lazy"
-        referrerPolicy="no-referrer-when-downgrade"
-      />
-    </div>
-  );
-}
-
 /* ---------- On-brand date + time picker (replaces raw datetime-local) ---------- */
 const WK = ["M", "T", "W", "T", "F", "S", "S"];
 const MO = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];

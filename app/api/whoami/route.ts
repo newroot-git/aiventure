@@ -6,6 +6,10 @@ export const runtime = "nodejs";
 // magic-link auth will replace (swap for a Supabase session) — every reader
 // already goes through currentUserId().
 export async function POST(req: Request) {
+  // dev-only seam — must never be reachable in production (one-request identity swap)
+  if (process.env.NEXT_PUBLIC_DEV_SWITCH !== "1") {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   let body: { id?: string };
   try {
     body = await req.json();

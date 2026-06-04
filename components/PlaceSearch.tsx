@@ -20,18 +20,23 @@ export function PlaceSearch({
     const s = q.trim();
     if (s.length < 3) { setResults([]); setBusy(false); return; }
     setBusy(true);
+    const ctrl = new AbortController();
     const id = setTimeout(async () => {
       try {
         const query = area ? `${s}, ${area}` : s;
-        const j = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(query)}`, { headers: { "Accept-Language": "en" } }).then((r) => r.json());
+        const j = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(query)}`, { headers: { "Accept-Language": "en" }, signal: ctrl.signal }).then((r) => r.json());
         const rows = Array.isArray(j) ? j.map((r: { display_name: string }) => ({
           name: r.display_name.split(",")[0].trim(),
           label: r.display_name.split(",").slice(0, 3).map((x) => x.trim()).join(", "),
         })) : [];
         setResults(rows);
-      } catch { setResults([]); } finally { setBusy(false); }
+        setBusy(false);
+      } catch (e) {
+        // ignore aborts (a newer keystroke superseded this request)
+        if ((e as Error)?.name !== "AbortError") { setResults([]); setBusy(false); }
+      }
     }, 400);
-    return () => clearTimeout(id);
+    return () => { clearTimeout(id); ctrl.abort(); };
   }, [q, area]);
 
   function pick(title: string) {
