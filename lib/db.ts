@@ -567,6 +567,11 @@ export async function setRsvp(slug: string, rsvp: RSVP): Promise<void> {
     { plan_id: (plan as Row).id as string, profile_id: me, rsvp, joined_via: "app" } as never,
     { onConflict: "plan_id,profile_id" } as never,
   );
+  // declining clears the plan off your lists — also clear its invite + notifications
+  if (rsvp === "out") {
+    await db.from("invites").delete().eq("to_id", me).eq("plan_slug", slug);
+    await db.from("notifications").update({ acknowledged: true } as never).eq("profile_id", me).eq("plan_slug", slug);
+  }
 }
 
 /** Propose a candidate date/time for the group to vote availability on. */
