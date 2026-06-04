@@ -36,6 +36,7 @@ import {
   WhenPicker,
 } from "./plan";
 import { PlanMap } from "./PlanMap";
+import { PlaceSearch } from "./PlaceSearch";
 import type { Plan, PlanOption, PlanMember, RSVP, Profile } from "@/lib/types";
 import type { PlanScaffoldSlot, PlanRecurrence, DateOption } from "@/lib/db";
 
@@ -192,7 +193,6 @@ export function PlanView({
   const [copied, setCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [refineText, setRefineText] = React.useState<Record<string, string>>({});
-  const [addText, setAddText] = React.useState<Record<string, string>>({});
   const [allFeedback, setAllFeedback] = React.useState<Record<number, string>>({}); // keyed by day (0 = whole plan)
   const [working, setWorking] = React.useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = React.useState(false);
@@ -290,17 +290,14 @@ export function PlanView({
       router.refresh();
     } finally { setWorking(null); }
   }
-  async function addOwn(slot: Slot) {
-    const q = (addText[slot.id] ?? "").trim();
-    if (!q) return;
-    const key = `${slot.id}:add`;
-    setWorking(key);
+  async function addOwn(slot: Slot, title: string, area?: string) {
+    if (!title.trim()) return;
+    setWorking(`${slot.id}:add`);
     try {
       await fetch("/api/plans/add-option", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: plan.slug, query: q, slotKey: slot.key, day: slot.day }),
+        body: JSON.stringify({ slug: plan.slug, title, area, slotKey: slot.key, day: slot.day }),
       });
-      setAddText((t) => ({ ...t, [slot.id]: "" }));
       router.refresh();
     } finally { setWorking(null); }
   }
@@ -439,17 +436,8 @@ export function PlanView({
 
         {planning && (
           <>
-            <div className="mt-3 flex gap-2">
-              <input
-                value={addText[slot.id] ?? ""}
-                onChange={(e) => setAddText((t) => ({ ...t, [slot.id]: e.target.value }))}
-                onKeyDown={(e) => e.key === "Enter" && addOwn(slot)}
-                placeholder="Add your own — a place or business…"
-                className="w-full rounded-md border-2 border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-primary"
-              />
-              <Button variant="soft" disabled={working === `${slot.id}:add` || !(addText[slot.id] ?? "").trim()} onClick={() => addOwn(slot)}>
-                {working === `${slot.id}:add` ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-              </Button>
+            <div className="mt-3">
+              <PlaceSearch area={plan.place_address} onPick={(title, area) => addOwn(slot, title, area)} />
             </div>
             {isOwner && !empty && (
               <div className="mt-2 flex gap-2">
@@ -611,6 +599,20 @@ export function PlanView({
         </div>
       )}
 
+      {/* recurring — sits with the dates */}
+      {isOwner && planning && (
+        <div className="mt-3">
+          <RecurringControl recurrence={recurrence} defaultStart={plan.starts_at} onChange={toggleRecurring} />
+        </div>
+      )}
+      {!isOwner && recurrence && (
+        <div className="mt-3">
+          <Section icon={<Repeat size={15} />} label="Recurring" tone="secondary">
+            <p className="text-sm font-bold">{recurrence.cadence === "monthly" ? "Repeats monthly" : recurrence.cadence === "biweekly" ? "Repeats fortnightly" : "Repeats weekly"}</p>
+          </Section>
+        </div>
+      )}
+
       {/* who */}
       <div className="mt-4">
         <Section icon={<Users size={15} />} label="Who's in" tone="success">
@@ -628,21 +630,6 @@ export function PlanView({
           )}
         </Section>
       </div>
-
-      {/* recurring control (owner) */}
-      {isOwner && planning && (
-        <div className="mt-4">
-          <RecurringControl recurrence={recurrence} defaultStart={plan.starts_at} onChange={toggleRecurring} />
-        </div>
-      )}
-      {/* recurring badge for participants */}
-      {!isOwner && recurrence && (
-        <div className="mt-4">
-          <Section icon={<Repeat size={15} />} label="Recurring" tone="secondary">
-            <p className="text-sm font-bold">{recurrence.cadence === "monthly" ? "Repeats monthly" : recurrence.cadence === "biweekly" ? "Repeats fortnightly" : "Repeats weekly"}</p>
-          </Section>
-        </div>
-      )}
 
       {/* why */}
       {plan.why && (

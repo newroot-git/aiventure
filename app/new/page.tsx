@@ -92,7 +92,8 @@ function NewPlanFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const location = areas.length ? areas.join(", ") : "London, UK";
+  // empty when unspecified → server falls back to the creator's home area
+  const location = areas.length ? areas.join(", ") : "";
 
   React.useEffect(() => {
     if (phase !== "loading") return;

@@ -14,6 +14,7 @@ export interface Profile {
   avatar?: string | null;
   interests: string[];
   interest_notes: string | null;
+  home_area?: string | null;
   is_paid: boolean;
   created_at: string;
 }

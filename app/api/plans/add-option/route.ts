@@ -5,17 +5,17 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
-  let body: { slug?: string; query?: string; slotKey?: string; day?: number };
+  let body: { slug?: string; title?: string; area?: string; slotKey?: string; day?: number };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "invalid JSON" }, { status: 400 });
   }
-  if (!body.slug || !body.query?.trim() || !body.slotKey) {
-    return NextResponse.json({ error: "slug + query + slotKey required" }, { status: 400 });
+  if (!body.slug || !body.title?.trim() || !body.slotKey) {
+    return NextResponse.json({ error: "slug + title + slotKey required" }, { status: 400 });
   }
   try {
-    const ok = await addCustomOption(body.slug, body.query, body.slotKey, body.day ?? 1);
+    const ok = await addCustomOption(body.slug, body.title, body.slotKey, body.day ?? 1, body.area);
     return NextResponse.json({ ok });
   } catch (e) {
     console.error("[/api/plans/add-option]", e);

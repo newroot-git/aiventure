@@ -25,6 +25,7 @@ function OnboardFlow() {
   const invite = useSearchParams().get("invite");
   const [step, setStep] = React.useState(0);
   const [name, setName] = React.useState("");
+  const [homeArea, setHomeArea] = React.useState("");
   const [setting, setSetting] = React.useState<Setting | null>(null);
   const [cats, setCats] = React.useState<string[]>([]);
   const [interests, setInterests] = React.useState<string[]>([]);
@@ -59,7 +60,7 @@ function OnboardFlow() {
     try {
       await fetch("/api/me", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, interests }),
+        body: JSON.stringify({ name, interests, home_area: homeArea }),
       });
     } catch {}
     router.push(invite ? `/p/${invite}` : "/plans");
@@ -100,7 +101,7 @@ function OnboardFlow() {
             <h1 className="font-display text-3xl font-bold leading-tight">
               First up — who are you?
             </h1>
-            <p className="mt-2 text-[15px] text-muted">Just a name to get started.</p>
+            <p className="mt-2 text-[15px] text-muted">A name + your town, so plans land near you.</p>
             <div className="mt-8 flex items-center gap-3">
               <Avatar name={name || "?"} size={52} />
               <Input
@@ -110,6 +111,16 @@ function OnboardFlow() {
                 className="flex-1"
                 autoFocus
               />
+            </div>
+            <div className="mt-4">
+              <Label>Where are you based?</Label>
+              <Input
+                value={homeArea}
+                onChange={(e) => setHomeArea(e.target.value)}
+                placeholder="Town or city — e.g. Cape Town"
+                className="mt-2"
+              />
+              <p className="mt-1 text-xs text-muted">We&apos;ll default your plans here. Change per-plan anytime.</p>
             </div>
           </div>
         )}

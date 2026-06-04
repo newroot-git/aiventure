@@ -143,21 +143,27 @@ export interface CreateExtras {
 /** Create a plan. aiBuild=true → AI fills slots; false → empty named skeleton. */
 export async function createPlanFromDrop(input: DropInput & CreateExtras): Promise<{ slug: string }> {
   const aiBuild = !!input.aiBuild;
+  const db = supabaseAdmin();
+  const me = await currentUserId();
+  // default location to the creator's home area (not London) when none is given.
+  // select("*") so it's safe before the home_area migration is applied.
+  const { data: meProf } = await db.from("profiles").select("*").eq("id", me).maybeSingle();
+  const homeArea = ((meProf as Row | null)?.home_area as string) || "London, UK";
+  const baseLocation = input.location?.trim() ? input.location : homeArea;
+
   let title = input.intent?.trim() ? input.intent.slice(0, 140) : "New plan";
   let slots: DropSlot[] = [];
   // the area refines/per-slot AI will use — the AI's resolved area beats the
-  // (possibly default "London") form value, so a HK plan stays HK throughout.
-  let area = input.location ?? null;
+  // form value, so a HK plan stays HK throughout.
+  let area: string | null = baseLocation;
   if (aiBuild) {
-    const drop = await generateDrop(input);
+    const drop = await generateDrop({ ...input, location: baseLocation });
     slots = drop.slots ?? [];
     if (drop.title) title = drop.title;
     if (drop.area) area = drop.area;
   }
   const scaffold = aiBuild ? scaffoldFromSlots(slots) : defaultScaffold(input.scope, input.nights);
   const slug = planSlug(`${Date.now()}-${input.intent}`);
-  const db = supabaseAdmin();
-  const me = await currentUserId();
 
   const firstTile = slots[0]?.options[0]?.tile ?? "city";
   const { data: plan, error } = await db
@@ -330,6 +336,7 @@ function mapProfile(r: Row | null | undefined): Profile | null {
     avatar: (r.avatar_emoji as string) ?? null, // avatar path repurposed into avatar_emoji
     interests: (r.interests as string[]) ?? [],
     interest_notes: (r.interest_notes as string) ?? null,
+    home_area: (r.home_area as string) ?? null,
     is_paid: (r.is_paid as boolean) ?? false,
     created_at: (r.created_at as string) ?? "",
   };
@@ -410,7 +417,7 @@ export async function getCurrentProfile(): Promise<Profile | null> {
 }
 
 /** Update the current user's own profile (onboarding / profile edit). */
-export async function updateMyProfile(patch: { name?: string; interests?: string[]; interest_notes?: string }): Promise<void> {
+export async function updateMyProfile(patch: { name?: string; interests?: string[]; interest_notes?: string; home_area?: string }): Promise<void> {
   const me = await currentUserId();
   if (!me) return;
   const db = supabaseAdmin();
@@ -419,6 +426,10 @@ export async function updateMyProfile(patch: { name?: string; interests?: string
   if (Array.isArray(patch.interests)) upd.interests = patch.interests;
   if (typeof patch.interest_notes === "string") upd.interest_notes = patch.interest_notes.slice(0, 500);
   if (Object.keys(upd).length) await db.from("profiles").update(upd as never).eq("id", me);
+  // home_area in its own call so a missing column (pre-migration) can't fail the rest
+  if (typeof patch.home_area === "string") {
+    await db.from("profiles").update({ home_area: patch.home_area.trim().slice(0, 120) } as never).eq("id", me);
+  }
 }
 
 /** All seeded profiles — used by the dev profile switcher. */
@@ -650,32 +661,26 @@ export async function deletePlan(slug: string): Promise<void> {
   await db.from("plans").delete().eq("id", planId);
 }
 
-/** Smart-resolve a typed place and add it as a voteable option in a given slot. */
-export async function addCustomOption(slug: string, query: string, slotKey: string, day: number): Promise<boolean> {
-  const { resolvePlace } = await import("./ai");
+/** Add a picked/typed place as a voteable option in a slot (from the maps search). */
+export async function addCustomOption(slug: string, title: string, slotKey: string, day: number, area?: string): Promise<boolean> {
   const db = supabaseAdmin();
-  const { data: plan } = await db.from("plans").select("id, place_address").eq("slug", slug).maybeSingle();
+  const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
   if (!plan) throw new Error("plan not found");
-  const row = plan as Row;
-  const planId = row.id as string;
-  const resolved = await resolvePlace(query, (row.place_address as string) || "London, UK");
-  if (!resolved) return false;
+  const planId = (plan as Row).id as string;
+  if (!title.trim()) return false;
 
-  // inherit slot meta (label / order) from a sibling option in the same slot
-  const { data: existing } = await db.from("plan_options").select("payload").eq("plan_id", planId);
-  const sib = ((existing as Row[]) ?? []).find((o) => {
-    const p = (o.payload as Row) ?? {};
-    return p.slot === slotKey && ((p.day as number) ?? 1) === day;
-  });
-  const meta = (sib?.payload as Row) ?? {};
+  // inherit slot meta (label / order) from the scaffold or a sibling option
+  const { data: existing } = await db.from("plan_options").select("payload, title").eq("plan_id", planId);
+  const allRows = (existing as Row[]) ?? [];
+  const meta = readMeta(allRows);
+  const { label, order } = slotMetaFrom(meta.scaffold, allRows, slotKey, day);
   await db.from("plan_options").insert({
     plan_id: planId, kind: "activity", source: "human",
-    title: resolved.title, subtitle: resolved.subtitle ?? null, why: resolved.why ?? null,
-    source_url: mapsUrl(resolved.map_query) ?? null, source_label: "Added",
+    title: title.trim().slice(0, 140), subtitle: area ?? null, why: null,
+    source_url: mapsUrl(area ? `${title}, ${area}` : title) ?? null, source_label: "Added",
     payload: {
-      slot: slotKey, slot_label: (meta.slot_label as string) || "Pick one",
-      slot_order: (meta.slot_order as number) ?? 0, day, fixed: false, chosen: false,
-      tile: resolved.tile, place_name: resolved.place_name ?? null, time: resolved.time ?? null,
+      slot: slotKey, slot_label: label, slot_order: order, day, fixed: false, chosen: false,
+      tile: "city", place_name: title.trim().slice(0, 140), time: null,
     },
   } as never);
   return true;
