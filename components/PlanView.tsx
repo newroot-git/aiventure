@@ -103,6 +103,8 @@ function buildSlots(options: PlanOption[], scaffold: PlanScaffoldSlot[]): Slot[]
     slot.options.push(o);
     if (p.chosen) slot.chosen = o;
   });
+  // most-voted options rise to the top of each slot (human still picks)
+  for (const s of map.values()) s.options.sort((a, b) => (b.votes ?? 0) - (a.votes ?? 0));
   return [...map.values()].sort((a, b) => a.day - b.day || a.order - b.order);
 }
 
@@ -254,6 +256,7 @@ export function PlanView({
     setRsvpState(v);
     persist({ action: "rsvp", rsvp: v });
   }
+  const deleteOpt = (optionId: string) => persist({ action: "deleteOption", optionId });
   const addDateOpt = (iso: string) => persist({ action: "addDate", iso });
   const lockDateOpt = (optionId: string) => persist({ action: "lockDate", optionId });
   function voteDate(id: string) {
@@ -428,6 +431,7 @@ export function PlanView({
                 votes={votes[o.id]} voted={voted[o.id]} onVote={() => vote(o.id)}
                 selected={slot.chosen?.id === o.id}
                 onSelect={isOwner && planning ? () => choose(slot.id, o.id) : undefined}
+                onDelete={isOwner && planning ? () => deleteOpt(o.id) : undefined}
               />
             ))}
           </div>
@@ -547,10 +551,10 @@ export function PlanView({
             </div>
           ) : (
             <>
-              <div className="font-bold leading-tight">{multiStep ? generalArea : (plan.place_name ?? "TBC")}</div>
+              <div className="font-bold leading-tight">{multiStep ? generalArea : (plan.place_name ?? plan.place_address ?? "TBC")}</div>
               {multiStep
                 ? <div className="text-sm text-muted">{pins.length} stop{pins.length === 1 ? "" : "s"}</div>
-                : plan.place_address && <div className="text-sm text-muted">{plan.place_address}</div>}
+                : (plan.place_name && plan.place_address) && <div className="text-sm text-muted">{plan.place_address}</div>}
               {isOwner && planning && (
                 <button onClick={() => { setLocVal(plan.place_address ?? ""); setEditLoc(true); }} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-primary">
                   <Pencil size={11} /> Change area
@@ -572,23 +576,30 @@ export function PlanView({
               <p className="mb-3 text-sm text-muted">Not pinned to a day yet — add a few options and everyone marks what works.</p>
             )}
             <div className="flex flex-col gap-2">
-              {dateOptions.map((d) => (
-                <div key={d.id} className="flex items-center gap-2 rounded-md border-2 border-line bg-surface p-2">
-                  <button
-                    onClick={() => voteDate(d.id)}
-                    className={`flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-bold transition ${voted[d.id] ? "text-success" : "text-ink"}`}
-                  >
-                    <Check size={15} className={voted[d.id] ? "opacity-100" : "opacity-30"} />
-                    {fmtDate(d.iso)}{fmtTime(d.iso) ? ` · ${fmtTime(d.iso)}` : ""}
-                  </button>
-                  <span className="text-xs font-bold text-muted">{d.votes} free</span>
-                  {isOwner && (
-                    <Button variant="soft" size="sm" onClick={() => lockDateOpt(d.id)}>
-                      <Lock size={13} /> Set
-                    </Button>
-                  )}
-                </div>
-              ))}
+              {(() => {
+                const maxV = Math.max(0, ...dateOptions.map((d) => d.votes));
+                return [...dateOptions].sort((a, b) => b.votes - a.votes).map((d) => {
+                  const ideal = maxV > 0 && d.votes === maxV;
+                  return (
+                    <div key={d.id} className={`flex items-center gap-2 rounded-md border-2 p-2 ${ideal ? "border-success bg-success-soft/40" : "border-line bg-surface"}`}>
+                      <button
+                        onClick={() => voteDate(d.id)}
+                        className={`flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-bold transition ${voted[d.id] ? "text-success" : "text-ink"}`}
+                      >
+                        <Check size={15} className={voted[d.id] ? "opacity-100" : "opacity-30"} />
+                        {fmtDate(d.iso)}{fmtTime(d.iso) ? ` · ${fmtTime(d.iso)}` : ""}
+                      </button>
+                      {ideal && <span className="rounded bg-success px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Best</span>}
+                      <span className="text-xs font-bold text-muted">{d.votes} free</span>
+                      {isOwner && (
+                        <Button variant="soft" size="sm" onClick={() => lockDateOpt(d.id)}>
+                          <Lock size={13} /> Set
+                        </Button>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
             {planning && (
               <div className="mt-2">

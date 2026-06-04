@@ -441,8 +441,9 @@ function DualCTA({
   return (
     <div className="mt-9 flex flex-col gap-2.5">
       <Button variant="primary" size="lg" className="w-full" disabled={disabled} onClick={onAi}>{aiIcon} {aiLabel}</Button>
-      <Button variant="soft" size="lg" className="w-full" disabled={disabled} onClick={onManual}>I&apos;ll build it myself</Button>
-      <p className="text-center text-xs text-muted">Build it yourself and ask AI for ideas on any step later.</p>
+      {/* building it yourself needs no description */}
+      <Button variant="soft" size="lg" className="w-full" onClick={onManual}>I&apos;ll build it myself</Button>
+      <p className="text-center text-xs text-muted">{disabled ? "Add a description for AI, or just build it yourself." : "Build it yourself and ask AI for ideas on any step later."}</p>
     </div>
   );
 }

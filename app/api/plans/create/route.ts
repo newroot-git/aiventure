@@ -12,9 +12,14 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "invalid JSON" }, { status: 400 });
   }
-  if (!body?.intent || typeof body.intent !== "string" || body.intent.length > 500) {
-    return NextResponse.json({ error: "valid intent (<=500 chars) required" }, { status: 400 });
+  // a description is only required for AI builds; building it yourself needs none
+  if (body.aiBuild && (!body?.intent || typeof body.intent !== "string" || !body.intent.trim())) {
+    return NextResponse.json({ error: "add a description so AI can build it" }, { status: 400 });
   }
+  if (typeof body.intent === "string" && body.intent.length > 500) {
+    return NextResponse.json({ error: "description too long (max 500)" }, { status: 400 });
+  }
+  if (typeof body.intent !== "string") body.intent = "";
   try {
     const { slug } = await createPlanFromDrop(body);
     if (Array.isArray(body.inviteIds) && body.inviteIds.length) {

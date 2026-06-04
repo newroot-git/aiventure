@@ -3,7 +3,7 @@ import {
   choosePlanOption, setPlanWhen, invitePeople,
   setSlotTime, addSlot, setRecurrence, deletePlan,
   setPlanTitle, setPlanLocation, pokeNonVoters,
-  setRsvp, addDateOption, lockDate, stopSeries,
+  setRsvp, addDateOption, lockDate, stopSeries, deleteOption,
   type PlanRecurrence,
 } from "@/lib/db";
 import type { RSVP } from "@/lib/types";
@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   let body: {
     slug?: string;
-    action?: "choose" | "when" | "invite" | "slotTime" | "addSlot" | "recurrence" | "delete" | "title" | "location" | "poke" | "rsvp" | "addDate" | "lockDate" | "stopSeries";
+    action?: "choose" | "when" | "invite" | "slotTime" | "addSlot" | "recurrence" | "delete" | "title" | "location" | "poke" | "rsvp" | "addDate" | "lockDate" | "stopSeries" | "deleteOption";
     optionId?: string;
     startsAt?: string;
     profileIds?: string[];
@@ -50,6 +50,7 @@ export async function POST(req: Request) {
     else if (body.action === "addDate" && body.iso) await addDateOption(body.slug, body.iso);
     else if (body.action === "lockDate" && body.optionId) await lockDate(body.slug, body.optionId);
     else if (body.action === "stopSeries") await stopSeries(body.slug);
+    else if (body.action === "deleteOption" && body.optionId) await deleteOption(body.slug, body.optionId);
     else return NextResponse.json({ error: "bad action params" }, { status: 400 });
     return NextResponse.json({ ok: true });
   } catch (e) {

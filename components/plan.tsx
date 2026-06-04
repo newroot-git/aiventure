@@ -30,6 +30,7 @@ export function OptionCard({
   onVote,
   selected,
   onSelect,
+  onDelete,
 }: {
   title: string;
   subtitle?: string | null;
@@ -41,6 +42,7 @@ export function OptionCard({
   onVote?: () => void;
   selected?: boolean;
   onSelect?: () => void;
+  onDelete?: () => void;
 }) {
   return (
     <Card className={cx("p-5 transition", selected && "ring-2 ring-primary")}>
@@ -49,11 +51,18 @@ export function OptionCard({
           <h4 className="font-heading text-lg font-bold leading-snug">{title}</h4>
           {subtitle && <p className="mt-0.5 text-sm text-muted">{subtitle}</p>}
         </div>
-        {sourceLabel && (
-          <Pill tone="secondary" className="shrink-0">
-            <Sparkles size={14} /> {sourceLabel}
-          </Pill>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {sourceLabel && (
+            <Pill tone="secondary">
+              <Sparkles size={14} /> {sourceLabel}
+            </Pill>
+          )}
+          {onDelete && (
+            <button onClick={onDelete} aria-label="Remove" className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-[#c0392b]">
+              <X size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
       {why && <p className="mt-3 text-[15px] leading-relaxed text-ink/80">{why}</p>}

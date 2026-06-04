@@ -38,8 +38,10 @@ async function resolveAuthProfile(authId: string, email: string | null): Promise
 export const currentUserId = cache(async (): Promise<string> => {
   try {
     const sb = await supabaseServer();
-    const { data: { user } } = await sb.auth.getUser();
-    if (user) return await resolveAuthProfile(user.id, user.email ?? null);
+    // getSession reads the cookie (no network) — middleware already validates/refreshes
+    // the token each request, so this is both safe and much faster than getUser().
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user) return await resolveAuthProfile(session.user.id, session.user.email ?? null);
   } catch {}
   try {
     const c = await cookies();
@@ -141,7 +143,7 @@ export interface CreateExtras {
 /** Create a plan. aiBuild=true → AI fills slots; false → empty named skeleton. */
 export async function createPlanFromDrop(input: DropInput & CreateExtras): Promise<{ slug: string }> {
   const aiBuild = !!input.aiBuild;
-  let title = input.intent.slice(0, 140);
+  let title = input.intent?.trim() ? input.intent.slice(0, 140) : "New plan";
   let slots: DropSlot[] = [];
   // the area refines/per-slot AI will use — the AI's resolved area beats the
   // (possibly default "London") form value, so a HK plan stays HK throughout.
@@ -407,6 +409,18 @@ export async function getCurrentProfile(): Promise<Profile | null> {
   return mapProfile(data as Row | null);
 }
 
+/** Update the current user's own profile (onboarding / profile edit). */
+export async function updateMyProfile(patch: { name?: string; interests?: string[]; interest_notes?: string }): Promise<void> {
+  const me = await currentUserId();
+  if (!me) return;
+  const db = supabaseAdmin();
+  const upd: Record<string, unknown> = {};
+  if (typeof patch.name === "string" && patch.name.trim()) upd.name = patch.name.trim().slice(0, 60);
+  if (Array.isArray(patch.interests)) upd.interests = patch.interests;
+  if (typeof patch.interest_notes === "string") upd.interest_notes = patch.interest_notes.slice(0, 500);
+  if (Object.keys(upd).length) await db.from("profiles").update(upd as never).eq("id", me);
+}
+
 /** All seeded profiles — used by the dev profile switcher. */
 export async function getAllProfiles(): Promise<Profile[]> {
   const db = supabaseAdmin();
@@ -665,6 +679,17 @@ export async function addCustomOption(slug: string, query: string, slotKey: stri
     },
   } as never);
   return true;
+}
+
+/** Remove a single option/suggestion from a plan (owner). */
+export async function deleteOption(slug: string, optionId: string): Promise<void> {
+  await assertOwner(slug);
+  const db = supabaseAdmin();
+  const { data: opt } = await db.from("plan_options").select("plan_id").eq("id", optionId).maybeSingle();
+  await db.from("option_votes").delete().eq("option_id", optionId);
+  await db.from("plan_options").delete().eq("id", optionId);
+  const planId = (opt as Row | null)?.plan_id as string | undefined;
+  if (planId) await deriveHeadline(planId, slug);
 }
 
 /** Pick one option for its slot: marks it chosen, clears siblings, re-derives the plan headline. */

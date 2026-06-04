@@ -47,7 +47,7 @@ function OnboardFlow() {
     const ids = new Set(categoriesFor(s).map((c) => c.id));
     setCats((prev) => prev.filter((id) => ids.has(id)));
   }
-  function next() {
+  async function next() {
     if (step < STEPS.length - 1) return setStep((s) => s + 1);
     try {
       localStorage.setItem(
@@ -55,7 +55,14 @@ function OnboardFlow() {
         JSON.stringify({ name, setting, categories: cats, interests }),
       );
     } catch {}
-    router.push(invite ? `/p/${invite}` : "/welcome");
+    // persist to the real profile so the app knows your name + interests
+    try {
+      await fetch("/api/me", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, interests }),
+      });
+    } catch {}
+    router.push(invite ? `/p/${invite}` : "/plans");
   }
   function back() {
     if (step === 0) router.push("/");

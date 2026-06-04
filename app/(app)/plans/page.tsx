@@ -46,16 +46,15 @@ export default async function HomePage() {
             </Card>
           </Link>
         ))}
-        {nudges.map((n) => (
-          <Link key={n.id} href="/groups" className="block">
-            <Card className="flex items-center gap-3 p-3 transition active:scale-[0.99]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/img/icons/nudge.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink/10 object-cover" />
-              <div className="min-w-0 flex-1 text-sm"><b>{n.from.name}</b> nudged you · <span className="text-muted">{n.message}</span></div>
-              <ChevronRight size={18} className="shrink-0 text-muted" />
-            </Card>
-          </Link>
-        ))}
+        {nudges.length > 0 && (
+          <Card className="flex items-center gap-3 p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/img/icons/nudge.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink/10 object-cover" />
+            <div className="min-w-0 flex-1 text-sm">
+              <b>{nudges.length} nudge{nudges.length > 1 ? "s" : ""}</b> waiting · <span className="text-muted">tap the inbox to respond</span>
+            </div>
+          </Card>
+        )}
       </div>
 
       {rest.length > 0 && (

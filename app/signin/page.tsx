@@ -20,10 +20,16 @@ export default function SignIn() {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
 
-  // a real session must win — drop any leftover guest cookie so it can't mask it
-  const go = () => {
+  // a real session must win — drop any leftover guest cookie so it can't mask it,
+  // then route new accounts (no interests yet) into onboarding.
+  const go = async () => {
     document.cookie = "av_uid=; Path=/; Max-Age=0; SameSite=Lax";
-    router.push("/plans");
+    let dest = "/plans";
+    try {
+      const me = await fetch("/api/me").then((r) => r.json());
+      if (me?.needsOnboard) dest = "/onboard";
+    } catch {}
+    router.push(dest);
     router.refresh();
   };
 
