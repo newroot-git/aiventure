@@ -5,11 +5,14 @@ import { ChevronLeft, ChevronRight, MapPin, Clock, Repeat } from "lucide-react";
 import { Card, Pill, AvatarStack } from "./ui";
 import type { PlanCard } from "@/lib/db";
 
-// pull a HH:MM out of a plan (recurrence time, or the tail of its date label)
+// HH:MM in the viewer's timezone (recurrence time, or the plan's start). Formatted
+// client-side so it matches the plan page (server formats in UTC and disagrees).
 function timeOf(p: PlanCard): string | null {
   if (p.recurrence?.time) return p.recurrence.time;
-  const m = p.dateLabel?.match(/\b(\d{1,2}:\d{2})\b/);
-  return m ? m[1] : null;
+  if (!p.startsAtISO) return null;
+  const d = new Date(p.startsAtISO);
+  if (isNaN(d.getTime()) || (d.getHours() === 0 && d.getMinutes() === 0)) return null;
+  return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 function cadenceLabel(c: string): string {
   return c === "biweekly" ? "Fortnightly" : c === "monthly" ? "Monthly" : "Weekly";

@@ -138,7 +138,9 @@ export function Avatar({
   size?: number;
   ring?: boolean;
 }) {
-  if (src) {
+  // only real image paths/URLs render as <img>; emoji-defaulted avatars fall back to initials
+  const isImg = !!src && (src.startsWith("/") || src.startsWith("http"));
+  if (isImg) {
     return (
       <span
         className={cx(

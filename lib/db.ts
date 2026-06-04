@@ -339,7 +339,7 @@ function fmtDateLabel(iso?: string | null): string {
 }
 
 export interface PlanCard {
-  id: string; slug: string; activity: string; dateLabel: string; date: string; place: string;
+  id: string; slug: string; activity: string; dateLabel: string; date: string; startsAtISO: string; place: string;
   groupName: string; members: Profile[]; status: "upcoming" | "past"; adventureNo?: number;
   cover: string; tile: string; recurrence?: PlanRecurrence | null;
 }
@@ -354,6 +354,7 @@ function mapPlanCard(r: Row): PlanCard {
     slug: r.slug as string,
     activity: (r.activity as string) || (r.title as string),
     date: r.starts_at ? (r.starts_at as string).slice(0, 10) : "",
+    startsAtISO: (r.starts_at as string) || "",
     dateLabel: fmtDateLabel(r.starts_at as string),
     place: (r.place_name as string) || "TBC",
     groupName: ((r.group as Row)?.name as string) || "You",

@@ -3,7 +3,7 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Loader2, Sparkles, MapPin, Route, Tent, ArrowLeft, Plus, X, Navigation,
-  User, Users, Globe, CalendarDays, HelpCircle, ListChecks, Check,
+  User, Users, Globe, CalendarDays, HelpCircle, ListChecks, Check, Link2,
 } from "lucide-react";
 import { Button, Textarea, SelectTag, Label, Input, Avatar } from "@/components/ui";
 import { WhenPicker } from "@/components/plan";
@@ -71,6 +71,15 @@ function NewPlanFlow() {
   // budget
   const [budgetFree, setBudgetFree] = React.useState(false);
   const [budgetAmt, setBudgetAmt] = React.useState("");
+  const [linkCopied, setLinkCopied] = React.useState(false);
+
+  async function copyAppLink() {
+    try {
+      await navigator.clipboard.writeText(window.location.origin);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1800);
+    } catch {}
+  }
 
   React.useEffect(() => {
     fetch("/api/friends").then((r) => r.json()).then((d) => setFriends(d.friends ?? [])).catch(() => {});
@@ -284,7 +293,7 @@ function NewPlanFlow() {
             <ModeTile active={whoMode === "group"} Icon={Users} label="A group" onClick={() => setWhoMode("group")} disabled={!groups.length} />
             <ModeTile active={whoMode === "open"} Icon={Globe} label="Open to all" onClick={() => setWhoMode("open")} />
           </div>
-          {whoMode === "people" && friends.length > 0 && (
+          {whoMode === "people" && (
             <div className="mt-3 flex flex-wrap gap-3">
               {friends.map((f) => {
                 const on = invited.includes(f.id);
@@ -295,6 +304,13 @@ function NewPlanFlow() {
                   </button>
                 );
               })}
+              {/* invite someone not on the app — copy a share link */}
+              <button type="button" onClick={copyAppLink} className="flex flex-col items-center gap-1">
+                <span className="grid h-11 w-11 place-items-center rounded-md border-2 border-dashed border-ink/40 bg-surface text-primary">
+                  {linkCopied ? <Check size={20} /> : <Link2 size={20} />}
+                </span>
+                <span className="truncate text-xs font-bold text-muted">{linkCopied ? "Copied" : "Invite link"}</span>
+              </button>
             </div>
           )}
           {whoMode === "group" && (

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MapPin, CalendarDays, ChevronRight, Sparkles, Users } from "lucide-react";
 import { Card, Pill, AvatarStack } from "@/components/ui";
 import { Countdown } from "@/components/Countdown";
+import { LocalDateTime } from "@/components/LocalDateTime";
 import { getUserPlans, getCurrentProfile, getInvites, getNudges, getOpenEvents, type PlanCard } from "@/lib/db";
 
 export default async function HomePage() {
@@ -28,7 +29,7 @@ export default async function HomePage() {
 
       {next && (
         <div className="mt-5">
-          <Countdown slug={next.slug} activity={next.activity} cover={next.cover} place={next.place} targetISO={`${next.date}T16:00:00`} who={nextWho} />
+          <Countdown slug={next.slug} activity={next.activity} cover={next.cover} place={next.place} targetISO={next.startsAtISO || `${next.date}T16:00:00`} who={nextWho} />
         </div>
       )}
 
@@ -106,7 +107,7 @@ function PlanRow({ plan }: { plan: PlanCard }) {
         <div className="p-4">
           <h3 className="font-heading text-lg font-bold leading-snug">{plan.activity}</h3>
           <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-muted">
-            <span className="inline-flex items-center gap-1"><CalendarDays size={14} /> {plan.dateLabel}</span>
+            <span className="inline-flex items-center gap-1"><CalendarDays size={14} /> <LocalDateTime iso={plan.startsAtISO} /></span>
             <span className="inline-flex items-center gap-1"><MapPin size={14} /> {plan.place}</span>
           </div>
           <div className="mt-3"><AvatarStack people={plan.members} /></div>
