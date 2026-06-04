@@ -72,7 +72,7 @@ export default function SignIn() {
         {step === "email" ? (
           <div className="mt-6">
             <h1 className="font-display text-2xl font-bold">Sign in</h1>
-            <p className="mt-1 text-[15px] text-muted">Pop in your email — we&apos;ll send a 6-digit code. No password.</p>
+            <p className="mt-1 text-[15px] text-muted">Pop in your email — we&apos;ll send you a code. No password.</p>
             <div className="mt-4">
               <Input
                 type="email" inputMode="email" autoFocus
@@ -89,15 +89,15 @@ export default function SignIn() {
         ) : (
           <div className="mt-6">
             <h1 className="font-display text-2xl font-bold">Enter your code</h1>
-            <p className="mt-1 text-[15px] text-muted">We sent a 6-digit code to <b className="text-ink">{email}</b>.</p>
+            <p className="mt-1 text-[15px] text-muted">We sent a code to <b className="text-ink">{email}</b>.</p>
             <div className="mt-4">
               <Input
-                inputMode="numeric" autoFocus maxLength={6}
+                inputMode="numeric" autoFocus maxLength={8}
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
                 onKeyDown={(e) => e.key === "Enter" && verify()}
-                placeholder="123456"
-                className="text-center font-num text-2xl tracking-[0.4em]"
+                placeholder="Enter code"
+                className="text-center font-num text-2xl tracking-[0.3em]"
               />
             </div>
             <Button variant="primary" size="lg" className="mt-3 w-full" disabled={busy || code.length < 6} onClick={verify}>
