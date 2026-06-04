@@ -14,7 +14,7 @@ function diff(target: number) {
 function Unit({ v, label }: { v: number; label: string }) {
   return (
     <div className="flex flex-col items-center">
-      <span className="font-display text-3xl font-bold leading-none text-white">
+      <span className="font-num text-3xl font-extrabold leading-none text-white">
         {String(v).padStart(2, "0")}
       </span>
       <span className="mt-1 text-[10px] font-bold uppercase tracking-wider text-white/70">
@@ -66,9 +66,9 @@ export function Countdown({
           </div>
           <div className="mt-4 flex items-center gap-4">
             <Unit v={t.d} label="days" />
-            <span className="font-display text-2xl text-white/40">:</span>
+            <span className="font-num text-2xl text-white/40">:</span>
             <Unit v={t.h} label="hrs" />
-            <span className="font-display text-2xl text-white/40">:</span>
+            <span className="font-num text-2xl text-white/40">:</span>
             <Unit v={t.m} label="min" />
             <span className="ml-auto inline-flex items-center gap-1 rounded-md border-2 border-white/30 bg-white/10 px-3 py-1.5 text-sm font-bold text-white backdrop-blur-sm">
               <CalendarDays size={14} /> View

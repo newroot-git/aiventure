@@ -365,7 +365,7 @@ function NewPlanFlow() {
             <Label>How many nights?</Label>
             <div className="mt-3 flex items-center gap-4">
               <Button variant="soft" size="sm" onClick={() => setNights((n) => Math.max(1, n - 1))}>−</Button>
-              <span className="font-display text-2xl font-bold">{nights}</span>
+              <span className="font-num text-2xl font-extrabold">{nights}</span>
               <Button variant="soft" size="sm" onClick={() => setNights((n) => n + 1)}>+</Button>
             </div>
           </div>

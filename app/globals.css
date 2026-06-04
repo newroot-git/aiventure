@@ -110,6 +110,14 @@
   image-rendering: pixelated;
 }
 
+/* numerals: the pixel display font is ambiguous for digits — use the clean
+   heading font with tabular figures for any prominent number display */
+.font-num {
+  font-family: var(--font-heading);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
 /* dusk-forest title-screen gradient (purple night -> dusk -> gold -> forest) */
 .aurora {
   background: linear-gradient(

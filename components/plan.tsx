@@ -316,7 +316,7 @@ export function AdventureCard({
       <div className="relative">
         <div className="flex items-center justify-between">
           <span className="inline-flex items-center gap-1.5 rounded-md border-2 border-white/25 bg-black/25 px-3 py-1 font-display text-sm font-bold uppercase tracking-wide text-accent backdrop-blur-sm">
-            <Award size={14} /> Adventure {number}
+            <Award size={14} /> Adventure <span className="font-num">{number}</span>
           </span>
         </div>
 

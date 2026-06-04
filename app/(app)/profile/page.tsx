@@ -62,7 +62,7 @@ export default async function ProfilePage() {
 
       {/* upgrade */}
       {!me?.is_paid && (
-        <Card className="mt-7 bg-ink p-6 text-white">
+        <Card className="mt-7 !bg-ink p-6 text-white">
           <h3 className="font-heading text-lg font-extrabold">Go Plus</h3>
           <p className="mt-1 text-sm text-white/70">Unlimited AI drops, deeper personalisation, trip mode. One Plus member unlocks AI for everyone on a plan.</p>
           <Link href="/plus"><Button variant="primary" className="mt-4">See plans</Button></Link>
