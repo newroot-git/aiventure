@@ -2,40 +2,39 @@
 
 Last session: 2026-06-04. Hackathon due June 5 (Agent track, submit by 23:59 SGT). Style LOCKED: lush pixel landscapes, NO emojis, lucide icons + initials/image avatars.
 
+## LIVE
+- **Production: https://aiventure-swart.vercel.app** (Vercel project `newroot/aiventure`, account `newrootio`, team `newroot`, GitHub `newroot-git/aiventure` connected → push to main auto-deploys). Env vars set in Vercel (OpenRouter + Supabase, all environments). Verified live: pages 200, Supabase + OpenRouter working.
+- Discord (Elemental Studios webhook) pinged Conor with the link + how-to.
+
 ## Architecture
-Plans = ordered **slots** (each holds voteable options; pick one per slot). One renderer `PlanView` for one-thing / adventure / trip. Slots + scaffold + recurrence all live in `plan_options` (no DDL — meta row `kind='time', title='__meta'`). `/a/[slug]` → redirects `/p/[slug]`.
+Plans = ordered **slots** (each holds voteable options; pick one per slot). One renderer `PlanView` for one-thing / adventure / trip. Slots + scaffold + recurrence + seriesId all live in `plan_options` meta row (`kind='time', title='__meta'`, no DDL). `/a/[slug]` → `/p/[slug]`.
 
-## Identity (real owner/participant — auth seam)
-- `currentUserId()` in `lib/db.ts` reads the **`av_uid` cookie** (default Josh). This is the single seam — swap for a Supabase session when magic-link lands; every reader already routes through it.
-- Owner = `plan.creator_id`. **Owner-only (server-enforced via `assertOwner`):** lock / complete / delete / rename. Participants: vote, pick, add options, refine, RSVP.
-- Dev **profile switcher** in `AppShell` (sidebar + mobile header) → `POST /api/whoami` sets the cookie. 7 seeded profiles (Josh, Conor, Jack, Sam, Mia, Tom, Priya).
-- `getPlanBySlug` returns `isOwner`; PlanView hides owner actions for participants ("the owner locks it in").
+## Identity / permissions (real, cookie-switcher seam)
+- `currentUserId()` reads `av_uid` cookie (default Josh). **Seam for real auth** — swap for Supabase session; everything routes through it. Dev **profile switcher** (sidebar + mobile header, `/api/whoami`) lets you act as any of 7 seeded profiles.
+- **Owner = creator_id.** Owner-only (server-enforced via `assertOwner`): pick/choose, refine, refineAll, addSlot, slotTime, when, lockDate, lock/complete, delete, title, location, recurrence, stopSeries.
+- **Participants**: vote (persisted `option_votes`), suggest own options (`addCustomOption`), set RSVP (persisted `plan_members`), mark availability. After lock = read-only except RSVP. UI hides owner controls + shows "the owner locks it in".
 
-## Nudges (the intent to hang out)
-- QuickMenu "Send a nudge" = inline `NudgeSheet` popup (pick friend → `POST /api/nudge`). Also on Crew (preset friend).
-- Sending a nudge creates a **shared empty plan** (sender=owner, recipient=member, scaffold "What shall we do?") + a notification linking to it. Recipient clicks the notification → lands in that plan to co-build (NOT the from-scratch flow). Sender can pre-build first.
-- **Poke non-voters** (owner): `POST edit {action:"poke"}` notifies members who haven't weighed in.
+## Availability
+Candidate dates = `plan_options` `payload.date_option`. Members vote which work (`option_votes`); owner `lockDate` → `starts_at` + clears candidates. Create "a few options" mode seeds these. "When works?" section in PlanView.
 
-## Notifications (real)
-- Created on: invite, nudge, lock-in, poke (`notify()` in db). `getNotifications` returns `kind` + `plan_slug`. NotificationsMenu splits nudges (→ plan link) vs activity; opening the panel marks all read (`POST /api/notifications/read`).
+## Create form (`/new`)
+One "Who's coming?" (just me / invite people / a group / open to all). "When?" (not sure / a few options / set date). Budget (Free toggle or £ number). Wires visibility/groupId/inviteIds/startsAt/dateOptions into create.
 
-## This session also shipped
-- **Typing bug FIXED** — `SlotBlock` was a nested component remounting inputs each keystroke; now called as a function. Multi-char typing works (verified).
-- **Recurring**: weekly / fortnightly / monthly in the Recurring control; calendar expands all three.
-- **Editable plan title** (owner, tap hero). **Update location** (owner, Where section). **Invite friends in `/new`** create form (→ members + notifications). **Calendar**: time + multi-event count on day cells, time/cadence on day cards. **Who-with** label on home "Next adventure" (with Conor / with the boys).
-- Routes: `edit` gained title/location/poke; `/api/nudge`, `/api/whoami`, `/api/notifications/read`, `/api/friends`; create accepts `inviteIds`.
+## Recurring = independent instances
+Inert until lock. On lock, `materializeSeries` clones N future-dated **locked** plans sharing `seriesId` (weekly 8 / fortnightly 8 / monthly 6); each independent (own RSVP/edits — declining one doesn't touch others). Turn-off = `stopSeries` (confirm, deletes future, keeps current). Calendar shows real instances (synthetic expansion removed).
 
-Verified vs live DB: owner gate (Conor blocked, Josh allowed), nudge → shared plan + both members + recipient notification w/ slug, typing fix. `next build` green. Test plans cleaned.
+## Also live (earlier this session)
+Nudge = shared plan + popup + notifications; editable title; update location; calendar day times + multi-event count; who-with on home; recurring number-font + Go Plus contrast fixes; typing bug fixed.
 
-## Deferred — see `docs/PLAN-logistics-availability-polish.md`
-- **Availability**: multi date/time options + overlap (reuse `option_votes` + `date_option` rows). Planned, not built.
-- **Travel/logistics**: crew travel-mode chip + per-leg travel time + ferry/long-hop flags (Josh's HK case); trip flights/accom as fixed slots. Minimized UI. Planned.
-- **Polish**: loading skeletons, optimistic vote/pick, tap haptics, route transitions. Planned.
-- **Add-step**: kept (it's the manual-build affordance, not redundant) — revisit if it clutters AI-built plans.
-- Real **magic-link auth** (cookie switcher is the stand-in).
-- Legacy `/nudge` page now orphaned (QuickMenu uses popup); harmless, can delete.
+## Deferred — `docs/PLAN-logistics-availability-polish.md`
+- **Real magic-link auth** — BLOCKED without Josh: seeded profiles have null email/auth_id + Supabase redirect URLs need dashboard config. Dev switcher shipped as the stand-in (great for the demo: instant owner/participant). This is the clear next step (seam ready).
+- **Travel/logistics** (modes, per-leg time, ferry flags, trip flights/accom) — planned, not built.
+- **Polish**: loading skeletons, optimistic vote/pick, haptics, route transitions — planned.
+
+## Verified this session
+API (both roles): create who/when/budget, vote+RSVP persist, participant gating (lock/refine blocked; vote/suggest/RSVP allowed), lockDate, choose, recurring materialize (8 instances) + decline-one-independence + stopSeries. Playwright owner-vs-participant UI. Live prod AI create. `next build` green. All test data cleaned.
 
 ## Stack
 - Next 16 / React 19 / Tailwind v4. OpenRouter chat `anthropic/claude-sonnet-4.5`. No Google key → location search + map on free OSM (Nominatim + Leaflet).
 - Supabase service-role server-only, RLS on, untyped client → `as never` / `as unknown as Row`. DEMO_USER_ID = 1111…1111.
-- Secrets in `.env.local`. Commit as newroot-git. Dev on :3210.
+- Secrets in `.env.local` (+ Vercel envs). Commit as newroot-git. Local dev on :3210.
