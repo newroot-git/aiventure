@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Sparkles, Pencil, ChevronRight } from "lucide-react";
 import { Card, Pill, Button, Avatar } from "@/components/ui";
 import { ResetButton } from "@/components/ResetButton";
+import { SignOutButton } from "@/components/SignOutButton";
 import { getCurrentProfile, getUserPlans, getUserGroups } from "@/lib/db";
 
 export default async function ProfilePage() {
@@ -68,6 +69,11 @@ export default async function ProfilePage() {
           <Link href="/plus"><Button variant="primary" className="mt-4">See plans</Button></Link>
         </Card>
       )}
+
+      {/* account */}
+      <div className="mt-8">
+        <SignOutButton />
+      </div>
 
       {/* dev tools */}
       <div className="mt-10 border-t border-line pt-6">

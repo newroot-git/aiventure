@@ -1,6 +1,8 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "./supabase/admin";
+import { supabaseServer } from "./supabase/server";
 import { generateDrop, generateSlotOptions, mapsUrl, type DropInput, type DropSlot } from "./ai";
 import { planSlug } from "./slug";
 import type { Plan, PlanOption, PlanMember, Profile, RSVP, Visibility } from "./types";
@@ -8,17 +10,44 @@ import type { Plan, PlanOption, PlanMember, Profile, RSVP, Visibility } from "./
 // Demo identity (stands in for auth) — the seeded "Josh" profile.
 export const DEMO_USER_ID = "11111111-1111-1111-1111-111111111111";
 
-// Current acting user. Reads the `av_uid` cookie (set by the dev profile switcher);
-// defaults to Josh. This is the single seam for real auth later — swap the cookie
-// read for a Supabase auth session and every caller keeps working.
-export async function currentUserId(): Promise<string> {
+// Map a Supabase auth user → our profile id (link by auth_id, then email, else create).
+async function resolveAuthProfile(authId: string, email: string | null): Promise<string> {
+  const db = supabaseAdmin();
+  const { data: byAuth } = await db.from("profiles").select("id").eq("auth_id", authId).maybeSingle();
+  if (byAuth) return (byAuth as Row).id as string;
+  if (email) {
+    const { data: byEmail } = await db.from("profiles").select("id").eq("email", email).maybeSingle();
+    if (byEmail) {
+      await db.from("profiles").update({ auth_id: authId } as never).eq("id", (byEmail as Row).id as string);
+      return (byEmail as Row).id as string;
+    }
+  }
+  const name = email ? email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "Adventurer";
+  const { data: created } = await db.from("profiles")
+    .insert({ auth_id: authId, email, name, interests: [] } as never).select("id").single();
+  return (created as unknown as Row).id as string;
+}
+
+/**
+ * Current acting user, resolved once per request:
+ *  1. a real Supabase auth session  → linked/created profile
+ *  2. the `av_uid` cookie            → guest ("I'm a judge") or dev switcher
+ *  3. otherwise ""                   → anonymous (read-only; mutations will no-op/fail)
+ * This is the single identity seam — every caller routes through it.
+ */
+export const currentUserId = cache(async (): Promise<string> => {
+  try {
+    const sb = await supabaseServer();
+    const { data: { user } } = await sb.auth.getUser();
+    if (user) return await resolveAuthProfile(user.id, user.email ?? null);
+  } catch {}
   try {
     const c = await cookies();
-    return c.get("av_uid")?.value || DEMO_USER_ID;
-  } catch {
-    return DEMO_USER_ID;
-  }
-}
+    const uid = c.get("av_uid")?.value;
+    if (uid) return uid;
+  } catch {}
+  return "";
+});
 
 /** True if the acting user owns (created) the plan. */
 export async function isPlanOwner(slug: string): Promise<boolean> {

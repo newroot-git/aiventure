@@ -52,7 +52,7 @@ export function AppShell({
             <Avatar name={user.name} src={user.avatar} size={30} />
             <span className="text-[15px] font-bold">{user.name}</span>
           </Link>
-          {profiles.length > 1 && <ProfileSwitcher me={user} profiles={profiles} />}
+          {process.env.NEXT_PUBLIC_DEV_SWITCH === "1" && profiles.length > 1 && <ProfileSwitcher me={user} profiles={profiles} />}
         </div>
       </aside>
 
@@ -65,7 +65,7 @@ export function AppShell({
               AI<span className="text-primary">venture</span>
             </Link>
             <div className="flex items-center gap-3">
-              {profiles.length > 1 && <ProfileSwitcher me={user} profiles={profiles} compact />}
+              {process.env.NEXT_PUBLIC_DEV_SWITCH === "1" && profiles.length > 1 && <ProfileSwitcher me={user} profiles={profiles} compact />}
               <NotificationsMenu variant="icon" data={notifs} />
               <Link href="/profile" aria-label="Profile">
                 <Avatar name={user.name} src={user.avatar} size={32} />
