@@ -1058,7 +1058,7 @@ export async function respondNudge(nudgeId: string, accept: boolean): Promise<{ 
     await writeMeta(planId, { scaffold: [{ key: "plan", label: "What shall we do?", day: 1, order: 0 }] });
   }
   await db.from("nudges").update({ status: "accepted" } as never).eq("id", nudgeId);
-  await notify(fromId, `${myName} is up for it — start planning!`, "nudge_accepted", slug);
+  await notify(fromId, `${myName} is KEEN — let's go! Tap to start planning together.`, "nudge_accepted", slug);
   return { slug };
 }
 
