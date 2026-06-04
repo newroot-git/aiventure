@@ -760,12 +760,12 @@ function RecurringControl({
             <div className="font-bold">Repeats every {WEEKDAYS[recurrence.weekday]}</div>
             <p className="text-sm text-muted">Shows weekly — people confirm each time.</p>
           </div>
-          <Button variant="soft" size="sm" onClick={() => onChange(null)}>Turn off</Button>
+          <Button variant="soft" size="sm" className="shrink-0 whitespace-nowrap" onClick={() => onChange(null)}>Turn off</Button>
         </div>
       ) : (
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted">Make this a weekly thing (e.g. climbing every week).</p>
-          <Button variant="secondary" size="sm" onClick={() => onChange({ cadence: "weekly", weekday: startWeekday, time: defaultStart ? new Date(defaultStart).toTimeString().slice(0, 5) : null })}>
+          <Button variant="secondary" size="sm" className="shrink-0 whitespace-nowrap" onClick={() => onChange({ cadence: "weekly", weekday: startWeekday, time: defaultStart ? new Date(defaultStart).toTimeString().slice(0, 5) : null })}>
             <Repeat size={14} /> Make weekly
           </Button>
         </div>
