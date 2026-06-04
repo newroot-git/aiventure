@@ -371,6 +371,7 @@ const PLAN_SELECT = "*, group:groups(name), plan_members(rsvp, profile:profiles(
 export async function getUserPlans(): Promise<PlanCard[]> {
   const db = supabaseAdmin();
   const me = await currentUserId();
+  if (!me) return [];
   const { data: mem } = await db.from("plan_members").select("plan_id").eq("profile_id", me);
   const ids = ((mem as Row[]) ?? []).map((m) => m.plan_id as string);
   const orFilter = ids.length
@@ -409,6 +410,7 @@ export async function getAllProfiles(): Promise<Profile[]> {
 export async function getFriends(): Promise<{ profile: Profile; shared: string[] }[]> {
   const db = supabaseAdmin();
   const me = await currentUserId();
+  if (!me) return [];
   const { data: profiles } = await db.from("profiles").select("*").neq("id", me);
   const groups = await getUserGroups();
   return ((profiles as Row[]) ?? [])
@@ -421,7 +423,9 @@ export interface GroupCard { id: string; name: string; members: Profile[] }
 
 export async function getUserGroups(): Promise<GroupCard[]> {
   const db = supabaseAdmin();
-  const { data: gm } = await db.from("group_members").select("group_id").eq("profile_id", await currentUserId());
+  const me = await currentUserId();
+  if (!me) return [];
+  const { data: gm } = await db.from("group_members").select("group_id").eq("profile_id", me);
   const ids = ((gm as Row[]) ?? []).map((g) => g.group_id as string);
   if (!ids.length) return [];
   const { data } = await db.from("groups").select("*, group_members(profile:profiles(*))").in("id", ids);
