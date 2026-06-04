@@ -3,8 +3,26 @@
 Last session: 2026-06-04. Hackathon due June 5 (Agent track, submit by 23:59 SGT). Style LOCKED: lush pixel landscapes, NO emojis, lucide icons + initials/image avatars.
 
 ## LIVE
-- **Production: https://aiventure-swart.vercel.app** (Vercel project `newroot/aiventure`, account `newrootio`, team `newroot`, GitHub `newroot-git/aiventure` connected → push to main auto-deploys). Env vars set in Vercel (OpenRouter + Supabase, all environments). Verified live: pages 200, Supabase + OpenRouter working.
+- **Production: https://aiventure-swart.vercel.app** (Vercel project `newroot/aiventure`, account `newrootio`, team `newroot`, GitHub `newroot-git/aiventure` connected → push to main auto-deploys). Env vars set in Vercel (OpenRouter + Supabase, all environments).
 - Discord (Elemental Studios webhook) pinged Conor with the link + how-to.
+
+## REAL AUTH (live) — 6-digit OTP + judge mode
+- Logged-out → redirected to `/signin`. Sign in = email → **6-digit code** (Supabase OTP, `signInWithOtp`/`verifyOtp`). **"I'm a judge"** button → instant guest profile (no email; `/api/guest` sets `av_uid` cookie; seed crew appear as friends). Sign out on profile page.
+- `currentUserId()` (lib/db.ts, memoised): Supabase session → profile by `auth_id`/`email` (links/creates); else `av_uid` cookie (guest/dev); else anon "". `middleware.ts` refreshes session + guards (public: `/`, `/welcome`, `/signin`, `/onboard`, `/api`, static). `lib/supabase/server.ts` = cookie auth client.
+- Dev profile switcher gated behind `NEXT_PUBLIC_DEV_SWITCH=1` (local `.env.local` only; OFF in prod).
+- **TWO THINGS PENDING JOSH for OTP email to work:** (1) Supabase dashboard → Auth → Email Templates → add `Your code: {{ .Token }}` to the **Magic Link** AND **Confirm signup** templates. (2) give Conor's email → set on seeded Conor profile (Josh's already set to afiredeck@gmail.com). The judge button works without either.
+
+## Fixes 2026-06-04 (later)
+- **Timezone discrepancy FIXED**: times were server-formatted (UTC on Vercel) on home/calendar vs client-local on plan page → disagreed. Now ALL wall-clock times format client-side from ISO (`LocalDateTime` comp + `PlanCard.startsAtISO`; calendar `timeOf` from ISO; Countdown uses real start, not hardcoded 16:00).
+- **Avatar 404 FIXED**: emoji-defaulted avatars ('🙂') rendered as `<img src>`; now only path/URL avatars are images, else initials.
+- **External-invite link tile** in `/new` people picker (Conor's ask) — copies app link.
+- Landing CTAs → `/signin`.
+
+## DB hardening (migrations ready, apply in Supabase SQL editor — DDL can't run headless)
+`supabase/migrations/`: **0002_rls.sql (SECURITY — apply first**: RLS on all 15 tables; closes the public-anon-key hole; service-role bypasses so app unaffected), 0003_indexes.sql, 0004_constraints.sql. Full model + roadmap in **`supabase/DB-NOTES.md`** (security model, jsonb-meta patterns, identity, typed-client roadmap). RLS still OFF until applied.
+
+## QA 2026-06-04 (guest accounts, Playwright + API)
+All pages console-clean; create (all who/when/budget modes + invite tile), nudge popup→shared plan, owner/participant with real guest identities, time consistency, sign-in/out/guard, judge flow — all verified. Repo `d2f8678`.
 
 ## Architecture
 Plans = ordered **slots** (each holds voteable options; pick one per slot). One renderer `PlanView` for one-thing / adventure / trip. Slots + scaffold + recurrence + seriesId all live in `plan_options` meta row (`kind='time', title='__meta'`, no DDL). `/a/[slug]` → `/p/[slug]`.
