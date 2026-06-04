@@ -1,22 +1,21 @@
 "use client";
 import * as React from "react";
-import { useRouter } from "next/navigation";
 import { Hand, X, Loader2, Check } from "lucide-react";
 import { Button, Avatar, SelectTag, Textarea } from "./ui";
 import type { Profile } from "@/lib/types";
 
 const NUDGE_WHEN = ["Whenever", "This week", "This weekend", "Soon"];
 
-// A nudge = the intent to do something with someone. Sending it creates a shared,
-// empty plan and drops the recipient a notification; the sender lands on that plan
-// to start shaping it. Pass `friend` to nudge a specific person, or omit to pick.
+// A nudge = the intent to do something with someone. It stays a nudge until the
+// recipient accepts — only then is a shared plan created (see respondNudge).
+// Pass `friend` to nudge a specific person, or omit to pick.
 export function NudgeSheet({ friend, onClose }: { friend?: Profile; onClose: () => void }) {
-  const router = useRouter();
   const [friends, setFriends] = React.useState<Profile[]>(friend ? [friend] : []);
   const [target, setTarget] = React.useState<Profile | null>(friend ?? null);
   const [when, setWhen] = React.useState("This weekend");
   const [note, setNote] = React.useState("");
   const [sending, setSending] = React.useState(false);
+  const [sent, setSent] = React.useState(false);
 
   React.useEffect(() => {
     if (friend) return;
@@ -32,7 +31,7 @@ export function NudgeSheet({ friend, onClose }: { friend?: Profile; onClose: () 
         body: JSON.stringify({ toId: target.id, message: note, when }),
       });
       const d = await res.json();
-      if (res.ok && d.slug) { router.push(`/p/${d.slug}`); return; }
+      if (res.ok) { setSent(true); return; }
       throw new Error(d.error || "failed");
     } catch {
       setSending(false);
@@ -44,13 +43,22 @@ export function NudgeSheet({ friend, onClose }: { friend?: Profile; onClose: () 
       <div className="fixed inset-0 z-40 bg-night/30" onClick={onClose} />
       <div className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md p-4">
         <div className="rounded-xl border-2 border-ink bg-surface p-4 shadow-hard">
+          {sent ? (
+            <div className="flex flex-col items-center py-6 text-center">
+              <span className="grid h-14 w-14 place-items-center rounded-md border-2 border-ink bg-success-soft text-success shadow-hard"><Check size={28} /></span>
+              <p className="mt-4 font-display text-xl font-bold">Nudge sent to {target?.name}</p>
+              <p className="mt-1 text-sm text-muted">We&apos;ll tell you when they&apos;re up for it — then you can start a plan together.</p>
+              <Button variant="soft" className="mt-4" onClick={onClose}>Done</Button>
+            </div>
+          ) : (
+          <>
           <div className="mb-3 flex items-center justify-between">
             <span className="flex items-center gap-2 font-display text-lg font-bold">
               <Hand size={18} className="text-primary" /> Nudge {target ? target.name : "a mate"}
             </span>
             <button onClick={onClose} className="text-muted"><X size={20} /></button>
           </div>
-          <p className="text-sm text-muted">Poke someone to do something — they land in a shared plan you both shape.</p>
+          <p className="text-sm text-muted">Poke someone to do something. If they&apos;re up for it, you&apos;ll get a shared plan to shape together.</p>
 
           {!friend && (
             <div className="mt-3 grid grid-cols-4 gap-3">
@@ -78,6 +86,8 @@ export function NudgeSheet({ friend, onClose }: { friend?: Profile; onClose: () 
             {sending ? <Loader2 size={16} className="animate-spin" /> : <Hand size={16} />}
             {sending ? "Sending…" : "Send nudge"}
           </Button>
+          </>
+          )}
         </div>
       </div>
     </>

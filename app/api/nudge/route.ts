@@ -12,8 +12,8 @@ export async function POST(req: Request) {
   }
   if (!body.toId) return NextResponse.json({ error: "toId required" }, { status: 400 });
   try {
-    const { slug } = await sendNudge(body.toId, body.message ?? "", body.when ?? "Whenever");
-    return NextResponse.json({ ok: true, slug });
+    await sendNudge(body.toId, body.message ?? "", body.when ?? "Whenever");
+    return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("[/api/nudge]", e);
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });

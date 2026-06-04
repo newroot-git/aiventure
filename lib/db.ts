@@ -999,36 +999,66 @@ export async function markNotificationsRead(): Promise<void> {
  * plan (both are members) so the recipient lands somewhere to co-build, plus a nudge
  * row + a notification linking to that plan.
  */
-export async function sendNudge(toId: string, message: string, whenText: string): Promise<{ slug: string }> {
+/**
+ * Send a nudge — just the intent, NO plan yet. The recipient accepts or declines;
+ * only on accept is the shared plan created (see respondNudge).
+ */
+export async function sendNudge(toId: string, message: string, whenText: string): Promise<{ ok: true }> {
   const db = supabaseAdmin();
   const me = await currentUserId();
   const { data: meProfile } = await db.from("profiles").select("name").eq("id", me).maybeSingle();
   const myName = (meProfile as Row | null)?.name as string ?? "A friend";
+  await db.from("nudges").insert({ from_id: me, to_id: toId, message: message ?? null, when_text: whenText, status: "pending" } as never);
+  const detail = message?.trim() ? ` — "${message.trim()}"` : "";
+  await notify(toId, `${myName} nudged you${detail}. Up for it?`, "nudge", null);
+  return { ok: true };
+}
 
-  // shared empty plan to figure it out together
+/**
+ * Recipient responds to a nudge. Accept → create the shared blank plan (both
+ * members), notify the sender, return its slug. Decline → notify the sender.
+ */
+export async function respondNudge(nudgeId: string, accept: boolean): Promise<{ slug: string | null }> {
+  const db = supabaseAdmin();
+  const me = await currentUserId();
+  const { data: nRow } = await db.from("nudges").select("*").eq("id", nudgeId).maybeSingle();
+  if (!nRow) throw new Error("nudge not found");
+  const nudge = nRow as Row;
+  if ((nudge.to_id as string) !== me) throw new Error("not your nudge");
+  const fromId = nudge.from_id as string;
+  const message = (nudge.message as string) || "";
+
+  const { data: meProfile } = await db.from("profiles").select("name").eq("id", me).maybeSingle();
+  const myName = (meProfile as Row | null)?.name as string ?? "Someone";
+
+  if (!accept) {
+    await db.from("nudges").update({ status: "declined" } as never).eq("id", nudgeId);
+    await notify(fromId, `${myName} passed on your nudge this time.`, "nudge_declined", null);
+    return { slug: null };
+  }
+
+  // accepted → create the shared blank plan both can build
   const slug = planSlug(`${Date.now()}-nudge`);
   const { data: plan } = await db.from("plans").insert({
     slug,
-    title: message?.trim() ? message.trim().slice(0, 140) : `${myName} wants to do something`,
-    intent: message ?? null,
+    title: message.trim() ? message.trim().slice(0, 140) : "Something with the crew",
+    intent: message || null,
     status: "open",
     visibility: "invite",
-    creator_id: me,
+    creator_id: fromId, // the nudger started it — they own it
     ai_empowered: true,
     cover_hue: "city",
   } as never).select("id").single();
   const planId = (plan as unknown as Row | null)?.id as string;
   if (planId) {
     await db.from("plan_members").upsert([
+      { plan_id: planId, profile_id: fromId, rsvp: "in", joined_via: "app" },
       { plan_id: planId, profile_id: me, rsvp: "in", joined_via: "app" },
-      { plan_id: planId, profile_id: toId, rsvp: "maybe", joined_via: "app" },
     ] as never, { onConflict: "plan_id,profile_id" } as never);
     await writeMeta(planId, { scaffold: [{ key: "plan", label: "What shall we do?", day: 1, order: 0 }] });
   }
-
-  await db.from("nudges").insert({ from_id: me, to_id: toId, message: message ?? null, when_text: whenText, status: "pending" } as never);
-  const detail = message?.trim() ? ` — "${message.trim()}"` : "";
-  await notify(toId, `${myName} nudged you${detail}`, "nudge", slug);
+  await db.from("nudges").update({ status: "accepted" } as never).eq("id", nudgeId);
+  await notify(fromId, `${myName} is up for it — start planning!`, "nudge_accepted", slug);
   return { slug };
 }
 

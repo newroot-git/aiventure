@@ -20,7 +20,12 @@ export default function SignIn() {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
 
-  const go = () => { router.push("/plans"); router.refresh(); };
+  // a real session must win — drop any leftover guest cookie so it can't mask it
+  const go = () => {
+    document.cookie = "av_uid=; Path=/; Max-Age=0; SameSite=Lax";
+    router.push("/plans");
+    router.refresh();
+  };
 
   async function passwordSignIn() {
     if (!email.trim() || !password) return;

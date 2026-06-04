@@ -6,8 +6,10 @@ import { Home, Users, CalendarDays, Compass, ChevronsUpDown } from "lucide-react
 import { Avatar } from "./ui";
 import { QuickMenu } from "./QuickMenu";
 import { NotificationsMenu, type NotifData } from "./NotificationsMenu";
-import { CURRENT_USER } from "@/lib/mock";
 import type { Profile } from "@/lib/types";
+
+// neutral fallback — never masquerade as a seeded user when identity is unresolved
+const FALLBACK_USER = { id: "", name: "You", avatar: null } as unknown as Profile;
 
 const TABS = [
   { href: "/plans", label: "Home", Icon: Home },
@@ -23,7 +25,7 @@ export function AppShell({
 }) {
   const path = usePathname();
   const isActive = (href: string) => path.startsWith(href);
-  const user = me ?? CURRENT_USER;
+  const user = me ?? FALLBACK_USER;
 
   return (
     <div className="min-h-dvh">

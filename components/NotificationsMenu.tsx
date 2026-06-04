@@ -1,8 +1,10 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
-import { Inbox, X } from "lucide-react";
+import { Inbox, X, Check, Loader2 } from "lucide-react";
+import { Button } from "./ui";
 import type { InviteCard, NudgeCard, NotificationCard } from "@/lib/db";
 
 function PixelIcon({ name }: { name: string }) {
@@ -17,12 +19,14 @@ export interface NotifData {
 }
 
 export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon" | "side"; data: NotifData }) {
+  const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [invites] = React.useState(data.invites);
+  const [nudges, setNudges] = React.useState(data.nudges);
   const [notes, setNotes] = React.useState(data.notifications);
-  const nudgeNotes = notes.filter((n) => n.kind === "nudge");
-  const otherNotes = notes.filter((n) => n.kind !== "nudge");
-  const count = invites.length + notes.length;
+  const [busyNudge, setBusyNudge] = React.useState<string | null>(null);
+  const otherNotes = notes.filter((n) => n.kind !== "nudge"); // the actionable nudge lives in the Nudges section
+  const count = invites.length + nudges.length + otherNotes.length;
   const active = usePathActive();
 
   // once the panel is opened the items are seen — clear locally + mark read server-side
@@ -31,6 +35,19 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
     setNotes([]);
     fetch("/api/notifications/read", { method: "POST" }).catch(() => {});
   };
+
+  async function respondNudge(id: string, accept: boolean) {
+    setBusyNudge(id);
+    try {
+      const res = await fetch("/api/nudge/respond", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nudgeId: id, accept }),
+      });
+      const d = await res.json();
+      setNudges((ns) => ns.filter((n) => n.id !== id));
+      if (accept && d.slug) { setOpen(false); router.push(`/p/${d.slug}`); router.refresh(); }
+    } finally { setBusyNudge(null); }
+  }
 
   return (
     <>
@@ -84,12 +101,23 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
                   </Section>
                 )}
 
-                {nudgeNotes.length > 0 && (
+                {nudges.length > 0 && (
                   <Section label="Nudges">
-                    {nudgeNotes.map((nt) => (
-                      <Row key={nt.id} href={nt.slug ? `/p/${nt.slug}` : "/crew"} onPick={close} avatar={<PixelIcon name="nudge" />}>
-                        {nt.text}
-                      </Row>
+                    {nudges.map((n) => (
+                      <div key={n.id} className="flex items-center gap-3 rounded-md px-3 py-2.5">
+                        <PixelIcon name="nudge" />
+                        <div className="min-w-0 flex-1 text-sm">
+                          <div><b>{n.from.name}</b> wants to do something{n.message ? `: ${n.message}` : ""}</div>
+                          <div className="mt-1.5 flex gap-2">
+                            <Button variant="primary" size="sm" disabled={busyNudge === n.id} onClick={() => respondNudge(n.id, true)}>
+                              {busyNudge === n.id ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Let&apos;s plan
+                            </Button>
+                            <Button variant="soft" size="sm" disabled={busyNudge === n.id} onClick={() => respondNudge(n.id, false)}>
+                              Not now
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </Section>
                 )}

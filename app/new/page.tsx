@@ -86,6 +86,12 @@ function NewPlanFlow() {
     fetch("/api/groups").then((r) => r.json()).then((d) => setGroups(d.groups ?? [])).catch(() => {});
   }, []);
 
+  // deep-link / quick-menu "surprise" → fire instantly, no questions
+  React.useEffect(() => {
+    if (scopeParam === "surprise") doSurprise();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const location = areas.length ? areas.join(", ") : "London, UK";
 
   React.useEffect(() => {
@@ -136,6 +142,30 @@ function NewPlanFlow() {
       () => setGeo("idle"),
       { enableHighAccuracy: false, timeout: 8000 },
     );
+  }
+
+  // Surprise me — no questions, just a random real plan (single activity or a day)
+  async function doSurprise() {
+    setScope("surprise");
+    setPhase("loading");
+    let interests: string[] = [];
+    try { interests = JSON.parse(localStorage.getItem("aiventure_profile") || "{}").interests || []; } catch {}
+    const moods = ["chilled", "active", "fun", "cultured", "social", "spontaneous", "outdoorsy", "low-key", "adventurous"];
+    const mood = moods[Math.floor(Math.random() * moods.length)];
+    const bigDay = Math.random() < 0.4;
+    const sc: PlanScope = bigDay ? "adventure" : "single";
+    const intent = bigDay
+      ? `Surprise us with a full day of ${mood} things to do — your pick, make it interesting`
+      : `Surprise me with one ${mood} thing to do — your pick, something a bit different`;
+    try {
+      const res = await fetch("/api/plans/create", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: sc, intent, budget: "flexible", interests, location, aiBuild: true, visibility: "invite" }),
+      });
+      const data = await res.json();
+      if (res.ok && data.slug) { router.push(`/p/${data.slug}`); return; }
+      throw new Error(data.error || "failed");
+    } catch { router.push("/plans"); }
   }
 
   async function createPlan(aiBuild: boolean) {
@@ -198,7 +228,7 @@ function NewPlanFlow() {
         <p className="mt-2 text-[15px] text-muted">From a quick idea to a whole trip — pick the scale.</p>
         <div className="mt-6 flex flex-col gap-3">
           {SCOPES.map((s) => (
-            <button key={s.id} onClick={() => { setScope(s.id); setPhase("config"); }}
+            <button key={s.id} onClick={() => { if (s.id === "surprise") { doSurprise(); } else { setScope(s.id); setPhase("config"); } }}
               className="flex items-center gap-4 rounded-xl border-2 border-ink bg-surface p-5 text-left shadow-hard transition active:translate-x-1 active:translate-y-1 active:shadow-none">
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md border-2 border-ink bg-primary-soft text-primary-deep"><s.Icon size={24} /></span>
               <div>
@@ -232,14 +262,6 @@ function NewPlanFlow() {
           placeholder={scope === "trip" ? "e.g. somewhere 2–4hrs away, outdoorsy, long weekend…" : scope === "adventure" ? "e.g. a full Saturday — food, something active, then drinks…" : "e.g. something chill with the boys Saturday afternoon…"}
           className="mt-5 text-base"
         />
-      )}
-
-      {/* surprise mood */}
-      {isSurprise && (
-        <div className="mt-5">
-          <Label>What mood?</Label>
-          <Chips opts={MOODS} value={mood} onChange={setMood} />
-        </div>
       )}
 
       {/* where */}
@@ -386,20 +408,14 @@ function NewPlanFlow() {
         </div>
       )}
 
-      {/* CTA */}
-      {isSurprise ? (
-        <Button variant="primary" size="lg" className="mt-9 w-full" onClick={() => createPlan(true)}>
-          <Sparkles size={18} /> Surprise me
-        </Button>
-      ) : (
-        <DualCTA
-          aiLabel={scope === "trip" ? "Plan the trip with AI" : scope === "adventure" ? "Build the day with AI" : "Build it with AI"}
-          aiIcon={scope === "trip" ? <Tent size={18} /> : scope === "adventure" ? <Route size={18} /> : <Sparkles size={18} />}
-          disabled={!intent.trim()}
-          onAi={() => createPlan(true)}
-          onManual={() => createPlan(false)}
-        />
-      )}
+      {/* CTA (surprise never reaches config — it fires instantly) */}
+      <DualCTA
+        aiLabel={scope === "trip" ? "Plan the trip with AI" : scope === "adventure" ? "Build the day with AI" : "Build it with AI"}
+        aiIcon={scope === "trip" ? <Tent size={18} /> : scope === "adventure" ? <Route size={18} /> : <Sparkles size={18} />}
+        disabled={!intent.trim()}
+        onAi={() => createPlan(true)}
+        onManual={() => createPlan(false)}
+      />
     </main>
   );
 }
