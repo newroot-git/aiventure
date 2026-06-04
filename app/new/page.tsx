@@ -349,8 +349,8 @@ function NewPlanFlow() {
                 ))}
               </div>
             )}
-            <WhenPicker value={null} onChange={(iso) => setDateOpts((p) => (p.includes(iso) ? p : [...p, iso]))} />
-            <p className="mt-1 text-xs text-muted">Add a few — everyone marks which work, you lock one later.</p>
+            <WhenPicker multiple onPickMany={(isos) => setDateOpts((p) => [...new Set([...p, ...isos])])} />
+            <p className="mt-1 text-xs text-muted">Tap a few days — everyone marks which work, you lock one later.</p>
           </div>
         )}
         {whenMode === "unsure" && <p className="mt-2 text-xs text-muted">Leave it open — figure out the day together later.</p>}

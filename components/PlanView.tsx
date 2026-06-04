@@ -592,8 +592,8 @@ export function PlanView({
             </div>
             {planning && (
               <div className="mt-2">
-                <WhenPicker value={null} onChange={addDateOpt} />
-                <p className="mt-1 text-xs text-muted">Add a date option — anyone can add, everyone marks what works.</p>
+                <WhenPicker multiple onPickMany={(isos) => isos.forEach(addDateOpt)} />
+                <p className="mt-1 text-xs text-muted">Tap the days that work — anyone can add, everyone marks what suits.</p>
               </div>
             )}
           </Section>

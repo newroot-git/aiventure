@@ -177,9 +177,13 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 export function WhenPicker({
   value,
   onChange,
+  multiple,
+  onPickMany,
 }: {
   value?: string | null;
-  onChange: (iso: string) => void;
+  onChange?: (iso: string) => void;
+  multiple?: boolean;
+  onPickMany?: (isos: string[]) => void;
 }) {
   const init = value ? new Date(value) : null;
   const now = new Date();
@@ -190,11 +194,17 @@ export function WhenPicker({
   });
   const [day, setDay] = React.useState<number | null>(init ? init.getDate() : null);
   const [time, setTime] = React.useState<string>(init ? `${pad2(init.getHours())}:${pad2(init.getMinutes())}` : "19:00");
+  const [picked, setPicked] = React.useState<string[]>([]); // multiple mode
 
   const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
   const firstWk = (new Date(view.y, view.m, 1).getDay() + 6) % 7;
   const cells: (number | null)[] = [...Array(firstWk).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
   const isToday = (d: number) => view.y === now.getFullYear() && view.m === now.getMonth() && d === now.getDate();
+  const sameDay = (iso: string, d: number) => {
+    const x = new Date(iso);
+    return x.getFullYear() === view.y && x.getMonth() === view.m && x.getDate() === d;
+  };
+  const isPicked = (d: number) => multiple && picked.some((iso) => sameDay(iso, d));
 
   function shift(dir: number) {
     setView((v) => {
@@ -204,13 +214,29 @@ export function WhenPicker({
       return { y: v.y, m };
     });
   }
-  function commit(d: number, t: string) {
+  function isoFor(d: number, t: string) {
     const [h, min] = t.split(":").map(Number);
-    onChange(new Date(view.y, view.m, d, h, min).toISOString());
+    return new Date(view.y, view.m, d, h, min).toISOString();
   }
-  const label = value
-    ? new Date(value).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
-    : "Pick a date & time";
+  function clickDay(d: number) {
+    if (multiple) {
+      // toggle + highlight; nothing is committed until "Done"
+      setPicked((p) => (p.some((iso) => sameDay(iso, d)) ? p.filter((iso) => !sameDay(iso, d)) : [...p, isoFor(d, time)]));
+    } else {
+      setDay(d);
+      onChange?.(isoFor(d, time));
+    }
+  }
+  function done() {
+    if (multiple) { if (picked.length) onPickMany?.(picked); setPicked([]); }
+    setOpen(false);
+  }
+
+  const label = multiple
+    ? "Add date options"
+    : value
+      ? new Date(value).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+      : "Pick a date & time";
 
   return (
     <div className="relative mt-2">
@@ -225,13 +251,14 @@ export function WhenPicker({
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40 bg-night/30" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-40 bg-night/30" onClick={done} />
           <div className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,380px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-ink bg-surface p-4 shadow-hard">
             <div className="mb-3 flex items-center justify-between">
               <button type="button" onClick={() => shift(-1)} className="grid h-9 w-9 place-items-center rounded-md border-2 border-line text-ink hover:border-primary">‹</button>
               <span className="font-display text-base font-bold">{MO[view.m]} {view.y}</span>
               <button type="button" onClick={() => shift(1)} className="grid h-9 w-9 place-items-center rounded-md border-2 border-line text-ink hover:border-primary">›</button>
             </div>
+            {multiple && <p className="mb-2 text-center text-xs font-bold text-muted">Tap the days that work — then Done.</p>}
             <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-bold text-muted">
               {WK.map((d, i) => <div key={i}>{d}</div>)}
             </div>
@@ -241,10 +268,10 @@ export function WhenPicker({
                   <button
                     key={i}
                     type="button"
-                    onClick={() => { setDay(d); commit(d, time); }}
+                    onClick={() => clickDay(d)}
                     className={cx(
                       "grid aspect-square place-items-center rounded-md border-2 text-sm font-bold transition",
-                      day === d
+                      (multiple ? isPicked(d) : day === d)
                         ? "border-ink bg-primary text-white"
                         : isToday(d)
                           ? "border-primary text-primary-deep"
@@ -257,13 +284,13 @@ export function WhenPicker({
               )}
             </div>
             <div className="mt-4 border-t-2 border-line pt-3">
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Time</div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Time{multiple ? " (applies to days you tap next)" : ""}</div>
               <div className="flex flex-wrap gap-2">
                 {TIMES.map((t) => (
                   <button
                     key={t}
                     type="button"
-                    onClick={() => { setTime(t); if (day) commit(day, t); }}
+                    onClick={() => { setTime(t); if (!multiple && day) onChange?.(isoFor(day, t)); }}
                     className={cx(
                       "rounded-md border-2 px-3 py-1.5 text-sm font-bold transition",
                       time === t ? "border-ink bg-secondary text-white" : "border-line text-ink hover:border-secondary",
@@ -274,8 +301,8 @@ export function WhenPicker({
                 ))}
               </div>
             </div>
-            <Button variant="primary" size="md" className="mt-4 w-full" onClick={() => setOpen(false)}>
-              {day ? "Done" : "Pick a day"}
+            <Button variant="primary" size="md" className="mt-4 w-full" onClick={done}>
+              {multiple ? (picked.length ? `Add ${picked.length} date${picked.length > 1 ? "s" : ""}` : "Done") : (day ? "Done" : "Pick a day")}
             </Button>
           </div>
         </>
