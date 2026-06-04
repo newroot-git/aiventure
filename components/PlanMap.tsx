@@ -131,7 +131,7 @@ export function PlanMap({ pins, area }: { pins: Pin[]; area?: string | null }) {
   }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border-2 border-ink/10">
+    <div className="relative isolate z-0 overflow-hidden rounded-2xl border-2 border-ink/10">
       <div ref={ref} className="h-52 w-full bg-surface-2" />
       {state !== "ready" && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-surface-2/80 text-sm font-bold text-muted">
