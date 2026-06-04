@@ -45,16 +45,16 @@ export default function Home() {
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
-              href="/new"
+              href="/signin"
               className="press-hard inline-flex h-13 items-center justify-center rounded-md border-2 border-ink bg-accent px-8 text-base font-bold text-ink shadow-hard"
             >
-              Start a plan
+              Get started
             </Link>
             <Link
-              href="/onboard?invite=wild-otter-42"
+              href="/signin"
               className="press-hard inline-flex h-13 items-center justify-center rounded-md border-2 border-white/40 bg-white/10 px-8 text-base font-bold text-white backdrop-blur-sm"
             >
-              I got an invite
+              Sign in
             </Link>
           </div>
           <p className="mt-4 text-sm text-white/70">
@@ -85,8 +85,8 @@ export default function Home() {
             </p>
             <p className="mt-2 text-[15px] font-semibold text-white/90">
               Stop saying it. Just hang out.{" "}
-              <Link href="/new" className="font-bold text-accent underline">
-                Start a plan
+              <Link href="/signin" className="font-bold text-accent underline">
+                Get started
               </Link>
             </p>
           </div>
