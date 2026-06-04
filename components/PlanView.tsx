@@ -249,6 +249,8 @@ export function PlanView({
     }).catch(() => {});
   }
   function changeRsvp(v: RSVP) {
+    // declining drops the plan off your calendar/home — guard against a misclick
+    if (v === "out" && !window.confirm("Can't make it? This plan will drop off your plans. You can still reopen it from the link.")) return;
     setRsvpState(v);
     persist({ action: "rsvp", rsvp: v });
   }

@@ -372,13 +372,16 @@ export async function getUserPlans(): Promise<PlanCard[]> {
   const db = supabaseAdmin();
   const me = await currentUserId();
   if (!me) return [];
-  const { data: mem } = await db.from("plan_members").select("plan_id").eq("profile_id", me);
-  const ids = ((mem as Row[]) ?? []).map((m) => m.plan_id as string);
+  const { data: mem } = await db.from("plan_members").select("plan_id, rsvp").eq("profile_id", me);
+  // plans I belong to, EXCLUDING ones I've declined ("can't") — those drop off my lists
+  const ids = ((mem as Row[]) ?? []).filter((m) => (m.rsvp as string) !== "out").map((m) => m.plan_id as string);
+  const declined = new Set(((mem as Row[]) ?? []).filter((m) => (m.rsvp as string) === "out").map((m) => m.plan_id as string));
   const orFilter = ids.length
     ? `creator_id.eq.${me},id.in.(${ids.join(",")})`
     : `creator_id.eq.${me}`;
   const { data } = await db.from("plans").select(PLAN_SELECT).or(orFilter).order("created_at", { ascending: false });
-  const cards = ((data as Row[]) ?? []).map(mapPlanCard);
+  // a plan I created but later declined still drops off (unless I'm the only one)
+  const cards = ((data as Row[]) ?? []).filter((r) => !declined.has(r.id as string)).map(mapPlanCard);
   // attach recurrence from each plan's meta row
   const planIds = cards.map((c) => c.id);
   if (planIds.length) {
