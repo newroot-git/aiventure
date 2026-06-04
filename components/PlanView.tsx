@@ -37,7 +37,7 @@ import {
 } from "./plan";
 import { PlanMap } from "./PlanMap";
 import type { Plan, PlanOption, PlanMember, RSVP, Profile } from "@/lib/types";
-import type { PlanScaffoldSlot, PlanRecurrence } from "@/lib/db";
+import type { PlanScaffoldSlot, PlanRecurrence, DateOption } from "@/lib/db";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TIMES = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "16:00", "18:00", "19:00", "20:00", "21:00", "22:00"];
@@ -143,6 +143,8 @@ export function PlanView({
   friends = [],
   scaffold = [],
   recurrence = null,
+  dateOptions = [],
+  myRsvp = null,
   isOwner = true,
 }: {
   plan: Plan;
@@ -151,6 +153,8 @@ export function PlanView({
   friends?: Profile[];
   scaffold?: PlanScaffoldSlot[];
   recurrence?: PlanRecurrence | null;
+  dateOptions?: DateOption[];
+  myRsvp?: RSVP | null;
   isOwner?: boolean;
 }) {
   const slots = React.useMemo(() => buildSlots(options, scaffold), [options, scaffold]);
@@ -175,11 +179,13 @@ export function PlanView({
     [slots],
   );
 
-  const [rsvp, setRsvp] = React.useState<RSVP>("in");
+  const [rsvp, setRsvpState] = React.useState<RSVP>(myRsvp ?? "in");
   const [votes, setVotes] = React.useState<Record<string, number>>(
     Object.fromEntries(options.map((o) => [o.id, o.votes])),
   );
-  const [voted, setVoted] = React.useState<Record<string, boolean>>({});
+  const [voted, setVoted] = React.useState<Record<string, boolean>>(
+    Object.fromEntries(options.filter((o) => o.mine).map((o) => [o.id, true])),
+  );
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
   const [copied, setCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -234,9 +240,26 @@ export function PlanView({
   function vote(id: string) {
     setVoted((v) => {
       const now = !v[id];
-      setVotes((vs) => ({ ...vs, [id]: (vs[id] ?? 0) + (now ? 1 : -1) }));
+      setVotes((vs) => ({ ...vs, [id]: Math.max(0, (vs[id] ?? 0) + (now ? 1 : -1)) }));
       return { ...v, [id]: now };
     });
+    fetch("/api/plans/vote", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ optionId: id }),
+    }).catch(() => {});
+  }
+  function changeRsvp(v: RSVP) {
+    setRsvpState(v);
+    persist({ action: "rsvp", rsvp: v });
+  }
+  const addDateOpt = (iso: string) => persist({ action: "addDate", iso });
+  const lockDateOpt = (optionId: string) => persist({ action: "lockDate", optionId });
+  function voteDate(id: string) {
+    setVoted((v) => ({ ...v, [id]: !v[id] }));
+    fetch("/api/plans/vote", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ optionId: id }),
+    }).then(() => router.refresh()).catch(() => {});
   }
   async function refine(slot: Slot, feedback: string) {
     const key = `${slot.id}:refine`;
@@ -285,6 +308,12 @@ export function PlanView({
   const setSlotTime = (slot: Slot, time: string | null) =>
     persist({ action: "slotTime", slotKey: slot.key, day: slot.day, time });
   async function toggleRecurring(next: PlanRecurrence | null) {
+    // turning OFF after it's locked (materialised) wipes future instances — confirm
+    if (next === null && phase !== "open") {
+      if (!window.confirm("This is a recurring series — turning it off will remove all the future repeats. Continue?")) return;
+      await persist({ action: "stopSeries" });
+      return;
+    }
     await persist({ action: "recurrence", recurrence: next });
   }
   async function doDelete() {
@@ -364,7 +393,7 @@ export function PlanView({
       return (
         <SlotShell slot={slot} index={index} decided time={chosenTime(slot)}>
           <OptionCard title={o.title} subtitle={o.subtitle} why={o.why} sourceUrl={o.source_url} sourceLabel={o.source_label} selected />
-          {planning && (
+          {isOwner && planning && (
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <button onClick={() => setExpanded((e) => ({ ...e, [slot.id]: true }))} className="text-sm font-bold text-muted underline">
                 Change pick
@@ -381,7 +410,7 @@ export function PlanView({
         {empty ? (
           <div className="rounded-xl border-2 border-dashed border-line bg-surface-2/40 p-4 text-center">
             <p className="text-sm font-bold text-muted">Nothing here yet.</p>
-            {planning && (
+            {isOwner && planning && (
               <Button variant="secondary" size="sm" className="mt-3" disabled={working === `${slot.id}:refine`} onClick={() => refine(slot, "")}>
                 {working === `${slot.id}:refine` ? <Loader2 size={15} className="animate-spin" /> : <Wand2 size={15} />} Suggest with AI
               </Button>
@@ -396,7 +425,7 @@ export function PlanView({
                 sourceUrl={o.source_url} sourceLabel={o.source_label}
                 votes={votes[o.id]} voted={voted[o.id]} onVote={() => vote(o.id)}
                 selected={slot.chosen?.id === o.id}
-                onSelect={planning ? () => choose(slot.id, o.id) : undefined}
+                onSelect={isOwner && planning ? () => choose(slot.id, o.id) : undefined}
               />
             ))}
           </div>
@@ -416,7 +445,7 @@ export function PlanView({
                 {working === `${slot.id}:add` ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
               </Button>
             </div>
-            {!empty && (
+            {isOwner && !empty && (
               <div className="mt-2 flex gap-2">
                 <input
                   value={refineText[slot.id] ?? ""}
@@ -495,9 +524,9 @@ export function PlanView({
             </div>
           ) : (
             <>
-              <div className="font-bold leading-tight">{fmtDate(plan.starts_at) ?? "Pick a time"}</div>
+              <div className="font-bold leading-tight">{fmtDate(plan.starts_at) ?? (isOwner ? "Pick a time" : "TBC")}</div>
               {fmtTime(plan.starts_at) && <div className="text-sm text-muted">{fmtTime(plan.starts_at)}</div>}
-              <WhenPicker value={plan.starts_at} onChange={setWhenDate} />
+              {isOwner && planning && <WhenPicker value={plan.starts_at} onChange={setWhenDate} />}
             </>
           )}
         </Section>
@@ -533,6 +562,42 @@ export function PlanView({
       {/* multi-pin map for itineraries */}
       {pins.length >= 1 && <div className="mt-3"><PlanMap pins={pins} area={plan.place_address} /></div>}
 
+      {/* availability — propose dates, mark which work, owner locks one */}
+      {!recurrence && (dateOptions.length > 0 || (planning && !plan.starts_at)) && (
+        <div className="mt-4">
+          <Section icon={<CalendarDays size={15} />} label="When works?" tone="accent">
+            {dateOptions.length === 0 && (
+              <p className="mb-3 text-sm text-muted">Not pinned to a day yet — add a few options and everyone marks what works.</p>
+            )}
+            <div className="flex flex-col gap-2">
+              {dateOptions.map((d) => (
+                <div key={d.id} className="flex items-center gap-2 rounded-md border-2 border-line bg-surface p-2">
+                  <button
+                    onClick={() => voteDate(d.id)}
+                    className={`flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-bold transition ${voted[d.id] ? "text-success" : "text-ink"}`}
+                  >
+                    <Check size={15} className={voted[d.id] ? "opacity-100" : "opacity-30"} />
+                    {fmtDate(d.iso)}{fmtTime(d.iso) ? ` · ${fmtTime(d.iso)}` : ""}
+                  </button>
+                  <span className="text-xs font-bold text-muted">{d.votes} free</span>
+                  {isOwner && (
+                    <Button variant="soft" size="sm" onClick={() => lockDateOpt(d.id)}>
+                      <Lock size={13} /> Set
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {planning && (
+              <div className="mt-2">
+                <WhenPicker value={null} onChange={addDateOpt} />
+                <p className="mt-1 text-xs text-muted">Add a date option — anyone can add, everyone marks what works.</p>
+              </div>
+            )}
+          </Section>
+        </div>
+      )}
+
       {/* who */}
       <div className="mt-4">
         <Section icon={<Users size={15} />} label="Who's in" tone="success">
@@ -542,7 +607,7 @@ export function PlanView({
               {members.filter((m) => m.rsvp === "in").length} {recurrence ? "in this week" : "going"}
             </span>
           </div>
-          <RSVPControl value={rsvp} onChange={setRsvp} />
+          <RSVPControl value={rsvp} onChange={changeRsvp} />
           {friends.length > 0 && (
             <button onClick={() => setInviteOpen(true)} className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-primary">
               <UserPlus size={15} /> Invite people
@@ -551,10 +616,18 @@ export function PlanView({
         </Section>
       </div>
 
-      {/* recurring control */}
-      {planning && (
+      {/* recurring control (owner) */}
+      {isOwner && planning && (
         <div className="mt-4">
           <RecurringControl recurrence={recurrence} defaultStart={plan.starts_at} onChange={toggleRecurring} />
+        </div>
+      )}
+      {/* recurring badge for participants */}
+      {!isOwner && recurrence && (
+        <div className="mt-4">
+          <Section icon={<Repeat size={15} />} label="Recurring" tone="secondary">
+            <p className="text-sm font-bold">{recurrence.cadence === "monthly" ? "Repeats monthly" : recurrence.cadence === "biweekly" ? "Repeats fortnightly" : "Repeats weekly"}</p>
+          </Section>
         </div>
       )}
 
@@ -578,7 +651,7 @@ export function PlanView({
           </div>
 
           {/* whole-plan feedback (single-day) */}
-          {planning && multiStep && !multiDay && (
+          {isOwner && planning && multiStep && !multiDay && (
             <GeneralFeedback
               value={allFeedback[0] ?? ""}
               busy={working === "all:0"}
@@ -597,7 +670,7 @@ export function PlanView({
                     <span className="text-xs font-bold uppercase tracking-wider text-muted">Day {d}</span>
                   </div>
                 )}
-                {planning && multiDay && (
+                {isOwner && planning && multiDay && (
                   <GeneralFeedback
                     value={allFeedback[d] ?? ""}
                     busy={working === `all:${d}`}
@@ -616,7 +689,7 @@ export function PlanView({
                     );
                   })}
                 </div>
-                {planning && (
+                {isOwner && planning && (
                   <div className="mt-3 flex gap-2">
                     <input
                       value={newSlot[d] ?? ""}
@@ -858,7 +931,9 @@ function RecurringControl({
   return (
     <Section icon={<Repeat size={15} />} label="Recurring" tone="secondary">
       <p className="mb-3 text-sm text-muted">
-        {summary ?? "Make this a regular thing (e.g. climbing every week). People confirm each time."}
+        {summary
+          ? `${summary}. Becomes real repeats when you lock in — each one independent.`
+          : "Make this a regular thing (e.g. climbing every week). Repeats are created when you lock in; people confirm each one."}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         {CADENCES.map((c) => (

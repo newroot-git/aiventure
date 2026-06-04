@@ -18,7 +18,7 @@ export default async function PlanPage({
   ]);
   const data = live ?? {
     plan: { ...MOCK_PLAN, slug }, options: MOCK_OPTIONS, members: MOCK_MEMBERS,
-    scaffold: [], recurrence: null, isOwner: true, currentUserId: "",
+    scaffold: [], recurrence: null, dateOptions: [], myRsvp: null, isOwner: true, currentUserId: "",
   };
 
   return (
@@ -33,6 +33,8 @@ export default async function PlanPage({
         friends={friends.map((f) => f.profile)}
         scaffold={data.scaffold}
         recurrence={data.recurrence}
+        dateOptions={data.dateOptions}
+        myRsvp={data.myRsvp}
         isOwner={data.isOwner}
       />
     </div>

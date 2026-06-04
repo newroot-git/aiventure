@@ -3,13 +3,13 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Loader2, Sparkles, MapPin, Route, Tent, ArrowLeft, Plus, X, Navigation,
+  User, Users, Globe, CalendarDays, HelpCircle, ListChecks, Check,
 } from "lucide-react";
 import { Button, Textarea, SelectTag, Label, Input, Avatar } from "@/components/ui";
+import { WhenPicker } from "@/components/plan";
 import type { PlanScope } from "@/lib/types";
 
-const SCOPES: {
-  id: PlanScope; label: string; desc: string; Icon: typeof Sparkles;
-}[] = [
+const SCOPES: { id: PlanScope; label: string; desc: string; Icon: typeof Sparkles }[] = [
   { id: "surprise", label: "Surprise me", desc: "Solo — I'm in the mood for something today.", Icon: Sparkles },
   { id: "single", label: "One thing", desc: "A single activity — a hike, dinner, a date.", Icon: MapPin },
   { id: "adventure", label: "An adventure", desc: "A day of activities, back to back.", Icon: Route },
@@ -17,13 +17,19 @@ const SCOPES: {
 ];
 
 const MOODS = ["Active", "Chilled", "Foodie", "Cultured", "Social", "Anything"];
-const WHEN = ["Today", "Tonight", "This weekend", "Pick a date"];
-const BUDGET = ["Free", "£", "££", "£££"];
-const WHO = ["The boys", "Just me", "Invite people", "Open to all"];
 const THINKING = [
   "Reading the vibe…", "Scanning real spots nearby…", "Checking what's on…",
   "Matching to your crew…", "Grounding every suggestion…",
 ];
+
+type WhoMode = "just-me" | "people" | "group" | "open";
+type WhenMode = "unsure" | "options" | "set";
+type Friend = { id: string; name: string; avatar?: string | null };
+type Group = { id: string; name: string; members: { name: string }[] };
+
+function fmtDT(iso: string) {
+  return new Date(iso).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
 
 export default function NewPlan() {
   return (
@@ -47,16 +53,28 @@ function NewPlanFlow() {
   const [searching, setSearching] = React.useState(false);
   const [geo, setGeo] = React.useState<"idle" | "locating">("idle");
   const [mood, setMood] = React.useState("Anything");
-  const [when, setWhen] = React.useState("This weekend");
-  const [budget, setBudget] = React.useState("££");
-  const [who, setWho] = React.useState("The boys");
   const [nights, setNights] = React.useState(3);
   const [tick, setTick] = React.useState(0);
-  const [friends, setFriends] = React.useState<{ id: string; name: string; avatar?: string | null }[]>([]);
+
+  // who
+  const [whoMode, setWhoMode] = React.useState<WhoMode>("just-me");
+  const [friends, setFriends] = React.useState<Friend[]>([]);
+  const [groups, setGroups] = React.useState<Group[]>([]);
   const [invited, setInvited] = React.useState<string[]>([]);
+  const [groupId, setGroupId] = React.useState<string>("");
+
+  // when
+  const [whenMode, setWhenMode] = React.useState<WhenMode>("unsure");
+  const [setDate, setSetDate] = React.useState<string | null>(null);
+  const [dateOpts, setDateOpts] = React.useState<string[]>([]);
+
+  // budget
+  const [budgetFree, setBudgetFree] = React.useState(false);
+  const [budgetAmt, setBudgetAmt] = React.useState("");
 
   React.useEffect(() => {
     fetch("/api/friends").then((r) => r.json()).then((d) => setFriends(d.friends ?? [])).catch(() => {});
+    fetch("/api/groups").then((r) => r.json()).then((d) => setGroups(d.groups ?? [])).catch(() => {});
   }, []);
 
   const location = areas.length ? areas.join(", ") : "London, UK";
@@ -77,26 +95,21 @@ function NewPlanFlow() {
     setResults([]);
   }
 
-  // debounced OSM Nominatim search for the area typeahead
   React.useEffect(() => {
     const q = areaInput.trim();
     if (q.length < 3) { setResults([]); setSearching(false); return; }
     setSearching(true);
     const id = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`,
-          { headers: { "Accept-Language": "en" } },
-        );
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&q=${encodeURIComponent(q)}`, { headers: { "Accept-Language": "en" } });
         const j = await res.json();
-        const labels: string[] = Array.isArray(j)
-          ? j.map((r: { display_name: string }) => r.display_name.split(",").slice(0, 3).map((s) => s.trim()).join(", "))
-          : [];
+        const labels: string[] = Array.isArray(j) ? j.map((r: { display_name: string }) => r.display_name.split(",").slice(0, 3).map((s) => s.trim()).join(", ")) : [];
         setResults([...new Set(labels)]);
       } catch { setResults([]); } finally { setSearching(false); }
     }, 400);
     return () => clearTimeout(id);
   }, [areaInput]);
+
   function useMyLocation() {
     if (!("geolocation" in navigator)) return;
     setGeo("locating");
@@ -104,34 +117,25 @@ function NewPlanFlow() {
       async (pos) => {
         try {
           const { latitude, longitude } = pos.coords;
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=12`,
-            { headers: { "Accept-Language": "en" } },
-          );
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=12`, { headers: { "Accept-Language": "en" } });
           const j = await res.json();
           const a = j.address ?? {};
           const place = a.city || a.town || a.village || a.suburb || a.county || j.name;
           addArea(place ? `${place}${a.country_code ? `, ${a.country_code.toUpperCase()}` : ""}` : "Near me");
-        } catch {
-          addArea("Near me");
-        } finally {
-          setGeo("idle");
-        }
+        } catch { addArea("Near me"); } finally { setGeo("idle"); }
       },
       () => setGeo("idle"),
       { enableHighAccuracy: false, timeout: 8000 },
     );
   }
 
-  // create a plan — aiBuild=true fills slots via AI, false = empty named skeleton
   async function createPlan(aiBuild: boolean) {
     setPhase("loading");
     let interests: string[] = [];
-    try {
-      interests = JSON.parse(localStorage.getItem("aiventure_profile") || "{}").interests || [];
-    } catch {}
-    const intentText =
-      scope === "surprise" ? `Something ${mood.toLowerCase()} to do ${when.toLowerCase()}` : intent;
+    try { interests = JSON.parse(localStorage.getItem("aiventure_profile") || "{}").interests || []; } catch {}
+    const intentText = scope === "surprise" ? `Something ${mood.toLowerCase()} to do soon` : intent;
+    const budget = budgetFree ? "Free" : budgetAmt.trim() ? `~£${budgetAmt.trim()} per person` : "flexible";
+    const surprise = scope === "surprise";
     try {
       const res = await fetch("/api/plans/create", {
         method: "POST",
@@ -139,24 +143,25 @@ function NewPlanFlow() {
         body: JSON.stringify({
           scope: scope ?? "single",
           intent: intentText,
-          when,
           budget,
-          who,
           nights,
           interests,
           location,
           aiBuild,
-          inviteIds: invited,
+          // who
+          visibility: whoMode === "open" ? "open" : "invite",
+          groupId: !surprise && whoMode === "group" ? groupId || null : null,
+          inviteIds: !surprise && whoMode === "people" ? invited : [],
+          // when
+          startsAt: whenMode === "set" ? setDate : null,
+          dateOptions: whenMode === "options" ? dateOpts : [],
         }),
       });
       const data = await res.json();
-      if (res.ok && data.slug) {
-        router.push(`/p/${data.slug}`);
-        return;
-      }
+      if (res.ok && data.slug) { router.push(`/p/${data.slug}`); return; }
       throw new Error(data.error || "failed");
     } catch {
-      router.push("/p/wild-otter-42"); // graceful fallback so it never dead-ends
+      router.push("/p/wild-otter-42");
     }
   }
 
@@ -170,9 +175,7 @@ function NewPlanFlow() {
         <h1 className="mt-6 font-display text-2xl font-bold">
           {scope === "adventure" || scope === "trip" ? "Building your adventure…" : "Building your plan…"}
         </h1>
-        <p className="mt-3 h-6 text-[15px] font-bold text-primary">
-          {THINKING[tick % THINKING.length]}
-        </p>
+        <p className="mt-3 h-6 text-[15px] font-bold text-primary">{THINKING[tick % THINKING.length]}</p>
       </main>
     );
   }
@@ -181,25 +184,14 @@ function NewPlanFlow() {
   if (!scope) {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-5 py-10">
-        <a href="/plans" className="inline-flex items-center gap-1 text-sm font-bold text-muted">
-          <ArrowLeft size={15} /> Home
-        </a>
-        <h1 className="mt-4 font-display text-3xl font-bold leading-tight">
-          What are we doing?
-        </h1>
-        <p className="mt-2 text-[15px] text-muted">
-          From a quick idea to a whole trip — pick the scale.
-        </p>
+        <a href="/plans" className="inline-flex items-center gap-1 text-sm font-bold text-muted"><ArrowLeft size={15} /> Home</a>
+        <h1 className="mt-4 font-display text-3xl font-bold leading-tight">What are we doing?</h1>
+        <p className="mt-2 text-[15px] text-muted">From a quick idea to a whole trip — pick the scale.</p>
         <div className="mt-6 flex flex-col gap-3">
           {SCOPES.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => { setScope(s.id); setPhase("config"); }}
-              className="flex items-center gap-4 rounded-xl border-2 border-ink bg-surface p-5 text-left shadow-hard transition active:translate-x-1 active:translate-y-1 active:shadow-none"
-            >
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md border-2 border-ink bg-primary-soft text-primary-deep">
-                <s.Icon size={24} />
-              </span>
+            <button key={s.id} onClick={() => { setScope(s.id); setPhase("config"); }}
+              className="flex items-center gap-4 rounded-xl border-2 border-ink bg-surface p-5 text-left shadow-hard transition active:translate-x-1 active:translate-y-1 active:shadow-none">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md border-2 border-ink bg-primary-soft text-primary-deep"><s.Icon size={24} /></span>
               <div>
                 <div className="font-display text-xl font-bold">{s.label}</div>
                 <div className="text-sm text-muted">{s.desc}</div>
@@ -211,30 +203,41 @@ function NewPlanFlow() {
     );
   }
 
-  /* ---------- config (per scope) ---------- */
+  const isSurprise = scope === "surprise";
+
+  /* ---------- config ---------- */
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-5 py-8">
-      <button onClick={() => setScope(null)} className="inline-flex items-center gap-1 text-sm font-bold text-muted">
-        <ArrowLeft size={15} /> Scale
-      </button>
+      <button onClick={() => setScope(null)} className="inline-flex items-center gap-1 text-sm font-bold text-muted"><ArrowLeft size={15} /> Scale</button>
       <div className="mt-3 flex items-center gap-2">
-        {meta && (
-          <span className="grid h-9 w-9 place-items-center rounded-md border-2 border-ink bg-primary-soft text-primary-deep">
-            <meta.Icon size={18} />
-          </span>
-        )}
+        {meta && <span className="grid h-9 w-9 place-items-center rounded-md border-2 border-ink bg-primary-soft text-primary-deep"><meta.Icon size={18} /></span>}
         <h1 className="font-display text-2xl font-bold">{meta?.label}</h1>
       </div>
 
-      {/* where — current location + add more areas */}
-      <div className="mt-5">
+      {/* intent (non-surprise) */}
+      {!isSurprise && (
+        <Textarea
+          rows={3}
+          value={intent}
+          onChange={(e) => setIntent(e.target.value)}
+          placeholder={scope === "trip" ? "e.g. somewhere 2–4hrs away, outdoorsy, long weekend…" : scope === "adventure" ? "e.g. a full Saturday — food, something active, then drinks…" : "e.g. something chill with the boys Saturday afternoon…"}
+          className="mt-5 text-base"
+        />
+      )}
+
+      {/* surprise mood */}
+      {isSurprise && (
+        <div className="mt-5">
+          <Label>What mood?</Label>
+          <Chips opts={MOODS} value={mood} onChange={setMood} />
+        </div>
+      )}
+
+      {/* where */}
+      <div className="mt-7">
         <Label>Where?</Label>
-        <button
-          type="button"
-          onClick={useMyLocation}
-          disabled={geo === "locating"}
-          className="mt-2 inline-flex items-center gap-2 rounded-md border-2 border-ink bg-surface px-3 py-2 text-sm font-bold text-ink shadow-hard-sm transition active:translate-y-0.5 disabled:opacity-60"
-        >
+        <button type="button" onClick={useMyLocation} disabled={geo === "locating"}
+          className="mt-2 inline-flex items-center gap-2 rounded-md border-2 border-ink bg-surface px-3 py-2 text-sm font-bold text-ink shadow-hard-sm transition active:translate-y-0.5 disabled:opacity-60">
           {geo === "locating" ? <Loader2 size={15} className="animate-spin" /> : <Navigation size={15} className="text-primary" />}
           {geo === "locating" ? "Locating…" : "Use my location"}
         </button>
@@ -251,27 +254,17 @@ function NewPlanFlow() {
         <div className="relative mt-3">
           <div className="flex gap-2">
             <div className="relative w-full">
-              <Input
-                value={areaInput}
-                onChange={(e) => setAreaInput(e.target.value)}
+              <Input value={areaInput} onChange={(e) => setAreaInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addArea(results[0] ?? areaInput))}
-                placeholder="Search a place — town, area, postcode…"
-                className="pr-9"
-              />
+                placeholder="Search a place — town, area, postcode…" className="pr-9" />
               {searching && <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted" />}
             </div>
-            <Button variant="soft" onClick={() => addArea(results[0] ?? areaInput)} disabled={!areaInput.trim()}>
-              <Plus size={17} />
-            </Button>
+            <Button variant="soft" onClick={() => addArea(results[0] ?? areaInput)} disabled={!areaInput.trim()}><Plus size={17} /></Button>
           </div>
           {results.length > 0 && (
             <div className="absolute z-30 mt-1 w-full overflow-hidden rounded-md border-2 border-ink bg-surface shadow-hard">
               {results.map((r) => (
-                <button
-                  key={r}
-                  onClick={() => addArea(r)}
-                  className="flex w-full items-center gap-2 border-b border-line px-3 py-2.5 text-left text-sm font-bold last:border-0 hover:bg-surface-2"
-                >
+                <button key={r} onClick={() => addArea(r)} className="flex w-full items-center gap-2 border-b border-line px-3 py-2.5 text-left text-sm font-bold last:border-0 hover:bg-surface-2">
                   <MapPin size={14} className="shrink-0 text-primary" /> <span className="truncate">{r}</span>
                 </button>
               ))}
@@ -281,135 +274,153 @@ function NewPlanFlow() {
         <p className="mt-1 text-xs text-muted">Search and tap a place, or use your location. Defaults to London if blank.</p>
       </div>
 
-      {/* invite friends (optional) */}
-      {scope !== "surprise" && friends.length > 0 && (
-        <div className="mt-6">
-          <Label>Invite anyone? (optional)</Label>
-          <div className="mt-3 flex flex-wrap gap-3">
-            {friends.map((f) => {
-              const on = invited.includes(f.id);
-              return (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setInvited((p) => (on ? p.filter((x) => x !== f.id) : [...p, f.id]))}
-                  className="flex flex-col items-center gap-1"
-                >
-                  <span className={on ? "rounded-md ring-2 ring-primary ring-offset-2 ring-offset-bg" : ""}>
-                    <Avatar name={f.name} src={f.avatar} size={44} />
-                  </span>
-                  <span className="truncate text-xs font-bold">{f.name}</span>
-                </button>
-              );
-            })}
+      {/* WHO — one section with all the optionality */}
+      {!isSurprise && (
+        <div className="mt-7">
+          <Label>Who&apos;s coming?</Label>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <ModeTile active={whoMode === "just-me"} Icon={User} label="Just me" onClick={() => setWhoMode("just-me")} />
+            <ModeTile active={whoMode === "people"} Icon={Users} label="Invite people" onClick={() => setWhoMode("people")} />
+            <ModeTile active={whoMode === "group"} Icon={Users} label="A group" onClick={() => setWhoMode("group")} disabled={!groups.length} />
+            <ModeTile active={whoMode === "open"} Icon={Globe} label="Open to all" onClick={() => setWhoMode("open")} />
           </div>
+          {whoMode === "people" && friends.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-3">
+              {friends.map((f) => {
+                const on = invited.includes(f.id);
+                return (
+                  <button key={f.id} type="button" onClick={() => setInvited((p) => (on ? p.filter((x) => x !== f.id) : [...p, f.id]))} className="flex flex-col items-center gap-1">
+                    <span className={on ? "rounded-md ring-2 ring-primary ring-offset-2 ring-offset-bg" : ""}><Avatar name={f.name} src={f.avatar} size={44} /></span>
+                    <span className="truncate text-xs font-bold">{f.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {whoMode === "group" && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {groups.map((g) => (
+                <SelectTag key={g.id} selected={groupId === g.id} onClick={() => setGroupId(g.id)}>{g.name} · {g.members.length}</SelectTag>
+              ))}
+            </div>
+          )}
+          {whoMode === "open" && <p className="mt-2 text-xs text-muted">Anyone with the link can join.</p>}
         </div>
       )}
 
-      {/* surprise */}
-      {scope === "surprise" && (
-        <div className="mt-6">
-          <Label>What mood?</Label>
-          <Chips opts={MOODS} value={mood} onChange={setMood} />
-          <Chips label="When" opts={["Right now", "Today", "Tonight"]} value={when} onChange={setWhen} />
-          <Button variant="primary" size="lg" className="mt-9 w-full" onClick={() => createPlan(true)}>
-            <Sparkles size={18} /> Surprise me
-          </Button>
+      {/* WHEN — not sure / a few options / set date */}
+      <div className="mt-7">
+        <Label>When?</Label>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <ModeTile active={whenMode === "unsure"} Icon={HelpCircle} label="Not sure yet" onClick={() => setWhenMode("unsure")} small />
+          <ModeTile active={whenMode === "options"} Icon={ListChecks} label="A few options" onClick={() => setWhenMode("options")} small />
+          <ModeTile active={whenMode === "set"} Icon={CalendarDays} label="Set date" onClick={() => setWhenMode("set")} small />
         </div>
-      )}
+        {whenMode === "set" && (
+          <div className="mt-3">
+            <WhenPicker value={setDate} onChange={setSetDate} />
+          </div>
+        )}
+        {whenMode === "options" && (
+          <div className="mt-3">
+            {dateOpts.length > 0 && (
+              <div className="mb-2 flex flex-col gap-1.5">
+                {dateOpts.map((iso) => (
+                  <span key={iso} className="inline-flex items-center gap-2 rounded-md border-2 border-line bg-surface px-3 py-1.5 text-sm font-bold">
+                    <Check size={13} className="text-success" /> {fmtDT(iso)}
+                    <button onClick={() => setDateOpts((p) => p.filter((x) => x !== iso))} className="ml-auto text-muted"><X size={14} /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <WhenPicker value={null} onChange={(iso) => setDateOpts((p) => (p.includes(iso) ? p : [...p, iso]))} />
+            <p className="mt-1 text-xs text-muted">Add a few — everyone marks which work, you lock one later.</p>
+          </div>
+        )}
+        {whenMode === "unsure" && <p className="mt-2 text-xs text-muted">Leave it open — figure out the day together later.</p>}
+      </div>
 
-      {/* single */}
-      {scope === "single" && (
-        <div className="mt-6">
-          <Textarea
-            rows={3}
-            value={intent}
-            onChange={(e) => setIntent(e.target.value)}
-            placeholder="e.g. something chill with the boys Saturday afternoon…"
-            className="text-base"
-          />
-          <Chips label="When" opts={WHEN} value={when} onChange={setWhen} />
-          <Chips label="Budget" opts={BUDGET} value={budget} onChange={setBudget} />
-          <Chips label="Who" opts={WHO} value={who} onChange={setWho} />
-          <DualCTA aiLabel="Build it with AI" aiIcon={<Sparkles size={18} />} disabled={!intent.trim()} onAi={() => createPlan(true)} onManual={() => createPlan(false)} />
-        </div>
-      )}
-
-      {/* adventure */}
-      {scope === "adventure" && (
-        <div className="mt-6">
-          <Textarea
-            rows={3}
-            value={intent}
-            onChange={(e) => setIntent(e.target.value)}
-            placeholder="e.g. a full Saturday — food, something active, then drinks…"
-            className="text-base"
-          />
-          <Chips label="When" opts={WHEN} value={when} onChange={setWhen} />
-          <Chips label="Who" opts={WHO} value={who} onChange={setWho} />
-          <DualCTA aiLabel="Build the day with AI" aiIcon={<Route size={18} />} disabled={!intent.trim()} onAi={() => createPlan(true)} onManual={() => createPlan(false)} />
-        </div>
-      )}
-
-      {/* trip */}
-      {scope === "trip" && (
-        <div className="mt-6">
-          <Textarea
-            rows={3}
-            value={intent}
-            onChange={(e) => setIntent(e.target.value)}
-            placeholder="e.g. somewhere 2–4hrs away, outdoorsy, for a long weekend…"
-            className="text-base"
-          />
-          <div className="mt-7">
-            <Label>How many nights?</Label>
-            <div className="mt-3 flex items-center gap-4">
-              <Button variant="soft" size="sm" onClick={() => setNights((n) => Math.max(1, n - 1))}>−</Button>
-              <span className="font-num text-2xl font-extrabold">{nights}</span>
-              <Button variant="soft" size="sm" onClick={() => setNights((n) => n + 1)}>+</Button>
+      {/* BUDGET */}
+      {!isSurprise && (
+        <div className="mt-7">
+          <Label>Budget</Label>
+          <div className="mt-3 flex items-center gap-2">
+            <button type="button" onClick={() => setBudgetFree((f) => !f)}
+              className={`rounded-md border-2 px-4 py-2.5 text-sm font-bold transition ${budgetFree ? "border-ink bg-success text-white shadow-hard-sm" : "border-line text-ink hover:border-primary"}`}>
+              Free
+            </button>
+            <div className="relative flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-muted">£</span>
+              <Input type="number" inputMode="numeric" value={budgetAmt} disabled={budgetFree}
+                onChange={(e) => setBudgetAmt(e.target.value)} placeholder="per person" className="pl-7 disabled:opacity-50" />
             </div>
           </div>
-          <Chips label="Who" opts={WHO} value={who} onChange={setWho} />
-          <DualCTA aiLabel="Plan the trip with AI" aiIcon={<Tent size={18} />} disabled={!intent.trim()} onAi={() => createPlan(true)} onManual={() => createPlan(false)} />
         </div>
       )}
+
+      {/* trip nights */}
+      {scope === "trip" && (
+        <div className="mt-7">
+          <Label>How many nights?</Label>
+          <div className="mt-3 flex items-center gap-4">
+            <Button variant="soft" size="sm" onClick={() => setNights((n) => Math.max(1, n - 1))}>−</Button>
+            <span className="font-num text-2xl font-extrabold">{nights}</span>
+            <Button variant="soft" size="sm" onClick={() => setNights((n) => n + 1)}>+</Button>
+          </div>
+        </div>
+      )}
+
+      {/* CTA */}
+      {isSurprise ? (
+        <Button variant="primary" size="lg" className="mt-9 w-full" onClick={() => createPlan(true)}>
+          <Sparkles size={18} /> Surprise me
+        </Button>
+      ) : (
+        <DualCTA
+          aiLabel={scope === "trip" ? "Plan the trip with AI" : scope === "adventure" ? "Build the day with AI" : "Build it with AI"}
+          aiIcon={scope === "trip" ? <Tent size={18} /> : scope === "adventure" ? <Route size={18} /> : <Sparkles size={18} />}
+          disabled={!intent.trim()}
+          onAi={() => createPlan(true)}
+          onManual={() => createPlan(false)}
+        />
+      )}
     </main>
+  );
+}
+
+function ModeTile({
+  active, Icon, label, onClick, disabled, small,
+}: {
+  active: boolean; Icon: typeof User; label: string; onClick: () => void; disabled?: boolean; small?: boolean;
+}) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled}
+      className={`flex items-center justify-center gap-2 rounded-md border-2 ${small ? "px-2 py-2.5 text-xs" : "px-3 py-3 text-sm"} font-bold transition disabled:opacity-40 ${active ? "border-ink bg-primary text-white shadow-hard-sm" : "border-line text-ink hover:border-primary"}`}>
+      <Icon size={small ? 15 : 17} /> {label}
+    </button>
   );
 }
 
 function DualCTA({
   aiLabel, aiIcon, disabled, onAi, onManual,
 }: {
-  aiLabel: string; aiIcon: React.ReactNode; disabled?: boolean;
-  onAi: () => void; onManual: () => void;
+  aiLabel: string; aiIcon: React.ReactNode; disabled?: boolean; onAi: () => void; onManual: () => void;
 }) {
   return (
     <div className="mt-9 flex flex-col gap-2.5">
-      <Button variant="primary" size="lg" className="w-full" disabled={disabled} onClick={onAi}>
-        {aiIcon} {aiLabel}
-      </Button>
-      <Button variant="soft" size="lg" className="w-full" disabled={disabled} onClick={onManual}>
-        I&apos;ll build it myself
-      </Button>
+      <Button variant="primary" size="lg" className="w-full" disabled={disabled} onClick={onAi}>{aiIcon} {aiLabel}</Button>
+      <Button variant="soft" size="lg" className="w-full" disabled={disabled} onClick={onManual}>I&apos;ll build it myself</Button>
       <p className="text-center text-xs text-muted">Build it yourself and ask AI for ideas on any step later.</p>
     </div>
   );
 }
 
-function Chips({
-  label, opts, value, onChange,
-}: {
-  label?: string; opts: string[]; value: string; onChange: (v: string) => void;
-}) {
+function Chips({ label, opts, value, onChange }: { label?: string; opts: string[]; value: string; onChange: (v: string) => void }) {
   return (
-    <div className="mt-7">
+    <div className="mt-3">
       {label && <Label>{label}</Label>}
-      <div className="mt-3 flex flex-wrap gap-2">
-        {opts.map((o) => (
-          <SelectTag key={o} selected={value === o} onClick={() => onChange(o)}>
-            {o}
-          </SelectTag>
-        ))}
+      <div className="mt-2 flex flex-wrap gap-2">
+        {opts.map((o) => <SelectTag key={o} selected={value === o} onClick={() => onChange(o)}>{o}</SelectTag>)}
       </div>
     </div>
   );

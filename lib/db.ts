@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { supabaseAdmin } from "./supabase/admin";
 import { generateDrop, generateSlotOptions, mapsUrl, type DropInput, type DropSlot } from "./ai";
 import { planSlug } from "./slug";
-import type { Plan, PlanOption, PlanMember, Profile } from "./types";
+import type { Plan, PlanOption, PlanMember, Profile, RSVP, Visibility } from "./types";
 
 // Demo identity (stands in for auth) — the seeded "Josh" profile.
 export const DEMO_USER_ID = "11111111-1111-1111-1111-111111111111";
@@ -48,7 +48,7 @@ function deriveCover(hue?: string | null): string | null {
 const META_TITLE = "__meta";
 interface ScaffoldSlot { key: string; label: string; day: number; order: number; fixed?: boolean }
 interface Recurrence { cadence: "weekly" | "biweekly" | "monthly"; weekday: number; monthday?: number; time?: string | null; anchor?: string }
-interface PlanMeta { scaffold: ScaffoldSlot[]; recurrence: Recurrence | null }
+interface PlanMeta { scaffold: ScaffoldSlot[]; recurrence: Recurrence | null; seriesId?: string | null; materialized?: boolean }
 
 // default empty skeleton when the user builds it themselves (no AI)
 function defaultScaffold(scope: DropInput["scope"], nights = 2): ScaffoldSlot[] {
@@ -83,6 +83,8 @@ async function writeMeta(planId: string, patch: Partial<PlanMeta>): Promise<void
   const next: PlanMeta = {
     scaffold: patch.scaffold ?? cur?.scaffold ?? [],
     recurrence: patch.recurrence !== undefined ? patch.recurrence : (cur?.recurrence ?? null),
+    seriesId: patch.seriesId !== undefined ? patch.seriesId : (cur?.seriesId ?? null),
+    materialized: patch.materialized !== undefined ? patch.materialized : (cur?.materialized ?? false),
   };
   if (existing) {
     await db.from("plan_options").update({ payload: { meta: next } } as never).eq("id", existing.id as string);
@@ -96,11 +98,19 @@ async function writeMeta(planId: string, patch: Partial<PlanMeta>): Promise<void
 function readMeta(options: Row[]): PlanMeta {
   const row = options.find((o) => (o.title as string) === META_TITLE);
   const m = (row?.payload as Row)?.meta as PlanMeta | undefined;
-  return { scaffold: m?.scaffold ?? [], recurrence: m?.recurrence ?? null };
+  return { scaffold: m?.scaffold ?? [], recurrence: m?.recurrence ?? null, seriesId: m?.seriesId ?? null, materialized: !!m?.materialized };
+}
+
+export interface CreateExtras {
+  visibility?: Visibility;
+  groupId?: string | null;
+  startsAt?: string | null;
+  dateOptions?: string[];
+  budget?: string | null;
 }
 
 /** Create a plan. aiBuild=true → AI fills slots; false → empty named skeleton. */
-export async function createPlanFromDrop(input: DropInput): Promise<{ slug: string }> {
+export async function createPlanFromDrop(input: DropInput & CreateExtras): Promise<{ slug: string }> {
   const aiBuild = !!input.aiBuild;
   let title = input.intent.slice(0, 140);
   let slots: DropSlot[] = [];
@@ -122,10 +132,12 @@ export async function createPlanFromDrop(input: DropInput): Promise<{ slug: stri
       title,
       intent: input.intent,
       status: "open",
-      visibility: "invite",
+      visibility: input.visibility ?? "invite",
       creator_id: me,
+      group_id: input.groupId ?? null,
       ai_empowered: true,
       cover_hue: firstTile,
+      starts_at: input.startsAt ?? null,
       place_address: input.location ?? null, // stash search area for later refine + general "where"
     } as never)
     .select("id")
@@ -134,15 +146,26 @@ export async function createPlanFromDrop(input: DropInput): Promise<{ slug: stri
 
   const planId = (plan as { id: string }).id;
   const rows = flattenSlots(planId, slots);
+  // candidate dates (the "a few options" path)
+  (input.dateOptions ?? []).forEach((iso) =>
+    rows.push({ plan_id: planId, kind: "time", source: "human", title: "date", payload: { date_option: true, iso } }),
+  );
   if (rows.length) {
     const { error: e2 } = await db.from("plan_options").insert(rows as never);
     if (e2) throw new Error(e2.message);
   }
   await writeMeta(planId, { scaffold });
-  // ensure the creator is a member so the plan shows on their home/calendar
-  await db.from("plan_members")
-    .upsert({ plan_id: planId, profile_id: me, rsvp: "in", joined_via: "app" } as never,
-      { onConflict: "plan_id,profile_id" } as never);
+
+  // members: creator always; whole group if a group was chosen
+  const memberRows: Record<string, unknown>[] = [{ plan_id: planId, profile_id: me, rsvp: "in", joined_via: "app" }];
+  if (input.groupId) {
+    const { data: gm } = await db.from("group_members").select("profile_id").eq("group_id", input.groupId);
+    for (const g of (gm as Row[]) ?? []) {
+      const pid = g.profile_id as string;
+      if (pid !== me) memberRows.push({ plan_id: planId, profile_id: pid, rsvp: "in", joined_via: "app" });
+    }
+  }
+  await db.from("plan_members").upsert(memberRows as never, { onConflict: "plan_id,profile_id" } as never);
   return { slug };
 }
 
@@ -179,6 +202,7 @@ function flattenSlots(planId: string, slots: DropSlot[]) {
 
 export interface PlanScaffoldSlot { key: string; label: string; day: number; order: number; fixed?: boolean }
 export interface PlanRecurrence { cadence: "weekly" | "biweekly" | "monthly"; weekday: number; monthday?: number; time?: string | null; anchor?: string }
+export interface DateOption { id: string; iso: string; votes: number; mine: boolean }
 
 /** Load a persisted plan + its options + members + meta by slug (null if not found). */
 export async function getPlanBySlug(slug: string): Promise<{
@@ -187,6 +211,8 @@ export async function getPlanBySlug(slug: string): Promise<{
   members: PlanMember[];
   scaffold: PlanScaffoldSlot[];
   recurrence: PlanRecurrence | null;
+  dateOptions: DateOption[];
+  myRsvp: RSVP | null;
   currentUserId: string;
   isOwner: boolean;
 } | null> {
@@ -208,7 +234,24 @@ export async function getPlanBySlug(slug: string): Promise<{
 
   const allOpts = (rawOptions ?? []) as Row[];
   const meta = readMeta(allOpts);
-  const options = allOpts.filter((o) => (o.title as string) !== META_TITLE);
+  const nonMeta = allOpts.filter((o) => (o.title as string) !== META_TITLE);
+  const dateRows = nonMeta.filter((o) => ((o.payload as Row) ?? {}).date_option);
+  const optionRows = nonMeta.filter((o) => !((o.payload as Row) ?? {}).date_option);
+
+  // vote tallies (one row per user per option) for every option + date candidate
+  const ids = nonMeta.map((o) => o.id as string);
+  const voteCount = new Map<string, number>();
+  const mine = new Set<string>();
+  if (ids.length) {
+    const { data: votes } = await db.from("option_votes").select("option_id, profile_id").in("option_id", ids);
+    for (const v of (votes as Row[]) ?? []) {
+      const oid = v.option_id as string;
+      voteCount.set(oid, (voteCount.get(oid) ?? 0) + 1);
+      if ((v.profile_id as string) === me) mine.add(oid);
+    }
+  }
+
+  const myMember = ((members ?? []) as Row[]).find((m) => (m.profile_id as string) === me);
 
   return {
     plan: {
@@ -216,13 +259,24 @@ export async function getPlanBySlug(slug: string): Promise<{
       key_info: (row.key_info as Plan["key_info"]) ?? [],
       cover_url: deriveCover(row.cover_hue as string | null),
     },
-    options: options as unknown as PlanOption[],
+    options: optionRows.map((o) => ({
+      ...o, votes: voteCount.get(o.id as string) ?? 0, mine: mine.has(o.id as string),
+    })) as unknown as PlanOption[],
     members: ((members ?? []) as Record<string, unknown>[]).map((m) => ({
       ...m,
       profile: mapProfile(m.profile as Record<string, unknown>),
     })) as unknown as PlanMember[],
     scaffold: meta.scaffold,
     recurrence: meta.recurrence,
+    dateOptions: dateRows
+      .map((o) => ({
+        id: o.id as string,
+        iso: ((o.payload as Row)?.iso as string) ?? "",
+        votes: voteCount.get(o.id as string) ?? 0,
+        mine: mine.has(o.id as string),
+      }))
+      .sort((a, b) => a.iso.localeCompare(b.iso)),
+    myRsvp: (myMember?.rsvp as RSVP) ?? null,
     currentUserId: me,
     isOwner: (row.creator_id as string) === me,
   };
@@ -377,6 +431,7 @@ function slotMetaFrom(scaffold: ScaffoldSlot[], optRows: Row[], slotKey: string,
 
 /** Regenerate the voteable options for ONE slot, optionally steered by feedback. */
 export async function refineSlot(slug: string, slotKey: string, day: number, feedback?: string): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   const { data: plan } = await db.from("plans").select("id, intent, place_address").eq("slug", slug).maybeSingle();
   if (!plan) throw new Error("plan not found");
@@ -413,6 +468,7 @@ export async function refineSlot(slug: string, slotKey: string, day: number, fee
 
 /** Regenerate EVERY slot's options from one feedback note (optionally just one day). */
 export async function refineAll(slug: string, feedback?: string, day?: number): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
   if (!plan) throw new Error("plan not found");
@@ -434,6 +490,7 @@ export async function refineAll(slug: string, feedback?: string, day?: number): 
 
 /** Set the time on a slot's chosen option (per-activity time). */
 export async function setSlotTime(slug: string, slotKey: string, day: number, time: string | null): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
   if (!plan) throw new Error("plan not found");
@@ -447,8 +504,60 @@ export async function setSlotTime(slug: string, slotKey: string, day: number, ti
   }
 }
 
+// ---------- participant actions: vote, RSVP, propose dates (no owner gate) ----------
+
+/** Toggle the current user's vote on an option or date candidate. */
+export async function toggleVote(optionId: string): Promise<boolean> {
+  const db = supabaseAdmin();
+  const me = await currentUserId();
+  const { data: existing } = await db.from("option_votes")
+    .select("option_id").eq("option_id", optionId).eq("profile_id", me).maybeSingle();
+  if (existing) {
+    await db.from("option_votes").delete().eq("option_id", optionId).eq("profile_id", me);
+    return false;
+  }
+  await db.from("option_votes").insert({ option_id: optionId, profile_id: me } as never);
+  return true;
+}
+
+/** Set the current user's RSVP (also joins them to the plan). */
+export async function setRsvp(slug: string, rsvp: RSVP): Promise<void> {
+  const db = supabaseAdmin();
+  const me = await currentUserId();
+  const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
+  if (!plan) throw new Error("plan not found");
+  await db.from("plan_members").upsert(
+    { plan_id: (plan as Row).id as string, profile_id: me, rsvp, joined_via: "app" } as never,
+    { onConflict: "plan_id,profile_id" } as never,
+  );
+}
+
+/** Propose a candidate date/time for the group to vote availability on. */
+export async function addDateOption(slug: string, iso: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
+  if (!plan) throw new Error("plan not found");
+  await db.from("plan_options").insert({
+    plan_id: (plan as Row).id as string, kind: "time", source: "human", title: "date",
+    payload: { date_option: true, iso },
+  } as never);
+}
+
+/** Owner locks one candidate date as the plan's time (clears the candidates). */
+export async function lockDate(slug: string, optionId: string): Promise<void> {
+  await assertOwner(slug);
+  const db = supabaseAdmin();
+  const { data: opt } = await db.from("plan_options").select("plan_id, payload").eq("id", optionId).maybeSingle();
+  if (!opt) throw new Error("date option not found");
+  const iso = ((opt as Row).payload as Row)?.iso as string;
+  if (iso) await db.from("plans").update({ starts_at: iso } as never).eq("slug", slug);
+  // remove all date candidates now that it's set
+  await db.from("plan_options").delete().eq("plan_id", (opt as Row).plan_id as string).eq("title", "date");
+}
+
 /** Append a new (empty) slot to the plan's scaffold. */
 export async function addSlot(slug: string, label: string, day = 1): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
   if (!plan) throw new Error("plan not found");
@@ -514,6 +623,7 @@ export async function addCustomOption(slug: string, query: string, slotKey: stri
 
 /** Pick one option for its slot: marks it chosen, clears siblings, re-derives the plan headline. */
 export async function choosePlanOption(slug: string, optionId: string): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   const { data: plan } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
   if (!plan) throw new Error("plan not found");
@@ -583,6 +693,7 @@ async function deriveHeadline(planId: string, slug: string): Promise<void> {
 
 /** Set the plan's date/time (ISO). */
 export async function setPlanWhen(slug: string, startsAt: string): Promise<void> {
+  await assertOwner(slug);
   const db = supabaseAdmin();
   await db.from("plans").update({ starts_at: startsAt } as never).eq("slug", slug);
 }
@@ -644,6 +755,117 @@ export async function updatePlanStatus(slug: string, status: "open" | "locked" |
         const id = m.profile_id as string;
         if (id !== me) await notify(id, `"${title}" is locked in`, "locked", slug);
       }
+    }
+    // recurring becomes real only on lock — spin up the independent instances
+    await materializeSeries(slug);
+  }
+}
+
+// recurrence cadence → the dates of the next N occurrences (incl. the base)
+function occurrenceDates(base: Date, r: Recurrence): string[] {
+  const out: string[] = [];
+  if (r.cadence === "monthly") {
+    for (let i = 0; i < 6; i++) { const d = new Date(base); d.setMonth(base.getMonth() + i); out.push(d.toISOString()); }
+  } else {
+    const step = r.cadence === "biweekly" ? 14 : 7;
+    for (let i = 0; i < 8; i++) { const d = new Date(base); d.setDate(base.getDate() + step * i); out.push(d.toISOString()); }
+  }
+  return out;
+}
+// first occurrence from "now" when the plan has no fixed start
+function firstOccurrence(r: Recurrence): Date {
+  const d = new Date();
+  const [h, min] = (r.time ?? "18:00").split(":").map(Number);
+  d.setHours(h || 18, min || 0, 0, 0);
+  if (r.cadence === "monthly") {
+    d.setDate(r.monthday ?? 1);
+    if (d.getTime() < Date.now()) d.setMonth(d.getMonth() + 1);
+  } else {
+    while (d.getDay() !== r.weekday || d.getTime() < Date.now()) d.setDate(d.getDate() + 1);
+  }
+  return d;
+}
+
+/** On lock, clone a recurring plan into independent future-dated instances (a series). */
+async function materializeSeries(slug: string): Promise<void> {
+  const db = supabaseAdmin();
+  const { data: planRow } = await db.from("plans").select("*").eq("slug", slug).maybeSingle();
+  if (!planRow) return;
+  const plan = planRow as Row;
+  const planId = plan.id as string;
+  const me = await currentUserId();
+
+  const { data: optRows } = await db.from("plan_options").select("*").eq("plan_id", planId);
+  const allRows = (optRows as Row[]) ?? [];
+  const meta = readMeta(allRows);
+  if (!meta.recurrence || meta.materialized) return; // not recurring, or already a series
+
+  const r = meta.recurrence;
+  const base = plan.starts_at ? new Date(plan.starts_at as string) : firstOccurrence(r);
+  const dates = occurrenceDates(base, r);
+  const seriesId = globalThis.crypto.randomUUID();
+
+  // anchor this plan as instance #1
+  await db.from("plans").update({ starts_at: dates[0] } as never).eq("id", planId);
+  await writeMeta(planId, { seriesId, materialized: true });
+
+  // options to copy (activity options only — not the meta row or date candidates)
+  const cloneOpts = allRows.filter((o) => (o.title as string) !== META_TITLE && !((o.payload as Row) ?? {}).date_option);
+  const { data: memRows } = await db.from("plan_members").select("profile_id").eq("plan_id", planId);
+  const members = ((memRows as Row[]) ?? []).map((m) => m.profile_id as string);
+
+  for (let i = 1; i < dates.length; i++) {
+    const childSlug = planSlug(`${Date.now()}-${plan.title}-${i}`);
+    const { data: child } = await db.from("plans").insert({
+      slug: childSlug,
+      title: plan.title, intent: plan.intent, status: "locked", visibility: plan.visibility,
+      creator_id: me, group_id: plan.group_id, ai_empowered: plan.ai_empowered,
+      activity: plan.activity, starts_at: dates[i], place_name: plan.place_name,
+      place_address: plan.place_address, place_url: plan.place_url, why: plan.why,
+      key_info: plan.key_info, cover_hue: plan.cover_hue,
+    } as never).select("id").single();
+    const childId = (child as unknown as Row | null)?.id as string;
+    if (!childId) continue;
+    if (cloneOpts.length) {
+      await db.from("plan_options").insert(cloneOpts.map((o) => ({
+        plan_id: childId, kind: o.kind, source: o.source, title: o.title, subtitle: o.subtitle,
+        why: o.why, image_url: o.image_url, source_url: o.source_url, source_label: o.source_label,
+        payload: o.payload, suggested_by: null,
+      })) as never);
+    }
+    // each instance carries the scaffold but does NOT itself recur (recurrence null)
+    await writeMeta(childId, { scaffold: meta.scaffold, recurrence: null, seriesId, materialized: true });
+    await db.from("plan_members").insert(
+      members.map((pid) => ({ plan_id: childId, profile_id: pid, rsvp: pid === me ? "in" : "maybe", joined_via: "app" })) as never,
+    );
+  }
+}
+
+/** Stop a recurring series: clear recurrence + delete future instances (owner). */
+export async function stopSeries(slug: string): Promise<void> {
+  await assertOwner(slug);
+  const db = supabaseAdmin();
+  const { data: planRow } = await db.from("plans").select("id, starts_at").eq("slug", slug).maybeSingle();
+  if (!planRow) return;
+  const planId = (planRow as Row).id as string;
+  const { data: optRows } = await db.from("plan_options").select("payload, title").eq("plan_id", planId);
+  const meta = readMeta((optRows as Row[]) ?? []);
+  await writeMeta(planId, { recurrence: null });
+  if (!meta.seriesId) return;
+  // delete sibling instances dated after this one
+  const cutoff = (planRow as Row).starts_at as string;
+  const { data: siblings } = await db.from("plan_options").select("plan_id, payload").eq("title", META_TITLE);
+  const sibPlanIds = ((siblings as Row[]) ?? [])
+    .filter((s) => ((s.payload as Row)?.meta as PlanMeta | undefined)?.seriesId === meta.seriesId)
+    .map((s) => s.plan_id as string)
+    .filter((id) => id !== planId);
+  for (const id of sibPlanIds) {
+    const { data: sp } = await db.from("plans").select("starts_at").eq("id", id).maybeSingle();
+    const sa = (sp as Row | null)?.starts_at as string | undefined;
+    if (!cutoff || (sa && sa > cutoff)) {
+      await db.from("plan_options").delete().eq("plan_id", id);
+      await db.from("plan_members").delete().eq("plan_id", id);
+      await db.from("plans").delete().eq("id", id);
     }
   }
 }

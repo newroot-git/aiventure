@@ -71,6 +71,7 @@ export interface PlanOption {
   payload: Record<string, unknown>;
   suggested_by: string | null;
   votes: number;
+  mine?: boolean; // did the current user vote for this option
   created_at: string;
 }
 

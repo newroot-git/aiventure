@@ -24,34 +24,10 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 export function CalendarView({ plans }: { plans: PlanCard[] }) {
   const byDate = React.useMemo(() => {
+    // recurring plans materialise into real dated instances on lock, so every
+    // plan simply lands on its own date — no synthetic expansion needed.
     const m: Record<string, PlanCard[]> = {};
-    // one-off plans land on their date
-    for (const p of plans) if (p.date && !p.recurrence) (m[p.date] ??= []).push(p);
-    // recurring plans repeat across a window (−4 wks … +26 wks)
-    const recur = plans.filter((p) => p.recurrence);
-    if (recur.length) {
-      const start = new Date();
-      start.setDate(start.getDate() - 28);
-      for (let i = 0; i < 210; i++) {
-        const d = new Date(start);
-        d.setDate(start.getDate() + i);
-        const ds = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-        for (const p of recur) {
-          const r = p.recurrence!;
-          let hit = false;
-          if (r.cadence === "monthly") {
-            hit = d.getDate() === (r.monthday ?? 1);
-          } else if (r.weekday === d.getDay()) {
-            if (r.cadence === "biweekly" && r.anchor) {
-              const anchor = new Date(r.anchor);
-              const weeks = Math.round((d.getTime() - anchor.getTime()) / (7 * 864e5));
-              hit = weeks % 2 === 0;
-            } else hit = true; // weekly
-          }
-          if (hit) (m[ds] ??= []).push(p);
-        }
-      }
-    }
+    for (const p of plans) if (p.date) (m[p.date] ??= []).push(p);
     return m;
   }, [plans]);
 
