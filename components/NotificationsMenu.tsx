@@ -75,10 +75,11 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nudgeId: id, accept }),
       });
-      const d = await res.json();
+      const d = await res.json().catch(() => ({} as { slug?: string }));
       setNudges((ns) => ns.filter((n) => n.id !== id));
       if (accept && d.slug) { setOpen(false); router.push(`/p/${d.slug}`); router.refresh(); }
-    } finally { setBusyNudge(null); }
+    } catch { /* leave the nudge in place; user can retry */ }
+    finally { setBusyNudge(null); }
   }
 
   return (

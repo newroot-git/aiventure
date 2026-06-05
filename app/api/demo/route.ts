@@ -9,7 +9,7 @@ export const runtime = "nodejs";
 export async function POST(req: NextRequest) {
   let body: { name?: string; avatar?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: "invalid JSON" }, { status: 400 }); }
-  if (!body.name || !body.name.trim()) return NextResponse.json({ error: "name required" }, { status: 400 });
+  if (typeof body.name !== "string" || !body.name.trim()) return NextResponse.json({ error: "name required" }, { status: 400 });
   if (!rateLimit(`demo:${clientIp(req)}`, 8, 60 * 60_000)) {
     return NextResponse.json({ error: "Too many demo accounts. Try again later." }, { status: 429 });
   }

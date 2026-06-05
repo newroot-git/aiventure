@@ -12,7 +12,7 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "invalid JSON" }, { status: 400 });
   }
-  if (!body.slug || !body.title?.trim() || !body.slotKey) {
+  if (!body.slug || typeof body.title !== "string" || !body.title.trim() || !body.slotKey) {
     return NextResponse.json({ error: "slug + title + slotKey required" }, { status: 400 });
   }
   // the "ask AI to find this exact place" path costs an LLM call — gate + limit it

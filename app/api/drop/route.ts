@@ -4,7 +4,8 @@ import { currentUserId } from "@/lib/db";
 import { rateLimit, clientIp } from "@/lib/http";
 
 export const runtime = "nodejs";
-export const maxDuration = 40;
+// matches /api/plans/create — generateDrop can run ~50s with a retry
+export const maxDuration = 120;
 
 export async function POST(req: Request) {
   if (!(await currentUserId())) return NextResponse.json({ error: "sign in required" }, { status: 401 });

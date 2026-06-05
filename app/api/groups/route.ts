@@ -22,11 +22,11 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "invalid JSON" }, { status: 400 });
   }
-  if (!body.name || !body.name.trim()) {
+  if (typeof body.name !== "string" || !body.name.trim()) {
     return NextResponse.json({ error: "name required" }, { status: 400 });
   }
   try {
-    const { id } = await createGroup(body.name, body.memberIds ?? [], body.description);
+    const { id } = await createGroup(body.name, Array.isArray(body.memberIds) ? body.memberIds : [], body.description);
     return NextResponse.json({ ok: true, id });
   } catch (e) {
     console.error("[/api/groups POST]", e);
