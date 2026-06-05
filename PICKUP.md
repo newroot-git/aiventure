@@ -114,3 +114,16 @@ Ran a 4-agent moody code audit, then fixed everything. `next build` green, `tsc`
 
 ## Stack
 - Next 16 / React 19 / Tailwind v4. OpenRouter chat `anthropic/claude-sonnet-4.5`. OSM (Nominatim + Leaflet) for location, no Google key. Supabase service-role server-only (bypasses RLS), untyped client → `as never`/`as Row`. Commit as **newroot-git**. New: `lib/http.ts` (clientError + rate limiter).
+
+## Pickup — 2026-06-05 (LANDING / marketing surface — appended; separate Claude from the app-internals sessions above)
+- **Was doing:** built AIventure's public marketing surface (landing page) while another Claude rebuilt app internals on the SAME tree. Committed only my own files each time (path-limited).
+- **Done (all live on aiventure-swart.vercel.app):**
+  - **New sales landing** = `app/page.tsx` (scoped `.lp` client component, own `<style>`, app font vars — no global leak). Arc: contained retro-monitor hero → 3 problems → "So we built AIventure" → 5 wins each w/ an app-accurate retro-screen demo (real `cover-*.png` banners, Keen/RSVP/availability vocab) → payoff → "what it isn't" → single **Start an adventure** CTA → `/signin`. Reference sandbox: `docs/landing-pitch.html`.
+  - **Hero** = a CONTAINED bordered retro monitor (LED bar + label + scanline sweep), NOT full-bleed — fixes the blur (gemini art caps ~1248px; contained ≈ shows 1:1). Image `public/img/hero-cliff-3.png` (Yosemite cliff, friends on a log) via `scripts/gen-hero-cliff.mjs` (locked cover style, anchored on cover-hike+cover-camp, magick trim+refit).
+  - **Login** (`app/signin/page.tsx`) banner = same framed cliff image in a retro device frame (replaced CSS PixelScene).
+  - **Notification/inbox icons** → clean lucide chips (Hand/Mail/Bell/Compass) in `components/NotificationsMenu.tsx` + `app/(app)/plans/page.tsx` (were lame pixel PNGs).
+  - **SW cache bug fixed:** `public/sw.js` caches `/img/*` cache-first at stable paths → regenerated covers showed "still old". Bumped VERSION (→v4) + fresh image filenames to dodge it.
+  - Game-feel: retro device frames on demos, beveled buttons, stage-chip kickers, blinking "press start", Web-Audio blip. REMOVED earlier HUD bar + scroll-score + global CRT scanlines (scanlines hazed the art).
+- **Next step:** proper SW fix — make `/img/*` network-first / stale-while-revalidate so regen'd images self-update (ends the version-bump dance). Optional: boot-up animations on the demo screens. Hackathon: lock a placeholder submission on evol.epicconnector.ai EARLY (deadline ~5pm UK Jun 5), seed a populated demo state so judges don't hit an empty app, prep a 60-90s demo video (30% community vote = shareability).
+- **Key files:** `app/page.tsx`, `app/signin/page.tsx`, `docs/landing-pitch.html`, `scripts/gen-hero-cliff.mjs`, `public/img/hero-cliff-3.png`, `public/sw.js`, `components/NotificationsMenu.tsx`.
+- **Gotcha:** SHARED TREE — local `next build` fails on the other session's uncommitted nav/AppShell WIP; Vercel builds the committed tree fine. Commit path-limited.

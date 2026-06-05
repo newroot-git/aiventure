@@ -18,6 +18,8 @@ export default function SignIn() {
   const [verifyType, setVerifyType] = React.useState<"email" | "signup">("email");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [showReal, setShowReal] = React.useState(false);
+  const [demoName, setDemoName] = React.useState("");
 
   // a real session must win — drop any leftover guest cookie so it can't mask it,
   // then route new accounts (no interests yet) into onboarding.
@@ -83,12 +85,16 @@ export default function SignIn() {
     } finally { setBusy(false); }
   }
 
-  async function judge() {
+  async function createDemo() {
+    if (!demoName.trim()) return;
     setBusy(true); setError("");
     try {
-      const res = await fetch("/api/guest", { method: "POST" });
-      if (!res.ok) throw new Error("Couldn't start a guest session");
-      go(false); // keep the guest cookie we just set
+      const res = await fetch("/api/demo", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: demoName.trim() }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || "Couldn't create a demo account"); }
+      go(false); // keep the demo cookie; go() routes into onboarding to pick interests
     } catch (e) { setError((e as Error).message); setBusy(false); }
   }
 
@@ -118,6 +124,8 @@ export default function SignIn() {
           <ArrowLeft size={15} /> Back
         </Link>
 
+        {showReal ? (
+        <>
         {step === "code" ? (
           <div className="mt-6">
             <h1 className="font-display text-2xl font-bold">Enter your code</h1>
@@ -166,16 +174,26 @@ export default function SignIn() {
             </button>
           </div>
         )}
+        <button onClick={() => { setShowReal(false); setError(""); }} className="mt-5 text-sm font-bold text-primary underline">
+          Back to the quick demo
+        </button>
+        </>
+        ) : (
+          <div className="mt-6">
+            <h1 className="font-display text-2xl font-bold">Try AIventure</h1>
+            <p className="mt-1 text-[15px] text-muted">A demo account, ready to go — a crew, a plan and an adventure already set up. Just pick a name.</p>
+            <Input autoFocus value={demoName} onChange={(e) => setDemoName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && createDemo()} placeholder="Your name" className="mt-4" />
+            <Button variant="primary" size="lg" className="mt-3 w-full" disabled={busy || !demoName.trim()} onClick={createDemo}>
+              {busy ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />} That&apos;s me — jump in
+            </Button>
+            <p className="mt-2 text-center text-xs text-muted">No email, no install. Set up in seconds.</p>
+            <button onClick={() => { setShowReal(true); setError(""); }} className="mt-5 text-sm font-bold text-primary underline">
+              I already have an account
+            </button>
+          </div>
+        )}
 
         {error && <p className="mt-3 text-sm font-bold text-[#c0392b]">{error}</p>}
-
-        <div className="mt-8 flex items-center gap-3 text-xs font-bold uppercase tracking-wider text-muted">
-          <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
-        </div>
-        <Button variant="soft" size="lg" className="mt-4 w-full" disabled={busy} onClick={judge}>
-          <Sparkles size={17} /> I&apos;m a judge — explore the demo
-        </Button>
-        <p className="mt-2 text-center text-xs text-muted">Jumps you in as a guest. No email needed.</p>
       </section>
     </main>
   );

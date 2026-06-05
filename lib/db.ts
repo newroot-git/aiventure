@@ -451,6 +451,87 @@ export async function getAllProfiles(): Promise<Profile[]> {
   return ((data as Row[]) ?? []).map((r) => mapProfile(r)).filter((p): p is Profile => !!p);
 }
 
+/**
+ * Create a ready-to-explore DEMO account: a named guest profile pre-seeded with its
+ * OWN crew (so accounts don't overlap), a group, a pending nudge, an invite to a plan,
+ * and one completed adventure — so the app isn't empty on first open. Returns the new
+ * profile id (the caller sets the signed av_uid cookie).
+ */
+const DEMO_CREW = [
+  { name: "Sam", interests: ["Hiking", "Craft beer", "Live music"] },
+  { name: "Priya", interests: ["Coffee", "Galleries", "Yoga"] },
+  { name: "Leo", interests: ["Football", "Board games", "BBQ"] },
+];
+export async function seedDemoAccount(name: string): Promise<{ userId: string }> {
+  const db = supabaseAdmin();
+  const clean = (name || "").trim().slice(0, 40) || "Explorer";
+
+  const { data: user } = await db.from("profiles")
+    .insert({ name: clean, email: null, interests: [] } as never).select("id").single();
+  const userId = (user as unknown as Row).id as string;
+
+  // the crew — each demo account gets its own copies so nobody shares state
+  const crew: string[] = [];
+  for (const c of DEMO_CREW) {
+    const { data } = await db.from("profiles")
+      .insert({ name: c.name, email: null, interests: c.interests } as never).select("id").single();
+    if (data) crew.push((data as unknown as Row).id as string);
+  }
+
+  // a group with the whole crew
+  const { data: grp } = await db.from("groups").insert({ name: "The Usual Crew", owner_id: userId } as never).select("id").single();
+  const groupId = (grp as unknown as Row | null)?.id as string | undefined;
+  if (groupId) {
+    await db.from("group_members").insert(
+      [userId, ...crew].map((pid) => ({ group_id: groupId, profile_id: pid })) as never,
+    );
+  }
+
+  // a pending nudge from the first crew member (+ its notification)
+  if (crew[0]) {
+    await db.from("nudges").insert({ from_id: crew[0], to_id: userId, message: "keen for something this weekend?", when_text: "This weekend", status: "pending" } as never);
+    await notify(userId, `${DEMO_CREW[0].name} nudged you — "keen for something this weekend?". Up for it?`, "nudge", null);
+  }
+
+  // an invite to a real upcoming plan owned by another crew member
+  if (crew[1]) {
+    const inviteSlug = planSlug(`${Date.now()}-demo-invite`);
+    const { data: ip } = await db.from("plans").insert({
+      slug: inviteSlug, title: "Sunday roast & a walk", intent: "Sunday roast then a walk", activity: "Sunday roast & a walk",
+      status: "open", visibility: "invite", creator_id: crew[1], ai_empowered: true, cover_hue: "roast",
+      place_address: "Richmond, London", place_name: "Richmond",
+    } as never).select("id").single();
+    const ipId = (ip as unknown as Row | null)?.id as string | undefined;
+    if (ipId) {
+      await writeMeta(ipId, { scaffold: [{ key: "plan", label: "The plan", day: 1, order: 0 }] });
+      await db.from("plan_members").insert([
+        { plan_id: ipId, profile_id: crew[1], rsvp: "in", joined_via: "app" },
+        { plan_id: ipId, profile_id: userId, rsvp: "maybe", joined_via: "app" },
+      ] as never);
+      await db.from("invites").insert({ to_id: userId, from_id: crew[1], from_label: DEMO_CREW[1].name, kind: "friend", activity: "Sunday roast & a walk", plan_slug: inviteSlug, cover: "/img/cover-roast.png" } as never);
+      await notify(userId, `${DEMO_CREW[1].name} invited you to Sunday roast & a walk`, "invite", inviteSlug);
+    }
+  }
+
+  // one completed adventure so the log + profile aren't empty
+  const advSlug = planSlug(`${Date.now()}-demo-adv`);
+  const { data: adv } = await db.from("plans").insert({
+    slug: advSlug, title: "Coffee & a coastal walk", intent: "Coffee then a coastal walk", activity: "Coffee & a coastal walk",
+    status: "completed", visibility: "invite", creator_id: userId, ai_empowered: true, cover_hue: "coffee",
+    place_address: "Brighton", place_name: "Brighton", adventure_no: 1,
+    starts_at: null, completed_at: new Date().toISOString(),
+  } as never).select("id").single();
+  const advId = (adv as unknown as Row | null)?.id as string | undefined;
+  if (advId) {
+    await writeMeta(advId, { scaffold: [{ key: "plan", label: "The plan", day: 1, order: 0 }] });
+    await db.from("plan_members").insert(
+      [userId, ...crew.slice(0, 2)].map((pid) => ({ plan_id: advId, profile_id: pid, rsvp: "in", joined_via: "app" })) as never,
+    );
+  }
+
+  return { userId };
+}
+
 export async function getFriends(): Promise<{ profile: Profile; shared: string[] }[]> {
   const db = supabaseAdmin();
   const me = await currentUserId();
