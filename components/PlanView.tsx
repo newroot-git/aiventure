@@ -587,12 +587,16 @@ export function PlanView({
       {/* THE PLAN — surface the exciting part first; logistics sit below */}
       {slots.length > 0 && (
         <section className="mt-5">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-1 flex items-center justify-between">
             <h2 className="flex items-center gap-1.5 font-display text-xl font-bold">
-              <Sparkles size={18} className="text-secondary" /> {multiDay ? "The itinerary" : "The plan"}
+              <Sparkles size={18} className="text-secondary" /> {multiDay ? "The itinerary" : multiStep ? "The plan" : "Your options"}
             </h2>
             {multiStep && <span className="text-sm font-bold text-muted">{decidedCount}/{slots.length} set</span>}
           </div>
+          {!multiStep && planning && (
+            <p className="mb-3 text-sm text-muted">A few real spots to choose from — vote your favourite, then lock one in.</p>
+          )}
+          {multiStep && <div className="mb-3" />}
 
           {/* whole-plan feedback (single-day) */}
           {isOwner && planning && multiStep && !multiDay && (
@@ -625,7 +629,7 @@ export function PlanView({
                     return (
                       <Reveal key={s.id} delay={Math.min(i, 5) * 0.05}>
                         <PlanSlot
-                          slot={s} index={i} isOwner={isOwner} planning={planning} working={working}
+                          slot={s} index={i} single={!multiStep} isOwner={isOwner} planning={planning} working={working}
                           voteCount={voteCount} isVoted={isVoted} placeArea={plan.place_address}
                           onVote={vote} onChoose={choose} onDeleteOpt={deleteOpt}
                           onRefine={onRefine} onAddOwn={onAddOwn} onResolveAdd={onResolveAdd} onSetSlotTime={onSetSlotTime}
@@ -885,17 +889,20 @@ export function PlanView({
 
 /* slot wrapper: numbered header + decided badge + time */
 function SlotShell({
-  slot, index, decided, time, onRefresh, refreshing, children,
+  slot, index, decided, time, onRefresh, refreshing, single, children,
 }: {
   slot: Slot; index: number; decided?: boolean; time?: string | null;
-  onRefresh?: () => void; refreshing?: boolean; children: React.ReactNode;
+  onRefresh?: () => void; refreshing?: boolean; single?: boolean; children: React.ReactNode;
 }) {
   return (
     <div>
       <div className="mb-2 flex items-center gap-2">
-        <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-ink bg-primary text-xs font-bold leading-none text-white">
-          {index + 1}
-        </span>
+        {/* numbered step badge only matters for multi-step plans (it shows order) */}
+        {!single && (
+          <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-ink bg-primary text-xs font-bold leading-none text-white">
+            {index + 1}
+          </span>
+        )}
         <span className="font-heading text-base font-bold">{slot.label}</span>
         {time && <span className="inline-flex items-center gap-1 text-xs font-bold text-muted"><Clock size={11} /> {time}</span>}
         <div className="ml-auto flex items-center gap-2">
@@ -1003,10 +1010,10 @@ function AddStepBox({ onAdd }: { onAdd: (label: string) => void }) {
 /* one slot's card stack — memoized module-scope component with local expand +
    refine-text state. Lives outside PlanView so React can bail re-renders. */
 const PlanSlot = React.memo(function PlanSlot({
-  slot, index, isOwner, planning, working, voteCount, isVoted, placeArea,
+  slot, index, single, isOwner, planning, working, voteCount, isVoted, placeArea,
   onVote, onChoose, onDeleteOpt, onRefine, onAddOwn, onResolveAdd, onSetSlotTime, onAddStep,
 }: {
-  slot: Slot; index: number; isOwner: boolean; planning: boolean; working: string | null;
+  slot: Slot; index: number; single: boolean; isOwner: boolean; planning: boolean; working: string | null;
   voteCount: (id: string) => number; isVoted: (id: string) => boolean; placeArea: string | null;
   onVote: (id: string) => void; onChoose: (slotId: string, id: string) => void; onDeleteOpt: (id: string) => void;
   onRefine: (slotKey: string, day: number, feedback: string, append?: boolean) => void;
@@ -1024,8 +1031,8 @@ const PlanSlot = React.memo(function PlanSlot({
   if (slot.fixed && slot.options[0]) {
     const o = slot.options[0];
     return (
-      <SlotShell slot={slot} index={index} decided>
-        <OptionCard title={o.title} subtitle={o.subtitle} why={o.why} sourceUrl={o.source_url} sourceLabel="Set" selected />
+      <SlotShell slot={slot} index={index} single={single} decided>
+        <OptionCard title={o.title} subtitle={o.subtitle} why={o.why} sourceUrl={o.source_url} sourceLabel="Set" selected tint="!bg-success-soft/50" />
       </SlotShell>
     );
   }
@@ -1033,8 +1040,9 @@ const PlanSlot = React.memo(function PlanSlot({
   if (decided && !expanded) {
     const o = slot.chosen!;
     return (
-      <SlotShell slot={slot} index={index} decided time={chosenTime(slot)}>
-        <OptionCard title={o.title} subtitle={o.subtitle} why={o.why} sourceUrl={o.source_url} sourceLabel={o.source_label} selected />
+      <SlotShell slot={slot} index={index} single={single} decided time={chosenTime(slot)}>
+        {/* keep colour once locked — green = locked in, matches the "Set" pill */}
+        <OptionCard title={o.title} subtitle={o.subtitle} why={o.why} sourceUrl={o.source_url} sourceLabel={o.source_label} selected tint="!bg-success-soft/50" />
         {isOwner && planning && (
           <>
             <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -1055,7 +1063,7 @@ const PlanSlot = React.memo(function PlanSlot({
 
   return (
     <SlotShell
-      slot={slot} index={index} decided={decided}
+      slot={slot} index={index} single={single} decided={decided}
       onRefresh={isOwner && planning && !empty ? () => onRefine(slot.key, slot.day, "", false) : undefined}
       refreshing={refining}
     >
