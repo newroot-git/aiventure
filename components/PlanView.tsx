@@ -39,6 +39,7 @@ import {
 import { PlanMap } from "./PlanMap";
 import { PlaceSearch } from "./PlaceSearch";
 import { WeatherChip } from "./WeatherChip";
+import { useConfirm } from "./Confirm";
 import type { Plan, PlanOption, PlanMember, RSVP, Profile, PlanStatus } from "@/lib/types";
 import type { PlanScaffoldSlot, PlanRecurrence, DateOption } from "@/lib/db";
 
@@ -181,6 +182,7 @@ export function PlanView({
   // matching server prop changes (i.e. once the refresh confirms the new truth),
   // so the prop is always the eventual source of truth.
   const router = useRouter();
+  const [confirm, confirmHost] = useConfirm();
   const [, startBgRefresh] = React.useTransition();
   const bgRefresh = React.useCallback(() => startBgRefresh(() => router.refresh()), [router]);
 
@@ -392,9 +394,15 @@ export function PlanView({
       .catch(() => setOptVote((v) => { const n = { ...v }; delete n[id]; return n; }))
       .finally(() => bgRefresh());
   }, [serverVotes, bgRefresh]);
-  function changeRsvp(v: RSVP) {
+  async function changeRsvp(v: RSVP) {
     // declining drops the plan off your calendar/home — guard against a misclick
-    if (v === "out" && !window.confirm("Can't make it? This plan will drop off your plans. You can still reopen it from the link.")) return;
+    if (v === "out" && !(await confirm({
+      title: "Can't make it?",
+      body: "This plan will drop off your plans. You can still reopen it from the link any time.",
+      confirmLabel: "Drop out",
+      cancelLabel: "Stay in",
+      tone: "danger",
+    }))) return;
     const prev = rsvp;
     setRsvpState(v);
     persist({ action: "rsvp", rsvp: v }, () => setRsvpState(prev));
@@ -467,7 +475,13 @@ export function PlanView({
   async function toggleRecurring(next: PlanRecurrence | null) {
     // turning OFF after it's locked (materialised) wipes future instances — confirm
     if (next === null && phase !== "open") {
-      if (!window.confirm("This is a recurring series — turning it off will remove all the future repeats. Continue?")) return;
+      if (!(await confirm({
+        title: "Turn off the repeat?",
+        body: "This is a recurring series — turning it off removes all the future repeats.",
+        confirmLabel: "Turn off",
+        cancelLabel: "Keep it",
+        tone: "danger",
+      }))) return;
       setOptRec({ set: true, val: null });
       await persist({ action: "stopSeries" });
       return;
@@ -537,6 +551,7 @@ export function PlanView({
 
   return (
     <div className="mx-auto w-full max-w-lg py-6">
+      {confirmHost}
       {err && (
         <div role="alert" className="fixed inset-x-0 bottom-4 z-[60] mx-auto w-fit max-w-[90vw] rounded-xl border-2 border-ink bg-[#c0392b] px-4 py-2.5 text-center text-sm font-bold text-white shadow-hard">
           {err}
