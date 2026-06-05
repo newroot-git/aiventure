@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { updatePlanStatus } from "@/lib/db";
+import { clientError } from "@/lib/http";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,6 @@ export async function POST(req: Request) {
     await updatePlanStatus(body.slug, body.status!);
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    return NextResponse.json({ error: clientError(e) }, { status: 500 });
   }
 }

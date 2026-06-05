@@ -273,7 +273,7 @@ export async function getPlanBySlug(slug: string): Promise<{
     .order("created_at");
   const { data: members } = await db
     .from("plan_members")
-    .select("*, profile:profiles(*)")
+    .select("*, profile:profiles(id, name, avatar_emoji)")
     .eq("plan_id", row.id as string);
 
   const allOpts = (rawOptions ?? []) as Row[];
@@ -383,7 +383,7 @@ function mapPlanCard(r: Row): PlanCard {
   };
 }
 
-const PLAN_SELECT = "*, group:groups(name), plan_members(rsvp, profile:profiles(*))";
+const PLAN_SELECT = "*, group:groups(name), plan_members(rsvp, profile:profiles(id, name, avatar_emoji))";
 
 export async function getUserPlans(): Promise<PlanCard[]> {
   const db = supabaseAdmin();
@@ -469,7 +469,7 @@ export async function getUserGroups(): Promise<GroupCard[]> {
   const { data: gm } = await db.from("group_members").select("group_id").eq("profile_id", me);
   const ids = ((gm as Row[]) ?? []).map((g) => g.group_id as string);
   if (!ids.length) return [];
-  const { data } = await db.from("groups").select("*, group_members(profile:profiles(*))").in("id", ids);
+  const { data } = await db.from("groups").select("*, group_members(profile:profiles(id, name, avatar_emoji))").in("id", ids);
   return ((data as Row[]) ?? []).map((g) => ({
     id: g.id as string,
     name: g.name as string,
@@ -481,7 +481,7 @@ export async function getGroup(id: string): Promise<{ group: GroupCard; plans: P
   const db = supabaseAdmin();
   const me = await currentUserId();
   if (!me) return null;
-  const { data: g } = await db.from("groups").select("*, group_members(profile:profiles(*))").eq("id", id).maybeSingle();
+  const { data: g } = await db.from("groups").select("*, group_members(profile:profiles(id, name, avatar_emoji))").eq("id", id).maybeSingle();
   if (!g) return null;
   const gr = g as Row;
   // Authorization: only the owner or a member may read a group's roster + plans.
@@ -1179,6 +1179,8 @@ export async function respondNudge(nudgeId: string, accept: boolean): Promise<{ 
   if (!nRow) throw new Error("nudge not found");
   const nudge = nRow as Row;
   if ((nudge.to_id as string) !== me) throw new Error("not your nudge");
+  // idempotent: a replayed accept must NOT create a second shared plan
+  if ((nudge.status as string) !== "pending") return { slug: null };
   const fromId = nudge.from_id as string;
   const message = (nudge.message as string) || "";
   const myName = await nameOf(me, "Someone");

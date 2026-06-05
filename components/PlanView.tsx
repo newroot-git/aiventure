@@ -173,15 +173,32 @@ export function PlanView({
   const [optChosen, setOptChosen] = React.useState<Record<string, string>>({});
   const [optPlan, setOptPlan] = React.useState<Partial<Pick<Plan, "activity" | "starts_at" | "place_address" | "place_name">>>({});
   const [optRec, setOptRec] = React.useState<{ set: boolean; val: PlanRecurrence | null }>({ set: false, val: null });
-  // Reconcile: a background refresh re-serialises all server props with fresh
-  // identities, so when `plan` changes we drop every optimistic override and let
-  // the server truth take over. Render-phase reset (React's documented pattern for
-  // "adjust state when a prop changes") — no effect, no extra render pass.
-  const [prevPlan, setPrevPlan] = React.useState(plan);
-  if (plan !== prevPlan) {
-    setPrevPlan(plan);
-    setOptStatus(null); setOptChosen({}); setOptPlan({}); setOptRec({ set: false, val: null });
+  const [err, setErr] = React.useState<string | null>(null);
+
+  // server truth for "which option is chosen" per slot, from the raw options
+  const serverChosen = React.useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const o of options) {
+      const p = (o.payload ?? {}) as Record<string, unknown>;
+      if (p.chosen) m[`${(p.day as number) || 1}:${(p.slot as string) || "plan"}`] = o.id;
+    }
+    return m;
+  }, [options]);
+
+  // Reconcile per-field: drop each optimistic override ONLY once the server prop
+  // actually reflects it (write landed). A wholesale reset on plan-identity would
+  // nuke still-in-flight overrides on an unrelated refresh; this clears exactly the
+  // ones that have caught up, and failed writes are rolled back explicitly (below).
+  if (optStatus !== null && plan.status === optStatus) setOptStatus(null);
+  {
+    const keep = Object.entries(optPlan).filter(([k, v]) => (plan as unknown as Record<string, unknown>)[k] !== v);
+    if (keep.length !== Object.keys(optPlan).length) setOptPlan(Object.fromEntries(keep));
   }
+  {
+    const keep = Object.entries(optChosen).filter(([sid, oid]) => serverChosen[sid] !== oid);
+    if (keep.length !== Object.keys(optChosen).length) setOptChosen(Object.fromEntries(keep));
+  }
+  if (optRec.set && JSON.stringify(recurrence ?? null) === JSON.stringify(optRec.val ?? null)) setOptRec({ set: false, val: null });
 
   const effPlan = React.useMemo(() => ({ ...plan, ...optPlan }), [plan, optPlan]);
   const effRecurrence = optRec.set ? optRec.val : recurrence;
@@ -235,24 +252,41 @@ export function PlanView({
   const [locVal, setLocVal] = React.useState(plan.place_address ?? "");
   const [poked, setPoked] = React.useState(false);
 
+  // auto-dismiss the error toast (setState lives in a timer, not the effect body)
+  React.useEffect(() => {
+    if (!err) return;
+    const t = setTimeout(() => setErr(null), 4000);
+    return () => clearTimeout(t);
+  }, [err]);
+
   const phase = optStatus ?? plan.status;
   const planning = phase === "open";
   const people = members.map((m) => m.profile ?? { name: "Guest" });
   const generalArea = effPlan.place_address || effPlan.place_name || "TBC";
 
-  // fire the write, then reconcile in the background — never blocks the optimistic UI
-  const persist = React.useCallback((body: Record<string, unknown>) => {
+  // fire the write, reconcile in the background. On failure: run the caller's rollback
+  // (undo the optimistic override) and surface an error — so a rejected write never
+  // silently "sticks" or vanishes without explanation.
+  const persist = React.useCallback((body: Record<string, unknown>, rollback?: () => void) => {
     return fetch("/api/plans/edit", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slug: plan.slug, ...body }),
-    }).then(() => bgRefresh());
+    })
+      .then((res) => { if (!res.ok) { rollback?.(); setErr("Couldn't save that — try again."); } })
+      .catch(() => { rollback?.(); setErr("Couldn't save — check your connection."); })
+      .finally(() => bgRefresh());
   }, [plan.slug, bgRefresh]);
   // slotId comes from the PlanSlot that owns the option, so the pick shows instantly
   const choose = React.useCallback((slotId: string, id: string) => {
     setOptChosen((prev) => ({ ...prev, [slotId]: id }));
-    persist({ action: "choose", optionId: id });
+    persist({ action: "choose", optionId: id }, () =>
+      setOptChosen((prev) => { const n = { ...prev }; delete n[slotId]; return n; }));
   }, [persist]);
-  const setWhenDate = (iso: string) => { setOptPlan((p) => ({ ...p, starts_at: iso })); persist({ action: "when", startsAt: iso }); };
+  const setWhenDate = (iso: string) => {
+    setOptPlan((p) => ({ ...p, starts_at: iso }));
+    persist({ action: "when", startsAt: iso }, () =>
+      setOptPlan((p) => { const n = { ...p }; delete n.starts_at; return n; }));
+  };
   async function doInvite() {
     if (!pickedFriends.length) return;
     setInviteOpen(false);
@@ -260,42 +294,47 @@ export function PlanView({
     await persist({ action: "invite", profileIds: pickedFriends });
   }
   async function move(status: "open" | "locked" | "completed") {
+    const prev = optStatus;
     setOptStatus(status); // hero + actions flip instantly
     setBusy(true);
     try {
-      await fetch("/api/plans/status", {
+      const res = await fetch("/api/plans/status", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: plan.slug, status }),
       });
-      bgRefresh();
-    } finally { setBusy(false); }
+      if (!res.ok) { setOptStatus(prev); setErr("Couldn't update the plan — try again."); }
+    } catch { setOptStatus(prev); setErr("Couldn't update — check your connection."); }
+    finally { setBusy(false); bgRefresh(); }
   }
   const vote = React.useCallback((id: string) => {
-    setVoted((v) => {
+    const toggle = () => setVoted((v) => {
       const now = !v[id];
       setVotes((vs) => ({ ...vs, [id]: Math.max(0, (vs[id] ?? 0) + (now ? 1 : -1)) }));
       return { ...v, [id]: now };
     });
+    toggle();
     fetch("/api/plans/vote", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ optionId: id }),
-    }).catch(() => {});
+    }).then((res) => { if (!res.ok) toggle(); }).catch(() => toggle()); // re-toggle = undo
   }, []);
   function changeRsvp(v: RSVP) {
     // declining drops the plan off your calendar/home — guard against a misclick
     if (v === "out" && !window.confirm("Can't make it? This plan will drop off your plans. You can still reopen it from the link.")) return;
+    const prev = rsvp;
     setRsvpState(v);
-    persist({ action: "rsvp", rsvp: v });
+    persist({ action: "rsvp", rsvp: v }, () => setRsvpState(prev));
   }
   const deleteOpt = React.useCallback((optionId: string) => persist({ action: "deleteOption", optionId }), [persist]);
   const addDateOpt = (iso: string) => persist({ action: "addDate", iso });
   const lockDateOpt = (optionId: string) => persist({ action: "lockDate", optionId });
   function voteDate(id: string) {
-    setVoted((v) => ({ ...v, [id]: !v[id] }));
+    const toggle = () => setVoted((v) => ({ ...v, [id]: !v[id] }));
+    toggle();
     fetch("/api/plans/vote", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ optionId: id }),
-    }).then(() => bgRefresh()).catch(() => {});
+    }).then((res) => { if (!res.ok) toggle(); bgRefresh(); }).catch(() => { toggle(); });
   }
   // Ask AI: append=true adds more ideas (keeps existing); append=false re-rolls the slot
   const onRefine = React.useCallback(async (slotKey: string, day: number, feedback: string, append = true) => {
@@ -420,6 +459,11 @@ export function PlanView({
 
   return (
     <div className="mx-auto w-full max-w-lg py-6">
+      {err && (
+        <div role="alert" className="fixed inset-x-0 bottom-4 z-[60] mx-auto w-fit max-w-[90vw] rounded-xl border-2 border-ink bg-[#c0392b] px-4 py-2.5 text-center text-sm font-bold text-white shadow-hard">
+          {err}
+        </div>
+      )}
       {/* hero */}
       <div className="relative overflow-hidden rounded-xl border-2 border-ink shadow-hard">
         {plan.cover_url ? (
