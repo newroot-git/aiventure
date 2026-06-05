@@ -1233,6 +1233,7 @@ export async function respondNudge(nudgeId: string, accept: boolean): Promise<{ 
   const fromId = nudge.from_id as string;
   const message = (nudge.message as string) || "";
   const myName = await nameOf(me, "Someone");
+  const fromName = await nameOf(fromId, "A friend");
 
   if (!accept) {
     await db.from("nudges").update({ status: "declined" } as never).eq("id", nudgeId);
@@ -1244,7 +1245,10 @@ export async function respondNudge(nudgeId: string, accept: boolean): Promise<{ 
   const slug = planSlug(`${Date.now()}-nudge`);
   const { data: plan } = await db.from("plans").insert({
     slug,
-    title: message.trim() ? message.trim().slice(0, 140) : "Something with the crew",
+    // default name = the two people involved (e.g. "Josh & Conor"). Holds until they
+    // commit to a venue (deriveHeadline overrides on choose) or rename it manually.
+    // The nudge message becomes the intent (drives the AI build), not the title.
+    title: `${fromName} & ${myName}`.slice(0, 140),
     intent: message || null,
     status: "open",
     visibility: "invite",

@@ -21,10 +21,32 @@ export interface NotifData {
 export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon" | "side"; data: NotifData }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
-  const [invites] = React.useState(data.invites);
+  const [invites, setInvites] = React.useState(data.invites);
   const [nudges, setNudges] = React.useState(data.nudges);
   const [notes, setNotes] = React.useState(data.notifications);
   const [busyNudge, setBusyNudge] = React.useState<string | null>(null);
+
+  // Poll the inbox so new nudges/invites/notifications appear without a navigation
+  // (no realtime push yet). Pause while the panel is open so items don't shuffle
+  // under the user mid-action, and only when the tab is visible.
+  React.useEffect(() => {
+    if (open) return;
+    let alive = true;
+    const tick = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const r = await fetch("/api/inbox");
+        if (!r.ok || !alive) return;
+        const d = await r.json();
+        setInvites(d.invites ?? []);
+        setNudges(d.nudges ?? []);
+        setNotes(d.notifications ?? []);
+      } catch {}
+    };
+    const id = setInterval(tick, 30000);
+    document.addEventListener("visibilitychange", tick);
+    return () => { alive = false; clearInterval(id); document.removeEventListener("visibilitychange", tick); };
+  }, [open]);
   const otherNotes = notes.filter((n) => n.kind !== "nudge"); // the actionable nudge lives in the Nudges section
   const count = invites.length + nudges.length + otherNotes.length;
   const active = usePathActive();
