@@ -9,16 +9,19 @@ export function GroupDescription({ groupId, initial, isOwner }: { groupId: strin
   const [val, setVal] = React.useState(initial);
   const [editing, setEditing] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState("");
 
   async function save() {
-    setBusy(true);
+    setBusy(true); setErr("");
     try {
       const res = await fetch("/api/groups", {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: groupId, description: val.trim() }),
       });
       if (res.ok) { setDesc(val.trim()); setEditing(false); }
-    } finally { setBusy(false); }
+      else setErr("Couldn't save — try again.");
+    } catch { setErr("Couldn't save — check your connection."); }
+    finally { setBusy(false); }
   }
 
   if (editing) {
@@ -34,8 +37,9 @@ export function GroupDescription({ groupId, initial, isOwner }: { groupId: strin
           <Button variant="primary" size="sm" disabled={busy} onClick={save}>
             {busy ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Save
           </Button>
-          <Button variant="soft" size="sm" onClick={() => { setEditing(false); setVal(desc); }}>Cancel</Button>
+          <Button variant="soft" size="sm" onClick={() => { setEditing(false); setVal(desc); setErr(""); }}>Cancel</Button>
         </div>
+        {err && <p className="mt-2 text-sm font-bold text-[#c0392b]">{err}</p>}
       </div>
     );
   }

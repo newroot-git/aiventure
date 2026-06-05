@@ -154,6 +154,10 @@ export async function createPlanFromDrop(input: DropInput & CreateExtras): Promi
   const { data: meProf } = await db.from("profiles").select("*").eq("id", me).maybeSingle();
   const homeArea = ((meProf as Row | null)?.home_area as string) || "London, UK";
   const baseLocation = input.location?.trim() ? input.location : homeArea;
+  // only honour a groupId the creator actually belongs to (stops attaching a plan to —
+  // or enrolling — an arbitrary crew by passing a guessed group id).
+  let validGroupId: string | null = null;
+  if (input.groupId) validGroupId = (await isGroupMember(input.groupId, me)) ? input.groupId : null;
 
   let title = input.intent?.trim() ? input.intent.slice(0, 140) : "New plan";
   let slots: DropSlot[] = [];
@@ -179,7 +183,7 @@ export async function createPlanFromDrop(input: DropInput & CreateExtras): Promi
       status: "open",
       visibility: input.visibility ?? "invite",
       creator_id: me,
-      group_id: input.groupId ?? null,
+      group_id: validGroupId,
       ai_empowered: true,
       cover_hue: firstTile,
       starts_at: input.startsAt ?? null,
@@ -201,10 +205,12 @@ export async function createPlanFromDrop(input: DropInput & CreateExtras): Promi
   }
   await writeMeta(planId, { scaffold });
 
-  // members: creator always; whole group if a group was chosen
+  // members: creator always; whole group if a group was chosen — but ONLY if the
+  // creator actually belongs to that group (else a caller could enrol / enumerate an
+  // arbitrary crew by passing a guessed group id).
   const memberRows: Record<string, unknown>[] = [{ plan_id: planId, profile_id: me, rsvp: "in", joined_via: "app" }];
-  if (input.groupId) {
-    const { data: gm } = await db.from("group_members").select("profile_id").eq("group_id", input.groupId);
+  if (validGroupId) {
+    const { data: gm } = await db.from("group_members").select("profile_id").eq("group_id", validGroupId);
     for (const g of (gm as Row[]) ?? []) {
       const pid = g.profile_id as string;
       if (pid !== me) memberRows.push({ plan_id: planId, profile_id: pid, rsvp: "in", joined_via: "app" });
@@ -582,6 +588,28 @@ export async function seedDemoAccount(name: string): Promise<{ userId: string }>
   return { userId };
 }
 
+// the set of profile ids `me` actually shares a group or a plan with (my real network).
+// used to scope who you can add to a crew / nudge, so a caller can't spam strangers.
+async function connectedProfileIds(me: string): Promise<Set<string>> {
+  const db = supabaseAdmin();
+  const ids = new Set<string>();
+  if (!me) return ids;
+  const { data: myG } = await db.from("group_members").select("group_id").eq("profile_id", me);
+  const gids = ((myG as Row[]) ?? []).map((g) => g.group_id as string);
+  if (gids.length) {
+    const { data } = await db.from("group_members").select("profile_id").in("group_id", gids);
+    for (const r of (data as Row[]) ?? []) ids.add(r.profile_id as string);
+  }
+  const { data: myP } = await db.from("plan_members").select("plan_id").eq("profile_id", me);
+  const pids = ((myP as Row[]) ?? []).map((p) => p.plan_id as string);
+  if (pids.length) {
+    const { data } = await db.from("plan_members").select("profile_id").in("plan_id", pids);
+    for (const r of (data as Row[]) ?? []) ids.add(r.profile_id as string);
+  }
+  ids.delete(me);
+  return ids;
+}
+
 export async function getFriends(): Promise<{ profile: Profile; shared: string[] }[]> {
   const db = supabaseAdmin();
   const me = await currentUserId();
@@ -624,8 +652,11 @@ export async function createGroup(name: string, memberIds: string[], description
   const { data: g, error } = await db.from("groups").insert({ name: clean, owner_id: me, emoji: desc } as never).select("id").single();
   if (error || !g) throw new Error(error?.message ?? "could not create group");
   const gid = (g as Row).id as string;
-  // owner always a member; dedupe + cap; only keep string ids
-  const ids = Array.from(new Set([me, ...((memberIds ?? []).filter((x) => typeof x === "string"))])).slice(0, 50);
+  // owner always a member; only add people the caller is actually connected to (no
+  // stuffing a crew with arbitrary/guessed profile ids); dedupe + cap.
+  const connected = await connectedProfileIds(me);
+  const allowed = (memberIds ?? []).filter((x) => typeof x === "string" && connected.has(x));
+  const ids = Array.from(new Set([me, ...allowed])).slice(0, 50);
   await db.from("group_members").insert(ids.map((pid) => ({ group_id: gid, profile_id: pid })) as never);
   return { id: gid };
 }
@@ -1255,6 +1286,14 @@ async function isMember(planId: string, me: string): Promise<boolean> {
   return !!data;
 }
 
+// True if `me` belongs to this group.
+async function isGroupMember(groupId: string, me: string): Promise<boolean> {
+  if (!me) return false;
+  const db = supabaseAdmin();
+  const { data } = await db.from("group_members").select("profile_id").eq("group_id", groupId).eq("profile_id", me).maybeSingle();
+  return !!data;
+}
+
 /**
  * Guard participant actions (vote / propose options or dates). The caller must be
  * the owner, an existing member, or the plan must be open. Returns { planId, me }.
@@ -1362,6 +1401,9 @@ export async function sendNudge(toId: string, message: string, whenText: string)
   const db = supabaseAdmin();
   const me = await currentUserId();
   if (!me) throw new Error("sign in required");
+  // only nudge people you're actually connected to — stops nudging arbitrary/guessed ids
+  const connected = await connectedProfileIds(me);
+  if (!connected.has(toId)) throw new Error("you can only nudge people you've shared a plan or crew with");
   const myName = await nameOf(me);
   await db.from("nudges").insert({ from_id: me, to_id: toId, message: message ?? null, when_text: whenText, status: "pending" } as never);
   const detail = message?.trim() ? ` — "${message.trim()}"` : "";

@@ -143,7 +143,7 @@ function PlanRow({ plan }: { plan: PlanCard }) {
         <div className="relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={plan.cover} alt="" className="h-40 w-full border-b-2 border-ink/10 object-cover" />
-          <div className="absolute left-3 top-3"><Pill tone="secondary">{plan.groupName}</Pill></div>
+          <div className="absolute left-3 top-3 max-w-[55%]"><Pill tone="secondary" className="max-w-full truncate">{plan.groupName}</Pill></div>
           {plan.phase === "locked" ? (
             <div className="absolute right-3 top-3"><Pill tone="success"><Lock size={12} /> Locked in</Pill></div>
           ) : plan.phase === "open" ? (

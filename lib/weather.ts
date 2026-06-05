@@ -43,7 +43,9 @@ async function geocode(place: string): Promise<{ lat: number; lon: number } | nu
     const j = await r.json();
     const hit = j?.results?.[0];
     const out = hit ? { lat: hit.latitude as number, lon: hit.longitude as number } : null;
-    geoCache.set(name, out);
+    // only cache a definitive hit — never cache a miss/failure (would poison the name
+    // for the whole session on a transient hiccup)
+    if (out) geoCache.set(name, out);
     return out;
   } catch { return null; }
 }

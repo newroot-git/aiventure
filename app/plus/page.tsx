@@ -34,7 +34,7 @@ export default function PlusPage() {
         </div>
       </PixelScene>
 
-      <section className="mx-auto w-full max-w-sm px-6 py-8">
+      <section className="mx-auto w-full max-w-md px-5 py-8">
         <Link href="/profile" className="inline-flex items-center gap-1 text-sm font-bold text-muted">
           <ArrowLeft size={15} /> Back
         </Link>

@@ -77,7 +77,7 @@ export function OptionCard({
 
       {why && <p className="mt-3 text-[15px] leading-relaxed text-ink/80">{why}</p>}
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {onVote && (
           <Button variant={voted ? "secondary" : "soft"} size="sm" onClick={onVote}>
             <Heart size={15} className={voted ? "fill-current" : ""} /> Keen

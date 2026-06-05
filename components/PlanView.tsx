@@ -256,7 +256,9 @@ export function PlanView({
     [slots],
   );
 
-  const [rsvp, setRsvpState] = React.useState<RSVP>(myRsvp ?? "in");
+  // default to "maybe" for someone who hasn't RSVP'd yet — never pre-show them as "in"
+  // (that made newcomers look counted when the server had no record of them)
+  const [rsvp, setRsvpState] = React.useState<RSVP>(myRsvp ?? "maybe");
   // Votes derive from server truth (per option: `votes` + `mine`) every render; we
   // keep only an optimistic toggle override per option the user just tapped. Once the
   // background refresh lands and the server `mine` matches the override, the override
@@ -720,13 +722,13 @@ export function PlanView({
                     <div key={d.id} className={`flex items-center gap-2 rounded-md border-2 p-2 ${ideal ? "border-success bg-success-soft/40" : "border-line bg-surface"}`}>
                       <button
                         onClick={() => voteDate(d.id)}
-                        className={`flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-bold transition ${isVoted(d.id) ? "text-success" : "text-ink"}`}
+                        className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-bold transition ${isVoted(d.id) ? "text-success" : "text-ink"}`}
                       >
-                        <Check size={15} className={isVoted(d.id) ? "opacity-100" : "opacity-30"} />
-                        {fmtDate(d.iso)}{fmtTime(d.iso) ? ` · ${fmtTime(d.iso)}` : ""}
+                        <Check size={15} className={`shrink-0 ${isVoted(d.id) ? "opacity-100" : "opacity-30"}`} />
+                        <span className="truncate">{fmtDate(d.iso)}{fmtTime(d.iso) ? ` · ${fmtTime(d.iso)}` : ""}</span>
                       </button>
-                      {ideal && <span className="rounded bg-success px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Best</span>}
-                      <span className="text-xs font-bold text-muted">{c} free</span>
+                      {ideal && <span className="shrink-0 rounded bg-success px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Best</span>}
+                      <span className="shrink-0 text-xs font-bold text-muted">{c} free</span>
                       {isOwner && (
                         <Button variant="soft" size="sm" onClick={() => lockDateOpt(d.id)}>
                           <Lock size={13} /> Set
@@ -838,7 +840,7 @@ export function PlanView({
         ) : (
           <>
             <Button variant="primary" size="lg" className="w-full" disabled={busy} onClick={() => move("completed")}>
-              {busy ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} Mark as done — get your Adventure card
+              {busy ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} Mark as done
             </Button>
             <button onClick={() => move("open")} disabled={busy} className="text-center text-sm font-bold text-muted underline">
               Back to planning
@@ -920,10 +922,10 @@ function SlotShell({
             {index + 1}
           </span>
         )}
-        <span className="font-heading text-base font-bold">{slot.label}</span>
+        <span className="min-w-0 truncate font-heading text-base font-bold">{slot.label}</span>
         {/* single-step plans take their time from the When section, not a per-step time */}
-        {time && !single && <span className="inline-flex items-center gap-1 text-xs font-bold text-muted"><Clock size={11} /> {time}</span>}
-        <div className="ml-auto flex items-center gap-2">
+        {time && !single && <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-muted"><Clock size={11} /> {time}</span>}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           {onRefresh && (
             <button
               onClick={onRefresh}
@@ -1147,7 +1149,7 @@ function SlotAddMenu({
         <div className="relative flex-1">
           <button
             onClick={() => { setMenuOpen((o) => !o); }}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-line px-3 py-2 text-sm font-bold text-primary transition hover:border-primary"
+            className="flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md border-2 border-dashed border-line px-3 py-2.5 text-sm font-bold text-primary transition hover:border-primary"
           >
             <Plus size={15} /> Add option <ChevronDown size={14} className={menuOpen ? "rotate-180 transition" : "transition"} />
           </button>
@@ -1170,7 +1172,7 @@ function SlotAddMenu({
         {isOwner && (
           <button
             onClick={() => setMode((m) => (m === "step" ? null : "step"))}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-line px-3 py-2 text-sm font-bold text-ink transition hover:border-primary"
+            className="flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border-2 border-dashed border-line px-3 py-2.5 text-sm font-bold text-ink transition hover:border-primary"
           >
             <Plus size={15} /> Add step
           </button>

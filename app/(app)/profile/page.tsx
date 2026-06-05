@@ -66,7 +66,7 @@ export default async function ProfilePage() {
           <div className="shrink-0 rounded-full border-2 border-ink shadow-hard-sm">
             <Avatar name={name} src={me?.avatar} size={72} />
           </div>
-          <div className="min-w-0 flex-1 pr-16 text-white">
+          <div className="min-w-0 flex-1 pr-24 text-white">
             <h1 className="font-display text-xl font-bold leading-tight">{name}</h1>
             <div className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-white/90">
               <Burst size={13} className="text-accent" /> {cls}

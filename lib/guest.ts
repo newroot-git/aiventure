@@ -2,9 +2,10 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 // The av_uid guest cookie is an HMAC-signed `<uuid>.<sig>` so a stranger can't set
-// av_uid=<someone-else's-uuid> and impersonate them. The signing secret is the
-// server-only service-role key (never shipped to the client).
-const SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || "dev-guest-secret";
+// av_uid=<someone-else's-uuid> and impersonate them. Use a DEDICATED secret so a leak
+// of the cookie secret doesn't grant DB access (and vice-versa). Falls back to the
+// service-role key only if GUEST_COOKIE_SECRET is unset, to keep dev working.
+const SECRET = process.env.GUEST_COOKIE_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "dev-guest-secret";
 
 function sign(uid: string): string {
   return createHmac("sha256", SECRET).update(uid).digest("base64url");

@@ -194,7 +194,7 @@ back to the default location when the intent names no place.`;
 
   let shape: string;
   if (input.scope === "trip") {
-    const days = Math.max(1, input.nights || 2);
+    const days = Math.max(2, (input.nights ?? 2) + 1); // N nights = N+1 days (matches the scaffold)
     shape = `Plan a ${days}-day trip. Return slots across all ${days} days.
 Each day has 2-4 ordered slots (e.g. Morning, Lunch, Afternoon, Evening). Set "day" 1-based (1..${days}).
 Each slot offers 2-3 distinct, voteable options for that step. Order slots sensibly through each day.`;

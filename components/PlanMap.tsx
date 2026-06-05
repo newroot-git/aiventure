@@ -189,7 +189,7 @@ function MapBtn({ label, onClick, children }: { label: string; onClick: () => vo
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="grid h-8 w-8 place-items-center rounded-md border-2 border-ink bg-surface text-ink shadow-hard-sm transition active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+      className="grid h-9 w-9 place-items-center rounded-md border-2 border-ink bg-surface text-ink shadow-hard-sm transition active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
     >
       {children}
     </button>

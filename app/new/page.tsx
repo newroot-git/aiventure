@@ -472,7 +472,7 @@ function ModeTile({
 }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled}
-      className={`flex items-center justify-center gap-2 rounded-md border-2 ${small ? "px-2 py-2.5 text-xs" : "px-3 py-3 text-sm"} font-bold transition disabled:opacity-40 ${active ? "border-ink bg-primary text-white shadow-hard-sm" : "border-line text-ink hover:border-primary"}`}>
+      className={`flex items-center justify-center gap-2 whitespace-nowrap rounded-md border-2 ${small ? "px-2 py-2.5 text-xs" : "px-3 py-3 text-sm"} font-bold transition disabled:opacity-40 ${active ? "border-ink bg-primary text-white shadow-hard-sm" : "border-line text-ink hover:border-primary"}`}>
       <Icon size={small ? 15 : 17} /> {label}
     </button>
   );

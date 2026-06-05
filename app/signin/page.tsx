@@ -100,7 +100,7 @@ export default function SignIn() {
 
   return (
     <main className="flex flex-1 flex-col">
-      <div className="mx-auto mt-6 w-full max-w-sm px-6">
+      <div className="mx-auto mt-6 w-full max-w-md px-5">
         <div className="rounded-xl border-[3px] border-ink bg-night p-2 shadow-hard">
           <div className="flex items-center gap-1.5 px-1 pb-1.5">
             <span className="h-2 w-2 rounded-full bg-primary" />
@@ -119,7 +119,7 @@ export default function SignIn() {
         </div>
       </div>
 
-      <section className="mx-auto w-full max-w-sm px-6 py-10">
+      <section className="mx-auto w-full max-w-md px-5 py-10">
         <Link href="/" className="inline-flex items-center gap-1 text-sm font-bold text-muted">
           <ArrowLeft size={15} /> Back
         </Link>
