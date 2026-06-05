@@ -354,7 +354,7 @@ export function PlanView({
 
   if (phase === "completed") {
     return (
-      <div className="mx-auto w-full max-w-lg px-5 py-12">
+      <div className="mx-auto w-full max-w-lg py-8">
         <p className="mb-5 text-center font-display text-2xl font-bold">Adventure logged</p>
         <AdventureCard
           number={plan.adventure_no ?? 1}
@@ -378,7 +378,7 @@ export function PlanView({
   }
 
   return (
-    <div className="mx-auto w-full max-w-lg px-5 py-6">
+    <div className="mx-auto w-full max-w-lg py-6">
       {/* hero */}
       <div className="relative overflow-hidden rounded-xl border-2 border-ink shadow-hard">
         {plan.cover_url ? (
@@ -637,7 +637,7 @@ export function PlanView({
 
         {/* poke non-voters (owner, planning, others present) */}
         {isOwner && planning && members.length > 1 && (
-          <Button variant="soft" onClick={poke} disabled={poked}>
+          <Button variant="soft" className="w-full" onClick={poke} disabled={poked}>
             <Hand size={16} /> {poked ? "Poked everyone" : "Poke people to weigh in"}
           </Button>
         )}
@@ -648,7 +648,7 @@ export function PlanView({
           </p>
         ) : phase === "open" ? (
           <>
-            <Button variant="primary" disabled={busy} onClick={() => move("locked")}>
+            <Button variant="primary" size="lg" className="w-full" disabled={busy} onClick={() => move("locked")}>
               {busy ? <Loader2 size={18} className="animate-spin" /> : <Lock size={18} />} Lock it in
             </Button>
             <p className="text-center text-xs text-muted">
@@ -659,7 +659,7 @@ export function PlanView({
           </>
         ) : (
           <>
-            <Button variant="primary" disabled={busy} onClick={() => move("completed")}>
+            <Button variant="primary" size="lg" className="w-full" disabled={busy} onClick={() => move("completed")}>
               {busy ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />} Mark as done — get your Adventure card
             </Button>
             <button onClick={() => move("open")} disabled={busy} className="text-center text-sm font-bold text-muted underline">
@@ -706,11 +706,11 @@ export function PlanView({
                 {friends.map((f) => {
                   const on = pickedFriends.includes(f.id);
                   return (
-                    <button key={f.id} onClick={() => setPickedFriends((p) => (on ? p.filter((x) => x !== f.id) : [...p, f.id]))} className="flex flex-col items-center gap-1">
+                    <button key={f.id} onClick={() => setPickedFriends((p) => (on ? p.filter((x) => x !== f.id) : [...p, f.id]))} className="flex min-w-0 flex-col items-center gap-1">
                       <span className={on ? "rounded-md ring-2 ring-primary ring-offset-2 ring-offset-surface" : ""}>
                         <Avatar name={f.name} src={f.avatar} size={48} />
                       </span>
-                      <span className="truncate text-xs font-bold">{f.name}</span>
+                      <span className="w-full truncate text-center text-xs font-bold">{f.name}</span>
                     </button>
                   );
                 })}

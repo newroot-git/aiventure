@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Check, Search, Plus, X } from "lucide-react";
+import { ArrowLeft, Check, Search, Plus, X, Navigation, Loader2 } from "lucide-react";
 import { Button, Input, SelectTag, Label, Avatar } from "@/components/ui";
 import {
   SETTINGS,
@@ -30,6 +30,26 @@ function OnboardFlow() {
   const [cats, setCats] = React.useState<string[]>([]);
   const [interests, setInterests] = React.useState<string[]>([]);
   const [query, setQuery] = React.useState("");
+  const [geo, setGeo] = React.useState<"idle" | "locating">("idle");
+
+  function useMyLocation() {
+    if (!("geolocation" in navigator)) return;
+    setGeo("locating");
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=12`, { headers: { "Accept-Language": "en" } });
+          const j = await res.json();
+          const a = j.address ?? {};
+          const place = a.city || a.town || a.village || a.suburb || a.county || j.name;
+          if (place) setHomeArea(`${place}${a.country_code ? `, ${a.country_code.toUpperCase()}` : ""}`);
+        } catch {} finally { setGeo("idle"); }
+      },
+      () => setGeo("idle"),
+      { enableHighAccuracy: false, timeout: 8000 },
+    );
+  }
 
   const available = setting ? categoriesFor(setting) : [];
   const chosenCats = available.filter((c) => cats.includes(c.id));
@@ -114,6 +134,15 @@ function OnboardFlow() {
             </div>
             <div className="mt-4">
               <Label>Where are you based?</Label>
+              <button
+                type="button"
+                onClick={useMyLocation}
+                disabled={geo === "locating"}
+                className="mt-2 inline-flex items-center gap-2 rounded-md border-2 border-ink bg-surface px-3 py-2 text-sm font-bold text-ink shadow-hard-sm transition active:translate-y-0.5 disabled:opacity-60"
+              >
+                {geo === "locating" ? <Loader2 size={15} className="animate-spin" /> : <Navigation size={15} className="text-primary" />}
+                {geo === "locating" ? "Locating…" : "Use my location"}
+              </button>
               <Input
                 value={homeArea}
                 onChange={(e) => setHomeArea(e.target.value)}
@@ -218,6 +247,28 @@ function OnboardFlow() {
                   </button>
                 )}
               </div>
+
+              {/* search RESULTS sit directly under the input (not below your picks) */}
+              {query.trim() && (
+                <div className="mt-3">
+                  {results.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {results.map((t) => (
+                        <SelectTag key={t} selected={interests.includes(t)} onClick={() => toggle(interests, setInterests, t)}>
+                          {t}
+                        </SelectTag>
+                      ))}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { toggle(interests, setInterests, query.trim()); setQuery(""); }}
+                      className="inline-flex items-center gap-2 rounded-md border-2 border-ink bg-surface px-4 py-2 text-sm font-bold shadow-hard-sm"
+                    >
+                      <Plus size={15} /> Add “{query.trim()}”
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* picks */}
@@ -238,53 +289,23 @@ function OnboardFlow() {
               </div>
             )}
 
-            {/* search results OR suggested-by-category */}
-            <div className="mt-6">
-              {query.trim() ? (
-                results.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {results.map((t) => (
-                      <SelectTag
-                        key={t}
-                        selected={interests.includes(t)}
-                        onClick={() => toggle(interests, setInterests, t)}
-                      >
-                        {t}
-                      </SelectTag>
-                    ))}
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => {
-                      toggle(interests, setInterests, query.trim());
-                      setQuery("");
-                    }}
-                    className="inline-flex items-center gap-2 rounded-md border-2 border-ink bg-surface px-4 py-2 text-sm font-bold shadow-hard-sm"
-                  >
-                    <Plus size={15} /> Add “{query.trim()}”
-                  </button>
-                )
-              ) : (
-                <div className="flex flex-col gap-6">
-                  {chosenCats.map((c) => (
-                    <div key={c.id}>
-                      <Label>{c.label}</Label>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {c.interests.map((t) => (
-                          <SelectTag
-                            key={t}
-                            selected={interests.includes(t)}
-                            onClick={() => toggle(interests, setInterests, t)}
-                          >
-                            {t}
-                          </SelectTag>
-                        ))}
-                      </div>
+            {/* suggested-by-category (only when not actively searching) */}
+            {!query.trim() && (
+              <div className="mt-6 flex flex-col gap-6">
+                {chosenCats.map((c) => (
+                  <div key={c.id}>
+                    <Label>{c.label}</Label>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {c.interests.map((t) => (
+                        <SelectTag key={t} selected={interests.includes(t)} onClick={() => toggle(interests, setInterests, t)}>
+                          {t}
+                        </SelectTag>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

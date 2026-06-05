@@ -45,10 +45,18 @@ export const currentUserId = cache(async (): Promise<string> => {
     const uid = c.get("av_uid")?.value;
     if (uid) {
       // only honour av_uid for genuine guest profiles (no linked auth account) —
-      // stops a forged cookie from impersonating a real signed-up user.
+      // stops a forged/stale cookie from impersonating a real or seeded user.
       const db = supabaseAdmin();
-      const { data } = await db.from("profiles").select("id, auth_id").eq("id", uid).maybeSingle();
-      if (data && !(data as Row).auth_id) return (data as Row).id as string;
+      const { data } = await db.from("profiles").select("id, auth_id, name").eq("id", uid).maybeSingle();
+      const row = data as Row | null;
+      if (row && !row.auth_id) {
+        // in prod, av_uid must be an actual minted guest ("Guest NNNN") — this stops a
+        // leftover dev-switch cookie (e.g. =Josh) from masking a fresh account. The dev
+        // profile-switcher (DEV_SWITCH=1) may still resolve any seed profile.
+        const devMode = process.env.NEXT_PUBLIC_DEV_SWITCH === "1";
+        const isGuest = typeof row.name === "string" && (row.name as string).startsWith("Guest ");
+        if (devMode || isGuest) return row.id as string;
+      }
     }
   } catch {}
   return "";
@@ -470,9 +478,16 @@ export async function getUserGroups(): Promise<GroupCard[]> {
 
 export async function getGroup(id: string): Promise<{ group: GroupCard; plans: PlanCard[] } | null> {
   const db = supabaseAdmin();
+  const me = await currentUserId();
+  if (!me) return null;
   const { data: g } = await db.from("groups").select("*, group_members(profile:profiles(*))").eq("id", id).maybeSingle();
   if (!g) return null;
   const gr = g as Row;
+  // Authorization: only the owner or a member may read a group's roster + plans.
+  // Without this any authenticated user could enumerate crews by guessing UUIDs.
+  const isMember = ((gr.group_members as Row[]) ?? []).some((m) => (m.profile as Row)?.id === me);
+  const isOwner = (gr.owner_id as string) === me;
+  if (!isMember && !isOwner) return null;
   const { data: plans } = await db.from("plans").select(PLAN_SELECT).eq("group_id", id).order("created_at", { ascending: false });
   return {
     group: {
@@ -851,7 +866,9 @@ export async function invitePeople(slug: string, profileIds: string[]): Promise<
   if (!plan) throw new Error("plan not found");
   const p = plan as Row;
   const pid = p.id as string;
-  const rows = profileIds.map((id) => ({ plan_id: pid, profile_id: id, rsvp: "in", joined_via: "app" }));
+  // Invitees start as "maybe" (tentative) — they only count as going once they
+  // explicitly accept via setRsvp. Auto-"in" inflated availability + lock counts.
+  const rows = profileIds.map((id) => ({ plan_id: pid, profile_id: id, rsvp: "maybe", joined_via: "app" }));
   if (!rows.length) return;
   await db.from("plan_members").upsert(rows as never, { onConflict: "plan_id,profile_id" } as never);
 

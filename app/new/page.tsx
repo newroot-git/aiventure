@@ -332,22 +332,22 @@ function NewPlanFlow() {
             <ModeTile active={whoMode === "open"} Icon={Globe} label="Open to all" onClick={() => setWhoMode("open")} />
           </div>
           {whoMode === "people" && (
-            <div className="mt-3 flex flex-wrap gap-3">
+            <div className="mt-3 grid grid-cols-4 gap-3 sm:grid-cols-5">
               {friends.map((f) => {
                 const on = invited.includes(f.id);
                 return (
-                  <button key={f.id} type="button" onClick={() => setInvited((p) => (on ? p.filter((x) => x !== f.id) : [...p, f.id]))} className="flex flex-col items-center gap-1">
+                  <button key={f.id} type="button" onClick={() => setInvited((p) => (on ? p.filter((x) => x !== f.id) : [...p, f.id]))} className="flex min-w-0 flex-col items-center gap-1">
                     <span className={on ? "rounded-md ring-2 ring-primary ring-offset-2 ring-offset-bg" : ""}><Avatar name={f.name} src={f.avatar} size={44} /></span>
-                    <span className="truncate text-xs font-bold">{f.name}</span>
+                    <span className="w-full truncate text-center text-xs font-bold">{f.name}</span>
                   </button>
                 );
               })}
               {/* invite someone not on the app — copy a share link */}
-              <button type="button" onClick={copyAppLink} className="flex flex-col items-center gap-1">
+              <button type="button" onClick={copyAppLink} className="flex min-w-0 flex-col items-center gap-1">
                 <span className="grid h-11 w-11 place-items-center rounded-md border-2 border-dashed border-ink/40 bg-surface text-primary">
                   {linkCopied ? <Check size={20} /> : <Link2 size={20} />}
                 </span>
-                <span className="truncate text-xs font-bold text-muted">{linkCopied ? "Copied" : "Invite link"}</span>
+                <span className="w-full truncate text-center text-xs font-bold text-muted">{linkCopied ? "Copied" : "Invite link"}</span>
               </button>
             </div>
           )}
