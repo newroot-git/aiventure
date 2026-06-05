@@ -67,7 +67,7 @@ export function AppShell({
       >
         {/* mobile top bar (flex-none — stays pinned, notch-safe) */}
         <header
-          className="flex-none border-b-2 border-line bg-bg/90 backdrop-blur md:hidden"
+          className="flex-none border-b-2 border-ink bg-bg/90 backdrop-blur md:hidden"
           style={{ paddingTop: "env(safe-area-inset-top)" }}
         >
           <div className="flex items-center justify-between px-5 py-3">
@@ -93,7 +93,7 @@ export function AppShell({
 
         {/* mobile bottom nav (flex-none — stays pinned, home-indicator-safe) */}
         <nav
-          className="flex-none border-t-2 border-line bg-surface/95 backdrop-blur md:hidden"
+          className="flex-none border-t-2 border-ink bg-surface/95 backdrop-blur md:hidden"
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
         >
           <div className="mx-auto grid w-full max-w-lg grid-cols-5 items-center px-3 py-1">
@@ -207,15 +207,18 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex min-h-[44px] flex-col items-center justify-center gap-1 py-1 text-xs font-bold transition ${
-        active ? "text-primary" : "text-muted"
-      }`}
+      className="flex min-h-[44px] flex-col items-center justify-center gap-1 py-1 text-[11px] font-bold"
     >
-      <span className="relative grid place-items-center">
-        <Icon size={22} />
-        <span className="absolute -right-3 -top-1"><LinkPending /></span>
+      {/* active tab = chunky pixel chip (ink border + tint fill), like the section bubbles */}
+      <span
+        className={`relative grid h-9 w-9 place-items-center rounded-md border-2 transition ${
+          active ? "border-ink bg-primary-soft text-primary-deep" : "border-transparent text-muted"
+        }`}
+      >
+        <Icon size={20} />
+        <span className="absolute -right-2 -top-2"><LinkPending /></span>
       </span>
-      {label}
+      <span className={active ? "text-primary-deep" : "text-muted"}>{label}</span>
     </Link>
   );
 }
