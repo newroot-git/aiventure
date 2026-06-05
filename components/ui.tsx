@@ -113,28 +113,13 @@ export function SelectTag({
    Default profile photo = a little pixel character silhouette on a per-profile
    colour (deterministic from the name, so it's stable + varied across people).
    A real image src overrides it. */
-const AVATAR_COLORS = [
-  "#CE3B2A", "#2A56A8", "#2E7B4E", "#D98A2B", "#7A5BA8",
-  "#3FA0A0", "#C25B8A", "#B5651D", "#4E6E8E", "#8A6FBF",
-  "#D2691E", "#3E8E7E",
-];
-function colorFor(seed?: string) {
+// Default profile photo = one of 16 generated character portraits, picked
+// deterministically from the name so it's stable + varied across people.
+const AVATAR_COUNT = 16;
+function avatarFor(seed?: string) {
   let h = 0;
   for (const c of seed ?? "?") h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
-
-// blocky pixel person (head + shoulders), in the brand's pixel style
-function PixelPerson({ size }: { size: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden style={{ imageRendering: "pixelated" }}>
-      <g fill="#ffffff" fillOpacity="0.92">
-        <rect x="6" y="2" width="4" height="4" />
-        <rect x="3" y="9" width="10" height="6" rx="1" />
-        <rect x="5" y="7" width="6" height="3" />
-      </g>
-    </svg>
-  );
+  return `/img/avatars/avatar-${(h % AVATAR_COUNT) + 1}.png`;
 }
 
 export function Avatar({
@@ -148,32 +133,19 @@ export function Avatar({
   size?: number;
   ring?: boolean;
 }) {
-  // only real image paths/URLs render as <img>; otherwise show the pixel character
-  const isImg = !!src && (src.startsWith("/") || src.startsWith("http"));
-  if (isImg) {
-    return (
-      <span
-        className={cx(
-          "inline-block overflow-hidden rounded-md border-2 border-ink",
-          ring && "ring-2 ring-surface",
-        )}
-        style={{ width: size, height: size }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={name ?? ""} className="pixelated h-full w-full scale-[1.12] object-cover" />
-      </span>
-    );
-  }
+  // real image path/URL if provided, else a deterministic generated portrait
+  const realImg = !!src && (src.startsWith("/") || src.startsWith("http"));
+  const imgSrc = realImg ? (src as string) : avatarFor(name);
   return (
     <span
       className={cx(
-        "inline-grid place-items-center overflow-hidden rounded-md border-2 border-ink",
+        "inline-block overflow-hidden rounded-md border-2 border-ink",
         ring && "ring-2 ring-surface",
       )}
-      style={{ width: size, height: size, background: colorFor(name) }}
-      aria-label={name ?? "profile"}
+      style={{ width: size, height: size }}
     >
-      <PixelPerson size={Math.round(size * 0.72)} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={imgSrc} alt={name ?? ""} className="h-full w-full object-cover" />
     </span>
   );
 }
