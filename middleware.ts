@@ -12,7 +12,7 @@ function isPublic(path: string): boolean {
     path.startsWith("/_next") ||
     path.startsWith("/img") ||
     // static assets only — a real route like /plans/some.thing must NOT bypass auth
-    /\.(?:ico|png|jpg|jpeg|svg|gif|webp|css|js|map|txt|woff2?)$/.test(path)
+    /\.(?:ico|png|jpg|jpeg|svg|gif|webp|css|js|map|txt|woff2?|webmanifest)$/.test(path)
   );
 }
 

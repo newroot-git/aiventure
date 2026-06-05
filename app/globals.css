@@ -59,10 +59,27 @@
     overflow-wrap: break-word;
     word-wrap: break-word;
   }
+  /* app-shell: the document itself never scrolls or rubber-bands — a single
+     inner region (#app-scroll, or AppShell's <main>) does the scrolling. */
   html,
   body {
-    min-height: 100dvh;
+    height: 100%;
     margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* the universal scroll host that wraps every route (standalone pages scroll
+     here; inside (app) routes the AppShell exactly fills it and its <main> scrolls) */
+  #app-scroll {
+    height: 100dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    /* flex column so the page template (flex-1) and standalone pages fill the
+       height — same contract they had under the old `body { flex flex-col }`. */
+    display: flex;
+    flex-direction: column;
   }
   body {
     background-color: var(--color-bg);

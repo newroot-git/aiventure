@@ -28,9 +28,11 @@ export function AppShell({
   const user = me ?? FALLBACK_USER;
 
   return (
-    <div className="min-h-dvh">
-      {/* ---- desktop sidebar ---- */}
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-60 flex-col border-r-2 border-line bg-surface/50 px-4 py-6 md:flex">
+    // app-shell: locked to the dynamic viewport height and never scrolls itself;
+    // only <main> scrolls, so the header/nav can't drift on iOS (no fixed/sticky).
+    <div className="flex h-dvh overflow-hidden">
+      {/* ---- desktop sidebar (in-flow flex column, full height) ---- */}
+      <aside className="hidden w-60 shrink-0 flex-col border-r-2 border-line bg-surface/50 px-4 py-6 md:flex">
         <Link href="/plans" className="px-2 font-display text-2xl font-bold tracking-tight">
           AI<span className="text-primary">venture</span>
         </Link>
@@ -58,10 +60,16 @@ export function AppShell({
         </div>
       </aside>
 
-      {/* ---- main column ---- */}
-      <div className="flex min-h-dvh flex-col md:pl-60">
-        {/* mobile top bar */}
-        <header className="sticky top-0 z-10 border-b-2 border-line bg-bg/90 backdrop-blur md:hidden">
+      {/* ---- main column: pinned header · scrolling main · pinned bottom nav ---- */}
+      <div
+        className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        style={{ paddingLeft: "env(safe-area-inset-left)", paddingRight: "env(safe-area-inset-right)" }}
+      >
+        {/* mobile top bar (flex-none — stays pinned, notch-safe) */}
+        <header
+          className="flex-none border-b-2 border-line bg-bg/90 backdrop-blur md:hidden"
+          style={{ paddingTop: "env(safe-area-inset-top)" }}
+        >
           <div className="flex items-center justify-between px-5 py-3">
             <Link href="/plans" className="font-display text-xl font-bold tracking-tight">
               AI<span className="text-primary">venture</span>
@@ -69,20 +77,26 @@ export function AppShell({
             <div className="flex items-center gap-3">
               {process.env.NEXT_PUBLIC_DEV_SWITCH === "1" && profiles.length > 1 && <ProfileSwitcher me={user} profiles={profiles} compact />}
               <NotificationsMenu variant="icon" data={notifs} />
-              <Link href="/profile" aria-label="Profile">
+              <Link href="/profile" aria-label="Profile" className="grid h-11 w-11 place-items-center">
                 <Avatar name={user.name} src={user.avatar} size={32} />
               </Link>
             </div>
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-28 pt-4 md:max-w-4xl md:px-8 md:pb-12 md:pt-10">
-          {children}
+        {/* the ONLY scrolling region (min-h-0 lets the flex child shrink + scroll) */}
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="mx-auto w-full max-w-2xl px-5 pb-10 pt-4 md:max-w-4xl md:px-8 md:pb-12 md:pt-10">
+            {children}
+          </div>
         </main>
 
-        {/* mobile bottom nav */}
-        <nav className="fixed inset-x-0 bottom-0 z-20 border-t-2 border-line bg-surface/95 backdrop-blur md:hidden">
-          <div className="mx-auto grid w-full max-w-lg grid-cols-5 items-center px-3 py-2">
+        {/* mobile bottom nav (flex-none — stays pinned, home-indicator-safe) */}
+        <nav
+          className="flex-none border-t-2 border-line bg-surface/95 backdrop-blur md:hidden"
+          style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+        >
+          <div className="mx-auto grid w-full max-w-lg grid-cols-5 items-center px-3 py-1">
             {TABS.slice(0, 2).map((t) => (
               <NavItem key={t.href} {...t} active={isActive(t.href)} />
             ))}
@@ -184,7 +198,7 @@ function NavItem({
   return (
     <Link
       href={href}
-      className={`flex flex-col items-center gap-1 py-1 text-xs font-bold transition ${
+      className={`flex min-h-[44px] flex-col items-center justify-center gap-1 py-1 text-xs font-bold transition ${
         active ? "text-primary" : "text-muted"
       }`}
     >
