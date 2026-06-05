@@ -364,6 +364,7 @@ export default function Home() {
                 <p>Describe the vibe. AIventure comes back with grounded, bookable things to do — the time, the place and the logistics already sorted.</p>
               </div>
               <div className="feat-viz">
+                <div className="screen"><div className="screen-bar"><i className="led" /><i className="led" /><i className="led" /><em>Plan</em></div><div className="screen-body">
                 <div>
                   <div className="vague"><span className="tag">you type</span>something with the boys Saturday, hike then a pint<span className="cursor" /></div>
                   <div className="plan">
@@ -378,6 +379,7 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
+                </div></div>
               </div>
             </div>
 
@@ -388,6 +390,7 @@ export default function Home() {
                 <p>One link to invite, votes to decide, and availability that finds the day everyone’s actually free. No 200-message thread, no chasing.</p>
               </div>
               <div className="feat-viz">
+                <div className="screen"><div className="screen-bar"><i className="led" /><i className="led" /><i className="led" /><em>Crew</em></div><div className="screen-body">
                 <div className="vizframe vf-blue">
                   <div className="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>Who’s coming</div>
                   <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10 }}>
@@ -401,6 +404,7 @@ export default function Home() {
                     <div className="dv"><span>Fri 12 Jun</span><span className="free">2 free</span></div>
                   </div>
                 </div>
+                </div></div>
               </div>
             </div>
 
@@ -411,6 +415,7 @@ export default function Home() {
                 <p>A solo coffee, a six-person day out, a two-week trip abroad. One engine builds the itinerary — from the tiny to the epic.</p>
               </div>
               <div className="feat-viz">
+                <div className="screen"><div className="screen-bar"><i className="led" /><i className="led" /><i className="led" /><em>Route</em></div><div className="screen-body">
                 <div className="vizframe vf-green">
                   <div className="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="19" r="3" /><circle cx="18" cy="5" r="3" /><path d="M9 19h6a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6" /></svg>A day out · 3 stops</div>
                   <div className="itin">
@@ -419,6 +424,7 @@ export default function Home() {
                     <div className="row"><span className="num">3</span><img src="/img/cover-pub.png" alt="" /><div className="t"><b>Late lunch &amp; a pint</b><small>1pm · The Anchor</small></div></div>
                   </div>
                 </div>
+                </div></div>
               </div>
             </div>
 
@@ -429,6 +435,7 @@ export default function Home() {
                 <p>Real spots near you — or anywhere on earth — you’d never have found yourself. So you stop doing the same three things.</p>
               </div>
               <div className="feat-viz">
+                <div className="screen"><div className="screen-bar"><i className="led" /><i className="led" /><i className="led" /><em>Explore</em></div><div className="screen-body">
                 <div className="vizframe vf-yellow">
                   <div className="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20" /></svg>Near you · for your interests</div>
                   <div className="disc">
@@ -437,6 +444,7 @@ export default function Home() {
                     <div className="d"><img src="/img/cover-gig.png" alt="" /><div><b>Open-air gig in the park</b><small>4km · Sat · 12 going</small></div></div>
                   </div>
                 </div>
+                </div></div>
               </div>
             </div>
 
@@ -447,6 +455,7 @@ export default function Home() {
                 <p>Every plan you finish becomes a private record — a log of the things you actually did, not a feed of things you watched.</p>
               </div>
               <div className="feat-viz">
+                <div className="screen"><div className="screen-bar"><i className="led" /><i className="led" /><i className="led" /><em>Log</em></div><div className="screen-body">
                 <div className="vizframe vf-red">
                   <div className="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6" /><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12" /></svg>Your adventure log</div>
                   <div className="loggrid">
@@ -456,6 +465,7 @@ export default function Home() {
                     <div className="minicard"><img src="/img/cover-beach.png" alt="" /><b>Coast day</b></div>
                   </div>
                 </div>
+                </div></div>
               </div>
             </div>
 
