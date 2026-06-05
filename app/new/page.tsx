@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { Button, Textarea, SelectTag, Label, Input, Avatar } from "@/components/ui";
 import { WhenPicker } from "@/components/plan";
+import { AuroraField } from "@/components/atmosphere";
 import type { PlanScope } from "@/lib/types";
 
 const SCOPES: { id: PlanScope; label: string; desc: string; Icon: typeof Sparkles }[] = [
@@ -225,14 +226,31 @@ function NewPlanFlow() {
   /* ---------- loading ---------- */
   if (phase === "loading") {
     return (
-      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-5 py-20 text-center">
-        <span className="grid h-20 w-20 place-items-center rounded-md border-2 border-ink bg-primary-soft text-primary shadow-hard">
-          <Loader2 size={40} className="animate-spin" />
-        </span>
-        <h1 className="mt-6 font-display text-2xl font-bold">
-          {scope === "adventure" || scope === "trip" ? "Building your adventure…" : "Building your plan…"}
-        </h1>
-        <p className="mt-3 h-6 text-[15px] font-bold text-primary">{THINKING[tick % THINKING.length]}</p>
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-5 py-8">
+        <AuroraField stars className="flex flex-col items-center rounded-2xl border-2 border-ink px-6 py-10 text-center text-white shadow-hard">
+          <span className="relative grid h-20 w-20 place-items-center rounded-xl border-2 border-ink bg-accent text-ink shadow-hard-sm">
+            <Sparkles size={36} className="animate-pulse" />
+          </span>
+          <h1 className="mt-6 font-display text-2xl font-bold drop-shadow">
+            {scope === "adventure" || scope === "trip" ? "Building your adventure…" : "Building your plan…"}
+          </h1>
+          <p className="mt-2 h-6 text-[15px] font-bold text-accent">{THINKING[tick % THINKING.length]}</p>
+        </AuroraField>
+
+        {/* shimmer skeletons hint at options assembling, one after another */}
+        <div className="mt-5 flex flex-col gap-3">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="animate-pulse rounded-xl border-2 border-ink/15 bg-surface-2 p-4 shadow-hard-sm"
+              style={{ animationDelay: `${i * 0.25}s` }}
+            >
+              <div className="h-4 w-2/3 rounded bg-ink/10" />
+              <div className="mt-2 h-3 w-1/3 rounded bg-ink/10" />
+              <div className="mt-3 h-3 w-full rounded bg-ink/5" />
+            </div>
+          ))}
+        </div>
       </main>
     );
   }

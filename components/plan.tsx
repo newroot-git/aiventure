@@ -31,6 +31,8 @@ export function OptionCard({
   selected,
   onSelect,
   onDelete,
+  rank,
+  tint,
 }: {
   title: string;
   subtitle?: string | null;
@@ -43,9 +45,17 @@ export function OptionCard({
   selected?: boolean;
   onSelect?: () => void;
   onDelete?: () => void;
+  rank?: number; // 0 = top pick (shows a badge)
+  tint?: string; // subtle per-option background tint so cards aren't identical
 }) {
+  const topPick = rank === 0;
   return (
-    <Card className={cx("p-5 transition", selected && "ring-2 ring-primary")}>
+    <Card className={cx("p-5 transition", tint ?? "", selected && "ring-2 ring-primary", topPick && "border-accent")}>
+      {topPick && (
+        <div className="mb-2 inline-flex items-center gap-1 rounded-md border-2 border-ink bg-accent px-2 py-0.5 text-xs font-bold text-ink shadow-hard-sm">
+          <Award size={13} /> Top pick
+        </div>
+      )}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h4 className="font-heading text-lg font-bold leading-snug">{title}</h4>

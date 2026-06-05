@@ -44,6 +44,10 @@ import type { PlanScaffoldSlot, PlanRecurrence, DateOption } from "@/lib/db";
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TIMES = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "16:00", "18:00", "19:00", "20:00", "21:00", "22:00"];
 
+// subtle per-option background tints so the suggestions aren't 4 identical white boxes.
+// index 0 (the top pick) gets the gold/accent tint to match its "Top pick" badge.
+const OPTION_TINTS = ["!bg-accent-soft/60", "!bg-secondary-soft/50", "!bg-success-soft/50", "!bg-primary-soft/45"];
+
 // a private/personal spot ("my house", "home") shouldn't get a map pin
 function isPersonalPlace(s?: string): boolean {
   if (!s) return false;
@@ -580,6 +584,68 @@ export function PlanView({
         </div>
       </div>
 
+      {/* THE PLAN — surface the exciting part first; logistics sit below */}
+      {slots.length > 0 && (
+        <section className="mt-5">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="flex items-center gap-1.5 font-display text-xl font-bold">
+              <Sparkles size={18} className="text-secondary" /> {multiDay ? "The itinerary" : "The plan"}
+            </h2>
+            {multiStep && <span className="text-sm font-bold text-muted">{decidedCount}/{slots.length} set</span>}
+          </div>
+
+          {/* whole-plan feedback (single-day) */}
+          {isOwner && planning && multiStep && !multiDay && (
+            <GeneralFeedback
+              busy={working === "all:0"}
+              onSubmit={(v) => refineAll(undefined, v)}
+              placeholder="Tweak the whole plan — e.g. keep it cheaper, more outdoorsy…"
+            />
+          )}
+
+          {(() => {
+            let idx = 0;
+            return dayNums.map((d) => (
+              <div key={d} className="mb-2">
+                {multiDay && (
+                  <div className="mb-2 mt-4 flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted">Day {d}</span>
+                  </div>
+                )}
+                {isOwner && planning && multiDay && (
+                  <GeneralFeedback
+                    busy={working === `all:${d}`}
+                    onSubmit={(v) => refineAll(d, v)}
+                    placeholder={`Tweak all of day ${d} at once…`}
+                  />
+                )}
+                <div className="mt-2 flex flex-col gap-5">
+                  {slots.filter((s) => s.day === d).map((s) => {
+                    const i = idx++;
+                    return (
+                      <Reveal key={s.id} delay={Math.min(i, 5) * 0.05}>
+                        <PlanSlot
+                          slot={s} index={i} isOwner={isOwner} planning={planning} working={working}
+                          voteCount={voteCount} isVoted={isVoted} placeArea={plan.place_address}
+                          onVote={vote} onChoose={choose} onDeleteOpt={deleteOpt}
+                          onRefine={onRefine} onAddOwn={onAddOwn} onResolveAdd={onResolveAdd} onSetSlotTime={onSetSlotTime}
+                          onAddStep={(label) => addStep(d, label)}
+                        />
+                      </Reveal>
+                    );
+                  })}
+                </div>
+                {/* add-step now lives per-step; only show a day-level add when the day is empty */}
+                {isOwner && planning && slots.filter((s) => s.day === d).length === 0 && (
+                  <AddStepBox onAdd={(label) => addStep(d, label)} />
+                )}
+              </div>
+            ));
+          })()}
+        </section>
+      )}
+
+      {/* ---- logistics: when / where / who live below the plan ---- */}
       {/* when — own full row (recurring folded in as a toggle) */}
       <div className="mt-4 flex flex-col gap-3">
         <Section icon={<Clock size={15} />} label={effRecurrence ? "Repeats" : "When"} tone="accent">
@@ -703,67 +769,6 @@ export function PlanView({
             <p className="text-[15px] leading-relaxed text-ink/80">{plan.why}</p>
           </Section>
         </div>
-      )}
-
-      {/* slots */}
-      {slots.length > 0 && (
-        <section className="mt-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="flex items-center gap-1.5 font-display text-xl font-bold">
-              <Sparkles size={18} className="text-secondary" /> {multiDay ? "The itinerary" : "The plan"}
-            </h2>
-            {multiStep && <span className="text-sm font-bold text-muted">{decidedCount}/{slots.length} set</span>}
-          </div>
-
-          {/* whole-plan feedback (single-day) */}
-          {isOwner && planning && multiStep && !multiDay && (
-            <GeneralFeedback
-              busy={working === "all:0"}
-              onSubmit={(v) => refineAll(undefined, v)}
-              placeholder="Tweak the whole plan — e.g. keep it cheaper, more outdoorsy…"
-            />
-          )}
-
-          {(() => {
-            let idx = 0;
-            return dayNums.map((d) => (
-              <div key={d} className="mb-2">
-                {multiDay && (
-                  <div className="mb-2 mt-4 flex items-center justify-between">
-                    <span className="text-xs font-bold uppercase tracking-wider text-muted">Day {d}</span>
-                  </div>
-                )}
-                {isOwner && planning && multiDay && (
-                  <GeneralFeedback
-                    busy={working === `all:${d}`}
-                    onSubmit={(v) => refineAll(d, v)}
-                    placeholder={`Tweak all of day ${d} at once…`}
-                  />
-                )}
-                <div className="mt-2 flex flex-col gap-5">
-                  {slots.filter((s) => s.day === d).map((s) => {
-                    const i = idx++;
-                    return (
-                      <Reveal key={s.id} delay={Math.min(i, 5) * 0.05}>
-                        <PlanSlot
-                          slot={s} index={i} isOwner={isOwner} planning={planning} working={working}
-                          voteCount={voteCount} isVoted={isVoted} placeArea={plan.place_address}
-                          onVote={vote} onChoose={choose} onDeleteOpt={deleteOpt}
-                          onRefine={onRefine} onAddOwn={onAddOwn} onResolveAdd={onResolveAdd} onSetSlotTime={onSetSlotTime}
-                          onAddStep={(label) => addStep(d, label)}
-                        />
-                      </Reveal>
-                    );
-                  })}
-                </div>
-                {/* add-step now lives per-step; only show a day-level add when the day is empty */}
-                {isOwner && planning && slots.filter((s) => s.day === d).length === 0 && (
-                  <AddStepBox onAdd={(label) => addStep(d, label)} />
-                )}
-              </div>
-            ));
-          })()}
-        </section>
       )}
 
       {/* good to know */}
@@ -1065,16 +1070,19 @@ const PlanSlot = React.memo(function PlanSlot({
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {slot.options.map((o) => (
-            <OptionCard
-              key={o.id}
-              title={o.title} subtitle={o.subtitle} why={o.why}
-              sourceUrl={o.source_url} sourceLabel={o.source_label}
-              votes={voteCount(o.id)} voted={isVoted(o.id)} onVote={() => onVote(o.id)}
-              selected={slot.chosen?.id === o.id}
-              onSelect={isOwner && planning ? () => pick(o.id) : undefined}
-              onDelete={isOwner && planning ? () => onDeleteOpt(o.id) : undefined}
-            />
+          {slot.options.map((o, oi) => (
+            <Reveal key={o.id} delay={oi * 0.08}>
+              <OptionCard
+                title={o.title} subtitle={o.subtitle} why={o.why}
+                sourceUrl={o.source_url} sourceLabel={o.source_label}
+                votes={voteCount(o.id)} voted={isVoted(o.id)} onVote={() => onVote(o.id)}
+                selected={slot.chosen?.id === o.id}
+                onSelect={isOwner && planning ? () => pick(o.id) : undefined}
+                onDelete={isOwner && planning ? () => onDeleteOpt(o.id) : undefined}
+                rank={oi}
+                tint={OPTION_TINTS[oi % OPTION_TINTS.length]}
+              />
+            </Reveal>
           ))}
         </div>
       )}

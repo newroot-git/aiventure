@@ -52,7 +52,7 @@ export default async function ProfilePage() {
     <div>
       {/* character hero */}
       <AuroraField stars className="rounded-2xl border-2 border-ink p-5 shadow-hard">
-        <div className="absolute right-3 top-3 flex items-center gap-2">
+        <div className="absolute right-3 top-3 z-10 flex items-center gap-2">
           <Link href="/profile/edit" aria-label="Edit profile" className="grid h-8 w-8 place-items-center rounded-md border-2 border-ink bg-white/15 text-white transition active:translate-x-[2px] active:translate-y-[2px]">
             <Pencil size={15} />
           </Link>
@@ -106,14 +106,14 @@ export default async function ProfilePage() {
           <div className="flex gap-3 overflow-x-auto pb-1">
             {earned.map((b) => (
               <div key={b.id} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
-                <BadgeMedal badge={b} got />
+                <BadgeMedal id={b.id} label={b.label} how={b.how} got />
                 <span className="text-center text-[11px] font-bold leading-tight">{b.label}</span>
               </div>
             ))}
           </div>
         ) : (
           <div className="flex items-center gap-3">
-            <BadgeMedal badge={locked[0]} got={false} />
+            <BadgeMedal id={locked[0].id} label={locked[0].label} how={locked[0].how} got={false} />
             <div className="text-sm">
               <p className="font-bold">No badges yet.</p>
               <p className="text-muted">{locked[0].how} to earn your first.</p>

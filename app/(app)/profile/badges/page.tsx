@@ -35,7 +35,7 @@ export default async function BadgesPage() {
           const got = b.got(stats);
           return (
             <Card key={b.id} hard={got} className={`flex items-center gap-4 p-4 ${got ? "" : "opacity-70"}`}>
-              <BadgeMedal badge={b} got={got} />
+              <BadgeMedal id={b.id} label={b.label} how={b.how} got={got} />
               <div className="flex-1">
                 <h3 className="font-display text-lg font-bold">{b.label}</h3>
                 <p className="text-sm text-muted">{got ? "Earned" : b.how}</p>
