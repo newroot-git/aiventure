@@ -22,6 +22,19 @@ const THINKING = [
   "Matching to your crew…", "Grounding every suggestion…",
 ];
 
+// Some failures (e.g. a platform timeout on a long build) return a non-JSON body.
+// Parse defensively so the user sees a real message, never "Unexpected token".
+async function readJson(res: Response): Promise<{ slug?: string; error?: string }> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as { slug?: string; error?: string };
+  } catch {
+    return { error: res.status === 504 || res.status === 502
+      ? "That took too long to build — try again, or make it a bit simpler."
+      : "Couldn't build that — try again." };
+  }
+}
+
 type WhoMode = "just-me" | "people" | "group" | "open";
 type WhenMode = "unsure" | "options" | "set";
 type Friend = { id: string; name: string; avatar?: string | null };
@@ -181,7 +194,7 @@ function NewPlanFlow() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scope: sc, intent, budget: "flexible", interests, location, aiBuild: true, visibility: "invite" }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (res.ok && data.slug) { router.push(`/p/${data.slug}`); return; }
       throw new Error(data.error || "failed");
     } catch { router.push("/plans"); }
@@ -216,7 +229,7 @@ function NewPlanFlow() {
           dateOptions: whenMode === "options" ? dateOpts : [],
         }),
       });
-      const data = await res.json();
+      const data = await readJson(res);
       if (res.ok && data.slug) { router.push(`/p/${data.slug}`); return; }
       throw new Error(data.error || "Couldn't create the plan.");
     } catch (e) {

@@ -68,6 +68,35 @@ function sanitize(s: string | undefined, maxLen: number): string {
     .slice(0, maxLen);
 }
 
+// Salvage a JSON value that was cut off mid-output (the model hit its token
+// cap). Cut back to the last complete `}`/`]` that sits OUTSIDE a string, drop a
+// dangling comma, then close any still-open brackets. Returns null if hopeless.
+function repairTruncatedJson(t: string): string | null {
+  let inStr = false, esc = false, lastClose = -1;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === "}" || c === "]") lastClose = i;
+  }
+  if (lastClose < 0) return null;
+  let s = t.slice(0, lastClose + 1);
+  // count unclosed openers in the kept slice (ignoring those inside strings)
+  inStr = false; esc = false;
+  const stack: string[] = [];
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === "{") stack.push("}");
+    else if (c === "[") stack.push("]");
+    else if (c === "}" || c === "]") stack.pop();
+  }
+  s = s.replace(/,\s*$/, "");
+  while (stack.length) s += stack.pop();
+  return s;
+}
+
 // strip markdown fences / prose and parse the first JSON value
 function parseJson(text: string): unknown {
   let t = text.trim();
@@ -78,6 +107,9 @@ function parseJson(text: string): unknown {
   try {
     return JSON.parse(t);
   } catch {
+    // most failures are a truncated tail — salvage the complete prefix
+    const repaired = repairTruncatedJson(t);
+    if (repaired) { try { return JSON.parse(repaired); } catch { /* fall through */ } }
     throw new Error("model returned malformed JSON");
   }
 }
@@ -217,7 +249,7 @@ Return STRICT JSON only: {"title","area","slots":[{"key","label","day","options"
 "key" = a short lowercase slug for the slot (e.g. "food", "main", "after"). "time" = optional "HH:MM" for that step.
 Make picks genuinely varied and tailored to the intent — not a generic highlights list.`;
 
-  const maxTokens = input.scope === "trip" ? 3000 : 2000;
+  const maxTokens = input.scope === "trip" ? 4500 : 2000;
   let lastTitle = "";
   let lastArea = "";
 

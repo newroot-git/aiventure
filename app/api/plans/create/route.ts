@@ -4,7 +4,9 @@ import type { DropInput } from "@/lib/ai";
 import { clientError, rateLimit, clientIp } from "@/lib/http";
 
 export const runtime = "nodejs";
-export const maxDuration = 45;
+// trip builds (multi-day, big output) can run long; give them headroom so the
+// platform never kills the function mid-build and returns a non-JSON page.
+export const maxDuration = 120;
 
 export async function POST(req: Request) {
   if (!(await currentUserId())) return NextResponse.json({ error: "sign in required" }, { status: 401 });

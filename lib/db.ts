@@ -182,7 +182,9 @@ export async function createPlanFromDrop(input: DropInput & CreateExtras): Promi
   // select("*") so it's safe before the home_area migration is applied.
   const { data: meProf } = await db.from("profiles").select("*").eq("id", me).maybeSingle();
   const homeArea = ((meProf as Row | null)?.home_area as string) || "London, UK";
-  const baseLocation = input.location?.trim() ? input.location : homeArea;
+  // coerce defensively — a non-string location would otherwise crash on .trim()
+  const locStr = typeof input.location === "string" ? input.location : "";
+  const baseLocation = locStr.trim() ? locStr : homeArea;
   // only honour a groupId the creator actually belongs to (stops attaching a plan to —
   // or enrolling — an arbitrary crew by passing a guessed group id).
   let validGroupId: string | null = null;
