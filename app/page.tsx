@@ -49,24 +49,25 @@ const CSS = `
 .lp .btn-gold{background:var(--gold); color:var(--ink);
   box-shadow:var(--shadow), inset 0 3px 0 rgba(255,255,255,.45), inset 0 -3px 0 rgba(0,0,0,.16)}
 
-.lp .hero{position:relative; min-height:92vh; display:flex; align-items:center; justify-content:center;
+.lp .hero{position:relative; min-height:92vh; display:flex; align-items:center; justify-content:flex-start;
   border-bottom-left-radius:26px; border-bottom-right-radius:26px; overflow:hidden; background:#241F33}
 .lp .hero-img{position:absolute; inset:-8% 0 0 0; width:100%; height:116%; object-fit:cover;
-  object-position:center 42%; z-index:0}
-.lp .hero-scrim{position:absolute; inset:0; z-index:1;
-  background:
-    radial-gradient(120% 80% at 50% 8%, rgba(36,31,51,.55), transparent 55%),
-    linear-gradient(rgba(36,31,51,.28) 0%, rgba(36,31,51,.12) 32%, rgba(36,31,51,.45) 72%, rgba(36,31,51,.82) 100%)}
-.lp .hero-inner{position:relative; z-index:3; text-align:center; color:#fff; padding:40px 22px 96px}
-.lp .hero .eyebrow{color:#fff; border:2px solid rgba(255,255,255,.32); background:rgba(0,0,0,.28);
-  padding:7px 14px; border-radius:7px; backdrop-filter:blur(3px)}
-.lp .hero h1{font-size:clamp(54px,11vw,104px); margin-top:26px; color:#fff; text-shadow:4px 4px 0 rgba(0,0,0,.5)}
+  object-position:center 46%; z-index:0}
+/* hero copy lives in a left-weighted retro screen over the full-colour image */
+.lp .hero-screen{position:relative; z-index:4; margin:0 0 0 clamp(16px,6vw,96px); width:min(90vw,520px)}
+.lp .hero-screen-body{position:relative; z-index:2; padding:24px 28px 30px; text-align:left; color:#fff}
+.lp .hero .eyebrow{color:#fff; border:2px solid rgba(255,255,255,.28); background:rgba(255,255,255,.07);
+  padding:6px 12px; border-radius:7px}
+.lp .hero h1{font-size:clamp(38px,6vw,56px); margin-top:18px; color:#fff; text-shadow:3px 3px 0 rgba(0,0,0,.55)}
 .lp .hero h1 b{color:var(--gold); font-weight:700}
-.lp .hero p.sub{max-width:540px; margin:22px auto 0; font-size:clamp(17px,2.3vw,21px); font-weight:600;
-  color:#fff; line-height:1.5; text-shadow:1px 2px 8px rgba(0,0,0,.5)}
-.lp .hero .cta{display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top:34px}
-.lp .trust{margin-top:16px; font-size:13px; color:rgba(255,255,255,.86); font-weight:600; letter-spacing:.3px;
-  text-shadow:0 1px 6px rgba(0,0,0,.6)}
+.lp .hero p.sub{max-width:none; margin:16px 0 0; font-size:16px; font-weight:600;
+  color:rgba(255,255,255,.92); line-height:1.55}
+.lp .hero .cta{display:flex; gap:14px; justify-content:flex-start; flex-wrap:wrap; margin-top:26px}
+.lp .trust{margin-top:14px; font-size:12.5px; color:rgba(255,255,255,.72); font-weight:600; letter-spacing:.3px}
+@media(max-width:680px){
+  .lp .hero{justify-content:center}
+  .lp .hero-screen{margin:0 14px; width:auto; max-width:100%}
+}
 
 .lp section.band{padding:96px 0; position:relative; z-index:2}
 .lp .kicker{display:inline-flex; align-items:center; gap:7px; font-family:var(--font-display); font-weight:600;
@@ -274,21 +275,23 @@ export default function Home() {
       {/* HERO */}
       <header className="hero">
         <img className="hero-img" ref={heroRef} src="/img/hero-cliff.png" alt="" />
-        <div className="hero-scrim" />
         <div className="stars" aria-hidden="true">
-          {Array.from({ length: 26 }).map((_, i) => (
-            <i key={i} className="star" style={{ left: `${(i * 41 + 7) % 100}%`, top: `${(i * 23 + 5) % 62}%`, animationDelay: `${(i % 7) * 0.42}s` }} />
+          {Array.from({ length: 16 }).map((_, i) => (
+            <i key={i} className="star" style={{ left: `${(i * 53 + 9) % 100}%`, top: `${(i * 29 + 4) % 36}%`, animationDelay: `${(i % 7) * 0.42}s` }} />
           ))}
         </div>
-        <div className="hero-inner">
-          <span className="eyebrow">◇ The anti-social-media app</span>
-          <h1>Less scrolling.<br />More <b>living</b>.</h1>
-          <p className="sub">AIventure turns “we should hang out” into a real plan — and your crew out the door. Then it remembers it for you.</p>
-          <div className="cta">
-            <Link className="btn btn-gold" href="/signin" onPointerDown={blip}>Start an adventure</Link>
+        <div className="screen hero-screen">
+          <div className="screen-bar"><i className="led" /><i className="led" /><i className="led" /><em>Title screen</em></div>
+          <div className="hero-screen-body">
+            <span className="eyebrow">◇ The anti-social-media app</span>
+            <h1>Less scrolling.<br />More <b>living</b>.</h1>
+            <p className="sub">AIventure turns “we should hang out” into a real plan — and your crew out the door. Then it remembers it for you.</p>
+            <div className="cta">
+              <Link className="btn btn-gold" href="/signin" onPointerDown={blip}>Start an adventure</Link>
+            </div>
+            <div className="pressstart">▶ Press start</div>
+            <p className="trust">Free to join any plan · No download · No feed</p>
           </div>
-          <div className="pressstart">▶ Press start</div>
-          <p className="trust">Free to join any plan · No download · No feed</p>
         </div>
       </header>
 

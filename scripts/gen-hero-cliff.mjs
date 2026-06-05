@@ -22,10 +22,10 @@ const CHAR =
 const SIMPLE =
   "Keep the composition SIMPLE and uncluttered: one clear focal point, plenty of calm sky and negative space. Absolutely NO text, NO words, NO signage, NO logos, NO readable writing anywhere.";
 const FRAME =
-  "The output MUST be a WIDE cinematic horizontal banner, much WIDER than it is tall (about 16:9), filled edge to edge with NO borders or letterbox, with the friends-on-the-log kept in the central horizontal band so it survives a wide crop.";
+  "The output MUST be a WIDE cinematic horizontal banner, much WIDER than it is tall (about 16:9), filled edge to edge with NO borders or letterbox. Compose with the friends in the RIGHT THIRD of the frame and leave the LEFT TWO-THIRDS as calm open valley, forest and sky negative space.";
 
 const scene =
-  "A small group of 3 to 4 friends sitting close together on a fallen log right at the top of a high granite cliff edge, seen from behind, gazing out over a vast Yosemite-style valley: deep green pine forest below, sweeping granite cliffs and a distant waterfall, far blue mountains on the horizon, soft warm golden-hour sunlight and gentle haze.";
+  "A small group of 3 to 4 friends sitting close together on a low sturdy fallen log that rests flat on a solid granite ledge at a cliff-top viewpoint — the log is safely on the ground, NOT overhanging or near the edge — positioned in the right third of the frame, seen from behind, gazing out over a vast Yosemite-style valley filling the centre and left: deep green pine forest, sweeping granite cliffs, a distant waterfall and far blue mountains, soft warm golden-hour sunlight and gentle haze, calm open sky.";
 
 const prompt = `GENERATE A NEW IMAGE (do not describe it). ${scene} ${STYLE} ${CHAR} ${SIMPLE} ${FRAME}`;
 const out = join(root, "public/img/hero-cliff.png");
