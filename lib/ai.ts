@@ -146,17 +146,26 @@ Rules:
 - For each item, set "tile" to the single best-fit category from this exact list: ${TILES.join(", ")}.
 - Keep "why" to one short, warm sentence.
 - "map_query" = a string you'd type into Google Maps to find it (venue name + area).
+- PRIVATE LOCATIONS: if the intent says a step happens at a personal/private place (e.g. "at my house", "my place", "a mate's flat", "home", "yours"), do NOT invent public venues for that step — return a SINGLE option named after that place with "map_query" set to "" (empty string) so no map pin is dropped.
 - Respond with STRICT JSON only. No markdown, no prose, no code fences.`;
 
 // only accept a real "HH:MM" clock time; drop prose like "lunch" / "2-3 hours"
 function cleanTime(t?: string): string | undefined {
   return t && /^\d{1,2}:\d{2}$/.test(t.trim()) ? t.trim() : undefined;
 }
+// personal/private place → no public venue, no map pin
+function isPersonalPlace(s?: string): boolean {
+  if (!s) return false;
+  return /\b(my|your|our|their|his|her)\s+(house|home|place|flat|apartment|gaff|yard|garden|pad)\b/i.test(s) || /^(home|mine|yours)$/i.test(s.trim());
+}
 function cleanOption(o: DropOptionOut): DropOptionOut {
+  // respect an explicit empty map_query (private location) — don't fall back to a
+  // place_name that would geocode to a random pin
+  const personal = o.map_query === "" || isPersonalPlace(o.place_name) || isPersonalPlace(o.title);
   return {
     ...o,
     tile: TILES.includes(o.tile as (typeof TILES)[number]) ? o.tile : "city",
-    map_query: o.map_query || o.place_name,
+    map_query: personal ? "" : (o.map_query || o.place_name),
     time: cleanTime(o.time),
   };
 }

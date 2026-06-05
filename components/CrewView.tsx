@@ -1,7 +1,8 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { Hand, UserPlus, Plus, ChevronRight, X, Boxes } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Hand, UserPlus, Plus, ChevronRight, X, Boxes, Check, Loader2 } from "lucide-react";
 import { Card, Button, Avatar, AvatarStack } from "./ui";
 import { NudgeSheet } from "./NudgeSheet";
 import type { GroupCard, NudgeCard } from "@/lib/db";
@@ -25,8 +26,26 @@ export function CrewView({
   friends: { profile: Profile; shared: string[] }[];
   nudges: NudgeCard[];
 }) {
+  const router = useRouter();
   const [nudges, setNudges] = React.useState(initialNudges);
   const [nudgeTarget, setNudgeTarget] = React.useState<Profile | null>(null);
+  const [busyNudge, setBusyNudge] = React.useState<string | null>(null);
+
+  // Respond to an INCOMING nudge. Accept → respondNudge creates the shared plan with
+  // BOTH people already in it and routes there (do NOT send them to a blank /new where
+  // they could exclude the nudger). Decline → just clears it.
+  async function respond(id: string, accept: boolean) {
+    setBusyNudge(id);
+    try {
+      const res = await fetch("/api/nudge/respond", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nudgeId: id, accept }),
+      });
+      const d = await res.json().catch(() => ({}));
+      setNudges((s) => s.filter((x) => x.id !== id));
+      if (accept && d.slug) { router.push(`/p/${d.slug}`); router.refresh(); }
+    } finally { setBusyNudge(null); }
+  }
 
   return (
     <div>
@@ -48,8 +67,10 @@ export function CrewView({
                 <div className="text-sm"><b>{n.from.name}</b> · {n.message}</div>
                 <div className="text-xs text-muted">{n.when}</div>
               </div>
-              <Link href="/new"><Button size="sm" variant="primary">Plan it</Button></Link>
-              <button onClick={() => setNudges((s) => s.filter((x) => x.id !== n.id))} className="text-muted"><X size={18} /></button>
+              <Button size="sm" variant="primary" disabled={busyNudge === n.id} onClick={() => respond(n.id, true)}>
+                {busyNudge === n.id ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Let&apos;s plan
+              </Button>
+              <button onClick={() => respond(n.id, false)} disabled={busyNudge === n.id} className="text-muted" aria-label="Dismiss nudge"><X size={18} /></button>
             </Card>
           ))}
         </div>

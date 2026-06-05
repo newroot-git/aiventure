@@ -64,13 +64,16 @@ export default async function HomePage() {
               </Link>
             ))}
             {nudges.length > 0 && (
-              <Card className="flex items-center gap-3 p-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/img/icons/nudge.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink object-cover" />
-                <div className="min-w-0 flex-1 text-sm">
-                  <b>{nudges.length} nudge{nudges.length > 1 ? "s" : ""}</b> waiting · <span className="text-muted">tap the inbox to respond</span>
-                </div>
-              </Card>
+              <Link href="/groups">
+                <Card className="flex items-center gap-3 p-3 transition active:scale-[0.99]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/img/icons/nudge.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink object-cover" />
+                  <div className="min-w-0 flex-1 text-sm">
+                    <b>{nudges.length} nudge{nudges.length > 1 ? "s" : ""}</b> waiting · <span className="text-muted">tap to respond</span>
+                  </div>
+                  <ChevronRight size={18} className="shrink-0 text-muted" />
+                </Card>
+              </Link>
             )}
           </div>
         </>

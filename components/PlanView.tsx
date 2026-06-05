@@ -43,6 +43,12 @@ import type { PlanScaffoldSlot, PlanRecurrence, DateOption } from "@/lib/db";
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TIMES = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "16:00", "18:00", "19:00", "20:00", "21:00", "22:00"];
 
+// a private/personal spot ("my house", "home") shouldn't get a map pin
+function isPersonalPlace(s?: string): boolean {
+  if (!s) return false;
+  return /\b(my|your|our|their|his|her)\s+(house|home|place|flat|apartment|gaff|yard|garden|pad)\b/i.test(s) || /^(home|mine|yours)$/i.test(s.trim());
+}
+
 function fmtDate(iso?: string | null) {
   if (!iso) return null;
   return new Date(iso).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
@@ -230,8 +236,12 @@ export function PlanView({
     () => slots
       .map((s) => {
         if (!s.chosen) return null;
+        // only pin real venues — a private/personal spot (e.g. "my house") has no
+        // Maps link, so don't drop a random pin for it.
+        if (!s.chosen.source_url) return null;
         const p = (s.chosen.payload ?? {}) as Record<string, unknown>;
         const place = (p.place_name as string) || s.chosen.title;
+        if (isPersonalPlace(place)) return null;
         const sub = s.chosen.subtitle ?? "";
         const hint = sub.includes("·") ? sub.split("·").pop()!.trim() : "";
         return place ? { label: s.chosen.title, place: place as string, hint } : null;
