@@ -46,24 +46,30 @@ const CSS = `
 .lp .btn-gold{background:var(--gold); color:var(--ink);
   box-shadow:var(--shadow), inset 0 3px 0 rgba(255,255,255,.45), inset 0 -3px 0 rgba(0,0,0,.16)}
 
-.lp .hero{position:relative; min-height:92vh; display:flex; align-items:center; justify-content:flex-start;
-  border-bottom-left-radius:26px; border-bottom-right-radius:26px; overflow:hidden; background:#241F33}
-.lp .hero-img{position:absolute; inset:-4% 0 0 0; width:100%; height:108%; object-fit:cover;
-  object-position:center 46%; z-index:0}
-/* hero copy lives in a left-weighted retro screen over the full-colour image */
-.lp .hero-screen{position:relative; z-index:4; margin:0 0 0 clamp(16px,6vw,96px); width:min(90vw,520px)}
-.lp .hero-screen-body{position:relative; z-index:2; padding:24px 28px 30px; text-align:left; color:#fff}
-.lp .hero .eyebrow{color:#fff; border:2px solid rgba(255,255,255,.28); background:rgba(255,255,255,.07);
+/* hero = a contained retro monitor (bordered, not full-bleed) so the art stays crisp */
+.lp .hero{position:relative; display:flex; justify-content:center; align-items:center;
+  padding:clamp(52px,8vh,94px) clamp(16px,5vw,56px) 42px}
+.lp .hero-monitor{width:100%; max-width:1140px}
+.lp .hero-screen{position:relative; border-radius:9px; overflow:hidden; aspect-ratio:16/9}
+.lp .hero-img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 48%}
+.lp .hero-copy{position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center;
+  align-items:flex-start; text-align:left; color:#fff; padding:clamp(22px,4vw,54px);
+  background:linear-gradient(90deg, rgba(20,17,28,.82) 0%, rgba(20,17,28,.5) 40%, transparent 68%)}
+.lp .hero .eyebrow{color:#fff; border:2px solid rgba(255,255,255,.3); background:rgba(255,255,255,.08);
   padding:6px 12px; border-radius:7px}
-.lp .hero h1{font-size:clamp(38px,6vw,56px); margin-top:18px; color:#fff; text-shadow:3px 3px 0 rgba(0,0,0,.55)}
+.lp .hero h1{font-size:clamp(34px,4.6vw,58px); margin-top:16px; color:#fff; text-shadow:3px 3px 0 rgba(0,0,0,.55)}
 .lp .hero h1 b{color:var(--gold); font-weight:700}
-.lp .hero p.sub{max-width:none; margin:16px 0 0; font-size:16px; font-weight:600;
-  color:rgba(255,255,255,.92); line-height:1.55}
-.lp .hero .cta{display:flex; gap:14px; justify-content:flex-start; flex-wrap:wrap; margin-top:26px}
-.lp .trust{margin-top:14px; font-size:12.5px; color:rgba(255,255,255,.72); font-weight:600; letter-spacing:.3px}
+.lp .hero p.sub{max-width:430px; margin:14px 0 0; font-size:clamp(14px,1.5vw,17px); font-weight:600;
+  color:rgba(255,255,255,.92); line-height:1.5}
+.lp .hero .cta{display:flex; gap:14px; justify-content:flex-start; flex-wrap:wrap; margin-top:24px}
+.lp .trust{margin-top:13px; font-size:12px; color:rgba(255,255,255,.72); font-weight:600; letter-spacing:.3px}
 @media(max-width:680px){
-  .lp .hero{justify-content:center}
-  .lp .hero-screen{margin:0 14px; width:auto; max-width:100%}
+  .lp .hero{padding:28px 14px}
+  .lp .hero-screen{aspect-ratio:4/5}
+  .lp .hero-copy{justify-content:flex-end; align-items:center; text-align:center;
+    background:linear-gradient(0deg, rgba(20,17,28,.92) 0%, rgba(20,17,28,.5) 46%, rgba(20,17,28,.15) 100%)}
+  .lp .hero p.sub{max-width:none}
+  .lp .hero .cta{justify-content:center}
 }
 
 .lp section.band{padding:96px 0; position:relative; z-index:2}
@@ -248,21 +254,7 @@ export default function Home() {
       { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
     );
     root.querySelectorAll(".reveal").forEach((el) => io.observe(el));
-
-    // the app scrolls inside #app-scroll, not the window
-    const scroller: HTMLElement | Window = document.getElementById("app-scroll") ?? window;
-    let ticking = false;
-    const onScroll = () => {
-      if (ticking) return;
-      ticking = true;
-      requestAnimationFrame(() => {
-        const y = scroller instanceof Window ? window.scrollY : scroller.scrollTop;
-        if (heroRef.current) heroRef.current.style.transform = `translateY(${y * 0.08}px)`;
-        ticking = false;
-      });
-    };
-    scroller.addEventListener("scroll", onScroll, { passive: true });
-    return () => { io.disconnect(); scroller.removeEventListener("scroll", onScroll); };
+    return () => io.disconnect();
   }, []);
 
   return (
@@ -271,23 +263,20 @@ export default function Home() {
 
       {/* HERO */}
       <header className="hero">
-        <img className="hero-img" ref={heroRef} src="/img/hero-cliff-2.png" alt="" />
-        <div className="stars" aria-hidden="true">
-          {Array.from({ length: 16 }).map((_, i) => (
-            <i key={i} className="star" style={{ left: `${(i * 53 + 9) % 100}%`, top: `${(i * 29 + 4) % 36}%`, animationDelay: `${(i % 7) * 0.42}s` }} />
-          ))}
-        </div>
-        <div className="screen hero-screen">
-          <div className="screen-bar"><i className="led" /><i className="led" /><i className="led" /><em>Title screen</em></div>
-          <div className="hero-screen-body">
-            <span className="eyebrow">◇ The anti-social-media app</span>
-            <h1>Less scrolling.<br />More <b>living</b>.</h1>
-            <p className="sub">AIventure turns “we should hang out” into a real plan — and your crew out the door. Then it remembers it for you.</p>
-            <div className="cta">
-              <Link className="btn btn-gold" href="/signin" onPointerDown={blip}>Start an adventure</Link>
+        <div className="screen hero-monitor">
+          <div className="screen-bar"><i className="led" /><i className="led" /><i className="led" /><em>AIventure · title screen</em></div>
+          <div className="hero-screen">
+            <img className="hero-img" ref={heroRef} src="/img/hero-cliff-3.png" alt="" />
+            <div className="hero-copy">
+              <span className="eyebrow">◇ The anti-social-media app</span>
+              <h1>Less scrolling.<br />More <b>living</b>.</h1>
+              <p className="sub">AIventure turns “we should hang out” into a real plan — and your crew out the door. Then it remembers it for you.</p>
+              <div className="cta">
+                <Link className="btn btn-gold" href="/signin" onPointerDown={blip}>Start an adventure</Link>
+              </div>
+              <div className="pressstart">▶ Press start</div>
+              <p className="trust">Free to join any plan · No download · No feed</p>
             </div>
-            <div className="pressstart">▶ Press start</div>
-            <p className="trust">Free to join any plan · No download · No feed</p>
           </div>
         </div>
       </header>

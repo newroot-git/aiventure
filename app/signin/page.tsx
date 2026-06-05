@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Mail, ArrowLeft, Loader2, Sparkles, Lock } from "lucide-react";
 import { Button, Input, Wordmark } from "@/components/ui";
-import { PixelScene } from "@/components/PixelScene";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 type Mode = "password" | "code";
@@ -95,12 +94,24 @@ export default function SignIn() {
 
   return (
     <main className="flex flex-1 flex-col">
-      <PixelScene className="min-h-[34vh] rounded-b-2xl">
-        <div className="flex min-h-[34vh] flex-col items-center justify-center px-6 text-center text-white">
-          <Wordmark className="text-4xl" onAccent />
-          <p className="mt-2 font-semibold text-white/85">Get out of the group chat.</p>
+      <div className="mx-auto mt-6 w-full max-w-sm px-6">
+        <div className="rounded-xl border-[3px] border-ink bg-night p-2 shadow-hard">
+          <div className="flex items-center gap-1.5 px-1 pb-1.5">
+            <span className="h-2 w-2 rounded-full bg-primary" />
+            <span className="h-2 w-2 rounded-full bg-accent" />
+            <span className="h-2 w-2 rounded-full bg-success" />
+            <span className="ml-auto font-display text-[10px] uppercase tracking-wider text-white/50">AIventure</span>
+          </div>
+          <div className="relative overflow-hidden rounded-md">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/img/hero-cliff-3.png" alt="" className="block aspect-[16/10] w-full object-cover" />
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-night/75 to-transparent p-3 text-center text-white">
+              <Wordmark className="text-2xl" onAccent />
+              <p className="text-[13px] font-semibold text-white/85">Get out of the group chat.</p>
+            </div>
+          </div>
         </div>
-      </PixelScene>
+      </div>
 
       <section className="mx-auto w-full max-w-sm px-6 py-10">
         <Link href="/" className="inline-flex items-center gap-1 text-sm font-bold text-muted">
