@@ -29,16 +29,22 @@ function loadLeaflet(): Promise<unknown> {
   return leafletPromise;
 }
 
+// Module-level cache: the same area/place is geocoded across many plan views and
+// re-renders. Caching by query string avoids hammering Nominatim (which rate-limits).
+const geoCache = new Map<string, { lat: number; lng: number } | null>();
 async function nominatim(q: string): Promise<{ lat: number; lng: number } | null> {
+  if (geoCache.has(q)) return geoCache.get(q) ?? null;
+  let result: { lat: number; lng: number } | null = null;
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`,
       { headers: { "Accept-Language": "en" } },
     );
     const j = await res.json();
-    if (Array.isArray(j) && j[0]) return { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon) };
+    if (Array.isArray(j) && j[0]) result = { lat: parseFloat(j[0].lat), lng: parseFloat(j[0].lon) };
   } catch {}
-  return null;
+  geoCache.set(q, result);
+  return result;
 }
 
 function near(a: { lat: number; lng: number }, b: { lat: number; lng: number }, deg = 1.2) {
@@ -63,14 +69,28 @@ async function geocodePin(
 }
 
 export function PlanMap({ pins, area }: { pins: Pin[]; area?: string | null }) {
+  const boxRef = React.useRef<HTMLDivElement>(null);
   const ref = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<unknown>(null);
   const [state, setState] = React.useState<"loading" | "ready" | "empty">("loading");
+  // Defer the ~100kB Leaflet JS/CSS + geocoding until the map scrolls into view.
+  // Most plan visits never reach the map, so loading it eagerly was wasted weight.
+  const [armed, setArmed] = React.useState(false);
 
   // stable key so we only re-geocode when the set of places changes
   const key = pins.map((p) => p.place).join("|");
 
   React.useEffect(() => {
+    if (armed || !boxRef.current) return;
+    const obs = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) { setArmed(true); obs.disconnect(); }
+    }, { rootMargin: "200px" });
+    obs.observe(boxRef.current);
+    return () => obs.disconnect();
+  }, [armed]);
+
+  React.useEffect(() => {
+    if (!armed) return;
     let cancelled = false;
     (async () => {
       setState("loading");
@@ -128,14 +148,14 @@ export function PlanMap({ pins, area }: { pins: Pin[]; area?: string | null }) {
       cancelled = true;
       if (mapRef.current) { (mapRef.current as { remove: () => void }).remove(); mapRef.current = null; }
     };
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, armed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="relative isolate z-0 overflow-hidden rounded-2xl border-2 border-ink/10">
+    <div ref={boxRef} className="relative isolate z-0 overflow-hidden rounded-2xl border-2 border-ink/10">
       <div ref={ref} className="h-52 w-full bg-surface-2" />
       {state !== "ready" && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-surface-2/80 text-sm font-bold text-muted">
-          {state === "loading" ? (
+          {armed && state === "loading" ? (
             <span className="inline-flex items-center gap-2"><Loader2 size={16} className="animate-spin" /> Mapping your stops…</span>
           ) : (
             <span className="inline-flex items-center gap-2"><MapPin size={16} /> Pin a few stops to see them mapped</span>

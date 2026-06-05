@@ -414,11 +414,14 @@ export async function getUserPlans(): Promise<PlanCard[]> {
   return cards;
 }
 
-export async function getCurrentProfile(): Promise<Profile | null> {
+// cache()-wrapped: the shell layout and the page it renders both call these inbox
+// getters in the same request. cache() dedups so each runs once per navigation
+// instead of double-hitting Supabase.
+export const getCurrentProfile = cache(async (): Promise<Profile | null> => {
   const db = supabaseAdmin();
   const { data } = await db.from("profiles").select("*").eq("id", await currentUserId()).maybeSingle();
   return mapProfile(data as Row | null);
-}
+});
 
 /** Update the current user's own profile (onboarding / profile edit). */
 export async function updateMyProfile(patch: { name?: string; interests?: string[]; interest_notes?: string; home_area?: string }): Promise<void> {
@@ -1096,16 +1099,16 @@ export async function getOpenEvents(): Promise<OpenEventCard[]> {
   // }));
 }
 
-export async function getNudges(): Promise<NudgeCard[]> {
+export const getNudges = cache(async (): Promise<NudgeCard[]> => {
   const db = supabaseAdmin();
   const { data } = await db.from("nudges").select("*, from:profiles!from_id(*)").eq("to_id", await currentUserId()).eq("status", "pending").order("created_at", { ascending: false });
   return ((data as Row[]) ?? []).map((n) => ({
     id: n.id as string, from: mapProfile(n.from as Row) ?? ({ name: "Someone" } as Profile),
     message: n.message as string, when: (n.when_text as string) ?? "",
   }));
-}
+});
 
-export async function getInvites(): Promise<InviteCard[]> {
+export const getInvites = cache(async (): Promise<InviteCard[]> => {
   const db = supabaseAdmin();
   const { data } = await db.from("invites").select("*").eq("to_id", await currentUserId()).order("created_at", { ascending: false });
   return ((data as Row[]) ?? []).map((i) => ({
@@ -1113,16 +1116,16 @@ export async function getInvites(): Promise<InviteCard[]> {
     activity: (i.activity as string) ?? "", slug: (i.plan_slug as string) ?? "wild-otter-42",
     dateLabel: (i.date_label as string) ?? "", cover: (i.cover as string) ?? "/img/cover-hike.png",
   }));
-}
+});
 
-export async function getNotifications(): Promise<NotificationCard[]> {
+export const getNotifications = cache(async (): Promise<NotificationCard[]> => {
   const db = supabaseAdmin();
   const { data } = await db.from("notifications").select("*").eq("profile_id", await currentUserId()).eq("acknowledged", false).order("created_at", { ascending: false });
   return ((data as Row[]) ?? []).map((n) => ({
     id: n.id as string, text: n.text as string, when: (n.when_text as string) ?? "",
     slug: (n.plan_slug as string) ?? undefined, kind: (n.kind as string) ?? undefined,
   }));
-}
+});
 
 // ---------- writes: notifications, nudges, poke, mark-read ----------
 

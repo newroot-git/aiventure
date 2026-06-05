@@ -1,8 +1,8 @@
 "use client";
 import * as React from "react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Users, CalendarDays, Compass, ChevronsUpDown } from "lucide-react";
+import { Home, Users, CalendarDays, Compass, ChevronsUpDown, Loader2 } from "lucide-react";
 import { Avatar } from "./ui";
 import { QuickMenu } from "./QuickMenu";
 import { NotificationsMenu, type NotifData } from "./NotificationsMenu";
@@ -153,6 +153,14 @@ function ProfileSwitcher({ me, profiles, compact }: { me: Profile; profiles: Pro
   );
 }
 
+// Pending indicator — reads the enclosing <Link>'s navigation status so the tab the
+// user clicked shows a spinner the instant they click, before the new page streams in.
+function LinkPending({ className = "" }: { className?: string }) {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return <Loader2 size={16} className={`animate-spin text-primary ${className}`} aria-label="Loading" />;
+}
+
 function SideLink({
   href,
   label,
@@ -175,6 +183,7 @@ function SideLink({
     >
       <Icon size={20} />
       {label}
+      <LinkPending className="ml-auto" />
       {badge ? (
         <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1 text-xs font-bold text-white">
           {badge}
@@ -202,7 +211,10 @@ function NavItem({
         active ? "text-primary" : "text-muted"
       }`}
     >
-      <Icon size={22} />
+      <span className="relative grid place-items-center">
+        <Icon size={22} />
+        <span className="absolute -right-3 -top-1"><LinkPending /></span>
+      </span>
       {label}
     </Link>
   );
