@@ -1,5 +1,6 @@
 "use client";
 import * as React from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
@@ -30,6 +31,10 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
   const [nudges, setNudges] = React.useState(data.nudges);
   const [notes, setNotes] = React.useState(data.notifications);
   const [busyNudge, setBusyNudge] = React.useState<string | null>(null);
+  // portal the overlay to <body> so it can't be trapped under page content by an
+  // ancestor stacking context / transform (the app-shell). mounted guard for SSR.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
 
   // Poll the inbox so new nudges/invites/notifications appear without a navigation
   // (no realtime push yet). Pause while the panel is open so items don't shuffle
@@ -93,6 +98,7 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
         </button>
       )}
 
+      {mounted && createPortal(
       <AnimatePresence>
         {open && (
           <>
@@ -162,7 +168,9 @@ export function NotificationsMenu({ variant = "icon", data }: { variant?: "icon"
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body,
+      )}
     </>
   );
 }

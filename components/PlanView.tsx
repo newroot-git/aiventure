@@ -336,6 +336,21 @@ export function PlanView({
     setOptPlan((p) => ({ ...p, starts_at: iso }));
     persist({ action: "when", startsAt: iso }, () =>
       setOptPlan((p) => { const n = { ...p }; delete n.starts_at; return n; }));
+    // if recurring, re-anchor the cadence to the new date (weekday/monthday/time).
+    // The repeat instances are only created on lock-in, so this just keeps the
+    // recurrence in sync with the chosen date until then.
+    if (effRecurrence) {
+      const d = new Date(iso);
+      const next: PlanRecurrence = {
+        ...effRecurrence,
+        weekday: d.getDay(),
+        monthday: d.getDate(),
+        time: d.toTimeString().slice(0, 5),
+        anchor: iso.slice(0, 10),
+      };
+      setOptRec({ set: true, val: next });
+      void persist({ action: "recurrence", recurrence: next });
+    }
   };
   async function doInvite() {
     if (!pickedFriends.length) return;
@@ -565,20 +580,18 @@ export function PlanView({
       {/* when — own full row (recurring folded in as a toggle) */}
       <div className="mt-4 flex flex-col gap-3">
         <Section icon={<Clock size={15} />} label={effRecurrence ? "Repeats" : "When"} tone="accent">
-          {effRecurrence ? (
-            <div className="font-bold leading-tight">
+          {/* date is always shown + editable, even when recurring — changing it re-anchors the cadence */}
+          <div className="font-bold leading-tight">{fmtDate(effPlan.starts_at) ?? (isOwner ? "Pick a time" : "TBC")}</div>
+          {fmtTime(effPlan.starts_at) && <div className="text-sm text-muted">{fmtTime(effPlan.starts_at)}</div>}
+          {effRecurrence && (
+            <div className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-secondary">
+              <Repeat size={13} />
               {effRecurrence.cadence === "monthly"
-                ? `Monthly · ${ordinal(effRecurrence.monthday ?? 1)}`
-                : `${effRecurrence.cadence === "biweekly" ? "Fortnightly" : "Weekly"} · ${WEEKDAYS[effRecurrence.weekday]}`}
-              {effRecurrence.time ? ` · ${effRecurrence.time}` : ""}
+                ? `Repeats monthly · ${ordinal(effRecurrence.monthday ?? 1)}`
+                : `Repeats ${effRecurrence.cadence === "biweekly" ? "fortnightly" : "weekly"} · ${WEEKDAYS[effRecurrence.weekday]}`}
             </div>
-          ) : (
-            <>
-              <div className="font-bold leading-tight">{fmtDate(effPlan.starts_at) ?? (isOwner ? "Pick a time" : "TBC")}</div>
-              {fmtTime(effPlan.starts_at) && <div className="text-sm text-muted">{fmtTime(effPlan.starts_at)}</div>}
-              {isOwner && planning && <WhenPicker value={effPlan.starts_at} onChange={setWhenDate} />}
-            </>
           )}
+          {isOwner && planning && <WhenPicker value={effPlan.starts_at} onChange={setWhenDate} />}
           {isOwner && planning && (
             <RecurringToggle recurrence={effRecurrence} defaultStart={effPlan.starts_at} onChange={toggleRecurring} />
           )}
