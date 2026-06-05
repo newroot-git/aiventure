@@ -253,58 +253,64 @@ export function WhenPicker({
       {open && (
         <>
           <div className="fixed inset-0 z-40 bg-ink/20 backdrop-blur-[1px]" onClick={done} />
-          <div className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,380px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-ink bg-surface p-4 shadow-hard">
-            <div className="mb-3 flex items-center justify-between">
-              <button type="button" onClick={() => shift(-1)} className="grid h-9 w-9 place-items-center rounded-md border-2 border-line text-ink hover:border-primary">‹</button>
-              <span className="font-display text-base font-bold">{MO[view.m]} {view.y}</span>
-              <button type="button" onClick={() => shift(1)} className="grid h-9 w-9 place-items-center rounded-md border-2 border-line text-ink hover:border-primary">›</button>
-            </div>
-            {multiple && <p className="mb-2 text-center text-xs font-bold text-muted">Tap the days that work — then Done.</p>}
-            <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-bold text-muted">
-              {WK.map((d, i) => <div key={i}>{d}</div>)}
-            </div>
-            <div className="mt-1.5 grid grid-cols-7 gap-1.5">
-              {cells.map((d, i) =>
-                d === null ? <div key={i} /> : (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => clickDay(d)}
-                    className={cx(
-                      "grid aspect-square place-items-center rounded-md border-2 text-sm font-bold transition",
-                      (multiple ? isPicked(d) : day === d)
-                        ? "border-ink bg-primary text-white"
-                        : isToday(d)
-                          ? "border-primary text-primary-deep"
-                          : "border-transparent text-ink hover:bg-surface-2",
-                    )}
-                  >
-                    {d}
-                  </button>
-                ),
-              )}
-            </div>
-            <div className="mt-4 border-t-2 border-line pt-3">
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Time{multiple ? " (applies to all selected)" : ""}</div>
-              <div className="flex flex-wrap gap-2">
-                {TIMES.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => { setTime(t); if (!multiple && day) onChange?.(isoFor(day, t)); }}
-                    className={cx(
-                      "rounded-md border-2 px-3 py-1.5 text-sm font-bold transition",
-                      time === t ? "border-ink bg-secondary text-white" : "border-line text-ink hover:border-secondary",
-                    )}
-                  >
-                    {t}
-                  </button>
-                ))}
+          <div className="fixed left-1/2 top-1/2 z-50 flex max-h-[88dvh] w-[min(92vw,380px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border-2 border-ink bg-surface shadow-hard">
+            {/* scrolls if it's taller than the screen so the Done button stays reachable */}
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <button type="button" onClick={() => shift(-1)} className="grid h-9 w-9 place-items-center rounded-md border-2 border-line text-ink hover:border-primary">‹</button>
+                <span className="font-display text-base font-bold">{MO[view.m]} {view.y}</span>
+                <button type="button" onClick={() => shift(1)} className="grid h-9 w-9 place-items-center rounded-md border-2 border-line text-ink hover:border-primary">›</button>
+              </div>
+              {multiple && <p className="mb-2 text-center text-xs font-bold text-muted">Tap the days that work — then Done.</p>}
+              <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] font-bold text-muted">
+                {WK.map((d, i) => <div key={i}>{d}</div>)}
+              </div>
+              <div className="mt-1.5 grid grid-cols-7 gap-1.5">
+                {cells.map((d, i) =>
+                  d === null ? <div key={i} /> : (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => clickDay(d)}
+                      className={cx(
+                        "grid aspect-square place-items-center rounded-md border-2 text-sm font-bold transition",
+                        (multiple ? isPicked(d) : day === d)
+                          ? "border-ink bg-primary text-white"
+                          : isToday(d)
+                            ? "border-primary text-primary-deep"
+                            : "border-transparent text-ink hover:bg-surface-2",
+                      )}
+                    >
+                      {d}
+                    </button>
+                  ),
+                )}
+              </div>
+              <div className="mt-4 border-t-2 border-line pt-3">
+                <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Time{multiple ? " (applies to all selected)" : ""}</div>
+                {/* single horizontal-scroll row → keeps the picker short on mobile */}
+                <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                  {TIMES.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => { setTime(t); if (!multiple && day) onChange?.(isoFor(day, t)); }}
+                      className={cx(
+                        "shrink-0 rounded-md border-2 px-3 py-1.5 text-sm font-bold transition",
+                        time === t ? "border-ink bg-secondary text-white" : "border-line text-ink hover:border-secondary",
+                      )}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-            <Button variant="primary" size="md" className="mt-4 w-full" onClick={done}>
-              {multiple ? (picked.length ? `Add ${picked.length} date${picked.length > 1 ? "s" : ""}` : "Done") : (day ? "Done" : "Pick a day")}
-            </Button>
+            <div className="flex-none border-t-2 border-line p-3">
+              <Button variant="primary" size="md" className="w-full" onClick={done}>
+                {multiple ? (picked.length ? `Add ${picked.length} date${picked.length > 1 ? "s" : ""}` : "Done") : (day ? "Done" : "Pick a day")}
+              </Button>
+            </div>
           </div>
         </>
       )}

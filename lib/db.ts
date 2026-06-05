@@ -70,12 +70,41 @@ const COVER_CATS = new Set([
   "pub", "bar", "cocktails", "wine", "coffee", "brunch", "food", "roast", "bbq", "market", "streetfood",
   "gig", "festival", "cinema", "theatre", "comedy", "gallery", "museum", "music",
   "games", "arcade", "bowling", "karaoke",
-  "park", "city", "trip", "spa", "dance",
+  "park", "city", "trip", "spa", "dance", "train",
 ]);
 // cover_hue stores a tile/category key for AI plans → map to its cover image
 function deriveCover(hue?: string | null): string | null {
   if (!hue) return null;
   return COVER_CATS.has(hue) ? `/img/cover-${hue}.png` : "/img/cover-park.png";
+}
+
+// Pick a cover for a self-built plan from its description; if it's not obvious, pick a
+// varied one (so unspecified plans aren't all the same "city" image).
+const COVER_ALIASES: [RegExp, string][] = [
+  [/\bhik|trail|summit\b/, "hike"], [/\bwalk|stroll|ramble/, "walk"], [/\bclimb|boulder/, "climb"],
+  [/\bcycl|bike|ride\b/, "cycle"], [/\brun\b|jog/, "run"], [/\bsurf/, "surf"], [/\bswim|lido|wild swim/, "swim"],
+  [/\bkayak|canoe|paddle/, "kayak"], [/\bski|snowboard/, "ski"], [/\bgolf/, "golf"], [/\btennis|padel/, "tennis"],
+  [/\bfootball|soccer|five-a-side/, "football"], [/\byoga|pilates/, "yoga"], [/\bcamp/, "camp"],
+  [/\bbeach|coast|seaside|sea\b/, "beach"], [/\bstar|night sky/, "stargazing"], [/\bfish/, "fishing"],
+  [/\bpub|quiz/, "pub"], [/\bbar\b|drinks|pint/, "bar"], [/\bcocktail/, "cocktails"], [/\bwine/, "wine"],
+  [/\bcoffee|cafe|café|espresso/, "coffee"], [/\bbrunch/, "brunch"], [/\broast/, "roast"], [/\bbbq|barbecue|grill/, "bbq"],
+  [/\bmarket/, "market"], [/\bstreet food|food truck/, "streetfood"], [/\bdinner|lunch|eat|restaurant|food|meal/, "food"],
+  [/\bgig|concert|live music|band/, "gig"], [/\bfestival/, "festival"], [/\bcinema|film|movie/, "cinema"],
+  [/\btheatre|theater|play\b/, "theatre"], [/\bcomedy|stand-?up/, "comedy"], [/\bgaller/, "gallery"],
+  [/\bmuseum/, "museum"], [/\bmusic/, "music"], [/\bboard game|tabletop|d&d|dnd/, "games"], [/\barcade/, "arcade"],
+  [/\bbowl/, "bowling"], [/\bkaraoke/, "karaoke"], [/\bpark|picnic/, "park"], [/\btrip|away|weekend|getaway/, "trip"],
+  [/\bspa|sauna|wellness/, "spa"], [/\bdance|club/, "dance"],
+  [/\btrain|rail|by train/, "train"],
+];
+const GENERIC_COVERS = ["park", "coffee", "food", "walk", "gig", "market", "trip", "beach", "camp", "city", "bar"];
+function coverFromIntent(intent?: string): string {
+  const t = (intent ?? "").toLowerCase();
+  for (const [re, cover] of COVER_ALIASES) if (re.test(t)) return cover;
+  // not obvious → varied (seed on the text, or the clock for an empty intent, so
+  // unspecified plans get different covers rather than all defaulting to one)
+  const seed = t.trim() || String(Date.now());
+  let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return GENERIC_COVERS[h % GENERIC_COVERS.length];
 }
 
 // A plan carries one meta row (kind='time', title='__meta') holding the slot
@@ -173,7 +202,8 @@ export async function createPlanFromDrop(input: DropInput & CreateExtras): Promi
   const scaffold = aiBuild ? scaffoldFromSlots(slots) : defaultScaffold(input.scope, input.nights);
   const slug = planSlug(`${Date.now()}-${input.intent}`);
 
-  const firstTile = slots[0]?.options[0]?.tile ?? "city";
+  // AI build → first option's tile; self-build → infer from the intent (varied, not "city")
+  const firstTile = slots[0]?.options[0]?.tile ?? coverFromIntent(input.intent);
   const { data: plan, error } = await db
     .from("plans")
     .insert({
