@@ -1,6 +1,6 @@
 "use client";
 import * as React from "react";
-import { MapPin, Loader2 } from "lucide-react";
+import { MapPin, Loader2, Plus, Minus, LocateFixed } from "lucide-react";
 
 // Multi-pin map using Leaflet + OpenStreetMap tiles (no API key).
 // Geocodes each chosen activity via Nominatim and drops a numbered pin.
@@ -72,6 +72,7 @@ export function PlanMap({ pins, area }: { pins: Pin[]; area?: string | null }) {
   const boxRef = React.useRef<HTMLDivElement>(null);
   const ref = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<unknown>(null);
+  const recenterRef = React.useRef<(() => void) | null>(null);
   const [state, setState] = React.useState<"loading" | "ready" | "empty">("loading");
   // Defer the ~100kB Leaflet JS/CSS + geocoding until the map scrolls into view.
   // Most plan visits never reach the map, so loading it eagerly was wasted weight.
@@ -123,7 +124,8 @@ export function PlanMap({ pins, area }: { pins: Pin[]; area?: string | null }) {
       if (mapRef.current) { (mapRef.current as { remove: () => void }).remove(); mapRef.current = null; }
       ref.current.innerHTML = "";
 
-      const map = L.map(ref.current, { scrollWheelZoom: false, attributionControl: false });
+      // default zoom control off — we render our own app-styled controls below
+      const map = L.map(ref.current, { scrollWheelZoom: false, attributionControl: false, zoomControl: false });
       mapRef.current = map;
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
 
@@ -140,8 +142,13 @@ export function PlanMap({ pins, area }: { pins: Pin[]; area?: string | null }) {
           .bindPopup(`<b>${i + 1}. ${p.label}</b><br/>${p.place}${p.approx ? "<br/><i>approx. area</i>" : ""}`);
         latlngs.push([p.lat, p.lng]);
       });
-      if (latlngs.length === 1) map.setView(latlngs[0], 14);
-      else map.fitBounds(latlngs, { padding: [30, 30] });
+      // fit to all stops — reused by the recenter button when you pan away
+      const fit = () => {
+        if (latlngs.length === 1) map.setView(latlngs[0], 14);
+        else map.fitBounds(latlngs, { padding: [30, 30] });
+      };
+      fit();
+      recenterRef.current = fit;
       setState("ready");
     })();
     return () => {
@@ -153,6 +160,14 @@ export function PlanMap({ pins, area }: { pins: Pin[]; area?: string | null }) {
   return (
     <div ref={boxRef} className="relative isolate z-0 overflow-hidden rounded-xl border-2 border-ink shadow-hard">
       <div ref={ref} className="h-52 w-full bg-surface-2" />
+      {/* app-styled map controls (above Leaflet panes via z-[1000], contained by isolate) */}
+      {state === "ready" && (
+        <div className="absolute right-2 top-2 z-[1000] flex flex-col gap-1.5">
+          <MapBtn label="Zoom in" onClick={() => (mapRef.current as { zoomIn: () => void } | null)?.zoomIn()}><Plus size={16} /></MapBtn>
+          <MapBtn label="Zoom out" onClick={() => (mapRef.current as { zoomOut: () => void } | null)?.zoomOut()}><Minus size={16} /></MapBtn>
+          <MapBtn label="Recenter on stops" onClick={() => recenterRef.current?.()}><LocateFixed size={16} /></MapBtn>
+        </div>
+      )}
       {state !== "ready" && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center bg-surface-2/80 text-sm font-bold text-muted">
           {armed && state === "loading" ? (
@@ -163,5 +178,20 @@ export function PlanMap({ pins, area }: { pins: Pin[]; area?: string | null }) {
         </div>
       )}
     </div>
+  );
+}
+
+// app-styled map control button (hard pixel shadow + press-sink)
+function MapBtn({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      className="grid h-8 w-8 place-items-center rounded-md border-2 border-ink bg-surface text-ink shadow-hard-sm transition active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+    >
+      {children}
+    </button>
   );
 }

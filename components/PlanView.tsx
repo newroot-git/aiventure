@@ -25,6 +25,7 @@ import {
   Repeat,
   Pencil,
   Hand,
+  ChevronDown,
 } from "lucide-react";
 import { Pill, Button, AvatarStack, Avatar } from "./ui";
 import { Reveal } from "./motion";
@@ -561,8 +562,8 @@ export function PlanView({
         </div>
       </div>
 
-      {/* when / where */}
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      {/* when — own full row (recurring folded in as a toggle) */}
+      <div className="mt-4 flex flex-col gap-3">
         <Section icon={<Clock size={15} />} label={effRecurrence ? "Repeats" : "When"} tone="accent">
           {effRecurrence ? (
             <div className="font-bold leading-tight">
@@ -577,6 +578,9 @@ export function PlanView({
               {fmtTime(effPlan.starts_at) && <div className="text-sm text-muted">{fmtTime(effPlan.starts_at)}</div>}
               {isOwner && planning && <WhenPicker value={effPlan.starts_at} onChange={setWhenDate} />}
             </>
+          )}
+          {isOwner && planning && (
+            <RecurringToggle recurrence={effRecurrence} defaultStart={effPlan.starts_at} onChange={toggleRecurring} />
           )}
         </Section>
         <Section icon={<MapPin size={15} />} label={multiStep ? "Area" : "Where"} tone="primary">
@@ -607,20 +611,6 @@ export function PlanView({
           )}
         </Section>
       </div>
-
-      {/* recurring — part of choosing the when (right under the date pickers) */}
-      {isOwner && planning && (
-        <div className="mt-3">
-          <RecurringControl recurrence={effRecurrence} defaultStart={effPlan.starts_at} onChange={toggleRecurring} />
-        </div>
-      )}
-      {!isOwner && effRecurrence && (
-        <div className="mt-3">
-          <Section icon={<Repeat size={15} />} label="Recurring" tone="secondary">
-            <p className="text-sm font-bold">{effRecurrence.cadence === "monthly" ? "Repeats monthly" : effRecurrence.cadence === "biweekly" ? "Repeats fortnightly" : "Repeats weekly"}</p>
-          </Section>
-        </div>
-      )}
 
       {/* multi-pin map for itineraries */}
       {pins.length >= 1 && <div className="mt-3"><PlanMap pins={pins} area={plan.place_address} /></div>}
@@ -680,11 +670,17 @@ export function PlanView({
             </span>
           </div>
           <RSVPControl value={rsvp} onChange={changeRsvp} />
-          {friends.length > 0 && (
-            <button onClick={() => setInviteOpen(true)} className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-primary">
-              <UserPlus size={15} /> Invite people
-            </button>
-          )}
+          {/* link = the invite. Always offer it (no-install join); friend-picker only if you have friends */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="soft" size="sm" onClick={copyLink}>
+              <Link2 size={15} /> {copied ? "Link copied" : "Copy invite link"}
+            </Button>
+            {friends.length > 0 && (
+              <Button variant="soft" size="sm" onClick={() => setInviteOpen(true)}>
+                <UserPlus size={15} /> Invite friends
+              </Button>
+            )}
+          </div>
         </Section>
       </div>
 
@@ -742,12 +738,16 @@ export function PlanView({
                           voteCount={voteCount} isVoted={isVoted} placeArea={plan.place_address}
                           onVote={vote} onChoose={choose} onDeleteOpt={deleteOpt}
                           onRefine={onRefine} onAddOwn={onAddOwn} onResolveAdd={onResolveAdd} onSetSlotTime={onSetSlotTime}
+                          onAddStep={(label) => addStep(d, label)}
                         />
                       </Reveal>
                     );
                   })}
                 </div>
-                {isOwner && planning && <AddStepBox onAdd={(label) => addStep(d, label)} />}
+                {/* add-step now lives per-step; only show a day-level add when the day is empty */}
+                {isOwner && planning && slots.filter((s) => s.day === d).length === 0 && (
+                  <AddStepBox onAdd={(label) => addStep(d, label)} />
+                )}
               </div>
             ));
           })()}
@@ -765,20 +765,15 @@ export function PlanView({
 
       {/* actions */}
       <section className="mt-6 flex flex-col gap-3">
-        <div className="flex gap-3">
-          <Button variant="soft" className="flex-1" onClick={copyLink}>
-            <Link2 size={17} /> {copied ? "Link copied" : "Invite"}
+        {calUrl ? (
+          <a href={calUrl} target="_blank" rel="noopener noreferrer" className="block">
+            <Button variant="soft" className="w-full"><CalendarDays size={17} /> Add to calendar</Button>
+          </a>
+        ) : (
+          <Button variant="soft" className="w-full" disabled title="Set a date first" aria-label="Set a date first to add to calendar">
+            <CalendarDays size={17} /> Add to calendar
           </Button>
-          {calUrl ? (
-            <a href={calUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
-              <Button variant="soft" className="w-full"><CalendarDays size={17} /> Calendar</Button>
-            </a>
-          ) : (
-            <Button variant="soft" className="flex-1" disabled title="Set a date first" aria-label="Set a date first to add to calendar">
-              <CalendarDays size={17} /> Calendar
-            </Button>
-          )}
-        </div>
+        )}
 
         {/* poke non-voters (owner, planning, others present) */}
         {isOwner && planning && members.length > 1 && (
@@ -873,9 +868,10 @@ export function PlanView({
 
 /* slot wrapper: numbered header + decided badge + time */
 function SlotShell({
-  slot, index, decided, time, children,
+  slot, index, decided, time, onRefresh, refreshing, children,
 }: {
-  slot: Slot; index: number; decided?: boolean; time?: string | null; children: React.ReactNode;
+  slot: Slot; index: number; decided?: boolean; time?: string | null;
+  onRefresh?: () => void; refreshing?: boolean; children: React.ReactNode;
 }) {
   return (
     <div>
@@ -885,11 +881,25 @@ function SlotShell({
         </span>
         <span className="font-heading text-base font-bold">{slot.label}</span>
         {time && <span className="inline-flex items-center gap-1 text-xs font-bold text-muted"><Clock size={11} /> {time}</span>}
-        {decided ? (
-          <Pill tone="success" className="ml-auto"><Check size={12} /> Set</Pill>
-        ) : (
-          <span className="ml-auto text-xs font-bold text-muted">Vote · pick one</span>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={refreshing}
+              title="Refresh options"
+              aria-label="Refresh these options"
+              className="inline-flex items-center gap-1 text-xs font-bold text-muted transition hover:text-ink disabled:opacity-50"
+            >
+              {refreshing ? <Loader2 size={13} className="animate-spin" /> : <RotateCw size={13} />}
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          )}
+          {decided ? (
+            <Pill tone="success"><Check size={12} /> Set</Pill>
+          ) : (
+            <span className="text-xs font-bold text-muted">Vote · pick one</span>
+          )}
+        </div>
       </div>
       {children}
     </div>
@@ -977,7 +987,7 @@ function AddStepBox({ onAdd }: { onAdd: (label: string) => void }) {
    refine-text state. Lives outside PlanView so React can bail re-renders. */
 const PlanSlot = React.memo(function PlanSlot({
   slot, index, isOwner, planning, working, voteCount, isVoted, placeArea,
-  onVote, onChoose, onDeleteOpt, onRefine, onAddOwn, onResolveAdd, onSetSlotTime,
+  onVote, onChoose, onDeleteOpt, onRefine, onAddOwn, onResolveAdd, onSetSlotTime, onAddStep,
 }: {
   slot: Slot; index: number; isOwner: boolean; planning: boolean; working: string | null;
   voteCount: (id: string) => number; isVoted: (id: string) => boolean; placeArea: string | null;
@@ -986,6 +996,7 @@ const PlanSlot = React.memo(function PlanSlot({
   onAddOwn: (slotKey: string, day: number, title: string, area?: string) => void;
   onResolveAdd: (slotKey: string, day: number, query: string) => void;
   onSetSlotTime: (slotKey: string, day: number, time: string | null) => void;
+  onAddStep: (label: string) => void;
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const decided = !!slot.chosen;
@@ -1008,19 +1019,29 @@ const PlanSlot = React.memo(function PlanSlot({
       <SlotShell slot={slot} index={index} decided time={chosenTime(slot)}>
         <OptionCard title={o.title} subtitle={o.subtitle} why={o.why} sourceUrl={o.source_url} sourceLabel={o.source_label} selected />
         {isOwner && planning && (
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <button onClick={() => setExpanded(true)} className="text-sm font-bold text-muted underline">
-              Change pick
-            </button>
-            <TimeChip value={chosenTime(slot)} onChange={(t) => onSetSlotTime(slot.key, slot.day, t)} />
-          </div>
+          <>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <button onClick={() => setExpanded(true)} className="text-sm font-bold text-muted underline">
+                Change pick
+              </button>
+              <TimeChip value={chosenTime(slot)} onChange={(t) => onSetSlotTime(slot.key, slot.day, t)} />
+            </div>
+            <SlotAddMenu
+              slot={slot} isOwner={isOwner} placeArea={placeArea} refining={refining}
+              onAddOwn={onAddOwn} onResolveAdd={onResolveAdd} onRefine={onRefine} onAddStep={onAddStep}
+            />
+          </>
         )}
       </SlotShell>
     );
   }
 
   return (
-    <SlotShell slot={slot} index={index} decided={decided}>
+    <SlotShell
+      slot={slot} index={index} decided={decided}
+      onRefresh={isOwner && planning && !empty ? () => onRefine(slot.key, slot.day, "", false) : undefined}
+      refreshing={refining}
+    >
       {empty ? (
         <div className="rounded-xl border-2 border-dashed border-line bg-surface-2/40 p-4 text-center">
           <p className="text-sm font-bold text-muted">Nothing here yet.</p>
@@ -1048,58 +1069,111 @@ const PlanSlot = React.memo(function PlanSlot({
 
       {planning && (
         <SlotAddMenu
-          slot={slot} isOwner={isOwner} empty={empty} placeArea={placeArea} refining={refining}
-          onAddOwn={onAddOwn} onResolveAdd={onResolveAdd} onRefine={onRefine}
+          slot={slot} isOwner={isOwner} placeArea={placeArea} refining={refining}
+          onAddOwn={onAddOwn} onResolveAdd={onResolveAdd} onRefine={onRefine} onAddStep={onAddStep}
         />
       )}
     </SlotShell>
   );
 });
 
-/* One consolidated "+ Add to this step" control: search a place, ask AI to find a
-   specific venue, or ask AI for ideas (which ADD to the step). Re-roll is separate. */
+/* Compact add controls under each step: two full-width buttons — "Add option"
+   (dropdown: your own place / ask AI) and "Add step". Collapsed by default so it
+   doesn't eat space. A full re-roll lives on the step's "Refresh" button. */
 function SlotAddMenu({
-  slot, isOwner, empty, placeArea, refining, onAddOwn, onResolveAdd, onRefine,
+  slot, isOwner, placeArea, refining, onAddOwn, onResolveAdd, onRefine, onAddStep,
 }: {
-  slot: Slot; isOwner: boolean; empty: boolean; placeArea: string | null; refining: boolean;
+  slot: Slot; isOwner: boolean; placeArea: string | null; refining: boolean;
   onAddOwn: (slotKey: string, day: number, title: string, area?: string) => void;
   onResolveAdd: (slotKey: string, day: number, query: string) => void;
   onRefine: (slotKey: string, day: number, feedback: string, append?: boolean) => void;
+  onAddStep: (label: string) => void;
 }) {
-  const [open, setOpen] = React.useState(false);
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="mt-3 inline-flex items-center gap-1.5 rounded-md border-2 border-dashed border-line px-3 py-2 text-sm font-bold text-primary transition hover:border-primary"
-      >
-        <Plus size={15} /> Add to this step
-      </button>
-    );
-  }
+  const [mode, setMode] = React.useState<null | "own" | "ai" | "step">(null);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const close = () => { setMode(null); setMenuOpen(false); };
+
   return (
-    <div className="mt-3 rounded-xl border-2 border-line bg-surface-2/40 p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wider text-muted">Add to this step</span>
-        <button onClick={() => setOpen(false)} className="text-muted" aria-label="Close"><X size={16} /></button>
+    <div className="mt-3">
+      {/* two buttons, one row */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <button
+            onClick={() => { setMenuOpen((o) => !o); }}
+            className="flex w-full items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-line px-3 py-2 text-sm font-bold text-primary transition hover:border-primary"
+          >
+            <Plus size={15} /> Add option <ChevronDown size={14} className={menuOpen ? "rotate-180 transition" : "transition"} />
+          </button>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setMenuOpen(false)} />
+              <div className="absolute left-0 right-0 z-40 mt-1 overflow-hidden rounded-md border-2 border-ink bg-surface shadow-hard-sm">
+                <button onClick={() => { setMode("own"); setMenuOpen(false); }} className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm font-bold hover:bg-surface-2">
+                  <MapPin size={14} className="text-primary" /> Add your own place
+                </button>
+                {isOwner && (
+                  <button onClick={() => { setMode("ai"); setMenuOpen(false); }} className="flex w-full items-center gap-2 border-t-2 border-line px-3 py-2.5 text-left text-sm font-bold hover:bg-surface-2">
+                    <Wand2 size={14} className="text-secondary" /> Ask AI for ideas
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+        {isOwner && (
+          <button
+            onClick={() => setMode((m) => (m === "step" ? null : "step"))}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-md border-2 border-dashed border-line px-3 py-2 text-sm font-bold text-ink transition hover:border-primary"
+          >
+            <Plus size={15} /> Add step
+          </button>
+        )}
       </div>
-      <PlaceSearch
-        area={placeArea}
-        onPick={(title, area) => onAddOwn(slot.key, slot.day, title, area)}
-        onAiFind={(q) => onResolveAdd(slot.key, slot.day, q)}
+
+      {/* the active input expands below, keeping things minimal until used */}
+      {mode && (
+        <div className="mt-2 rounded-xl border-2 border-line bg-surface-2/40 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-muted">
+              {mode === "step" ? "Add a step" : mode === "ai" ? "Ask AI for ideas" : "Add your own place"}
+            </span>
+            <button onClick={close} className="text-muted" aria-label="Close"><X size={16} /></button>
+          </div>
+          {mode === "own" && (
+            <PlaceSearch
+              area={placeArea}
+              onPick={(title, area) => onAddOwn(slot.key, slot.day, title, area)}
+              onAiFind={(q) => onResolveAdd(slot.key, slot.day, q)}
+            />
+          )}
+          {mode === "ai" && (
+            <SlotAskAi refining={refining} onAsk={(text) => onRefine(slot.key, slot.day, text, true)} />
+          )}
+          {mode === "step" && (
+            <StepInput onAdd={(label) => { onAddStep(label); close(); }} />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* self-stating add-a-step input */
+function StepInput({ onAdd }: { onAdd: (label: string) => void }) {
+  const [text, setText] = React.useState("");
+  const add = () => { const t = text.trim(); if (!t) return; onAdd(t); setText(""); };
+  return (
+    <div className="flex gap-2">
+      <input
+        autoFocus
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && add()}
+        placeholder="New step — e.g. Dessert, Nightcap…"
+        aria-label="Add a step"
+        className="w-full rounded-md border-2 border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-primary"
       />
-      {isOwner && (
-        <SlotAskAi refining={refining} onAsk={(text) => onRefine(slot.key, slot.day, text, true)} />
-      )}
-      {isOwner && !empty && (
-        <button
-          onClick={() => onRefine(slot.key, slot.day, "", false)}
-          disabled={refining}
-          className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-muted underline hover:text-ink disabled:opacity-60"
-        >
-          <RotateCw size={11} /> Replace all with fresh ideas
-        </button>
-      )}
+      <Button variant="soft" disabled={!text.trim()} onClick={add}><Plus size={16} /></Button>
     </div>
   );
 }
@@ -1135,11 +1209,14 @@ function ordinal(n: number) {
   const s = ["th", "st", "nd", "rd"], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
-function RecurringControl({
+// compact recurring toggle — lives INSIDE the When section (not its own section).
+// collapsed to a "Make recurring" link until used; expands to cadence chips.
+function RecurringToggle({
   recurrence, defaultStart, onChange,
 }: {
   recurrence: PlanRecurrence | null; defaultStart?: string | null; onChange: (r: PlanRecurrence | null) => void;
 }) {
+  const [open, setOpen] = React.useState(false);
   const base = defaultStart ? new Date(defaultStart) : new Date();
   const time = defaultStart ? base.toTimeString().slice(0, 5) : (recurrence?.time ?? null);
   function build(cadence: PlanRecurrence["cadence"]): PlanRecurrence {
@@ -1151,32 +1228,39 @@ function RecurringControl({
       anchor: recurrence?.anchor ?? base.toISOString().slice(0, 10),
     };
   }
-  const summary = recurrence
-    ? recurrence.cadence === "monthly"
-      ? `Repeats monthly on the ${ordinal(recurrence.monthday ?? base.getDate())}`
-      : `Repeats ${recurrence.cadence === "biweekly" ? "every two weeks" : "weekly"} on ${WEEKDAYS[recurrence.weekday]}`
-    : null;
+
+  if (!recurrence && !open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-secondary transition hover:text-ink">
+        <Repeat size={13} /> Make recurring
+      </button>
+    );
+  }
   return (
-    <Section icon={<Repeat size={15} />} label="Recurring" tone="secondary">
-      <p className="mb-3 text-sm text-muted">
-        {summary
-          ? `${summary}. Becomes real repeats when you lock in — each one independent.`
-          : "Make this a regular thing (e.g. climbing every week). Repeats are created when you lock in; people confirm each one."}
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="mt-3 border-t-2 border-line pt-3">
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted">
+        <Repeat size={12} /> Repeats
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">
         {CADENCES.map((c) => (
           <button
             key={c.id}
             onClick={() => onChange(build(c.id))}
-            className={`rounded-md border-2 px-3 py-1.5 text-sm font-bold transition ${recurrence?.cadence === c.id ? "border-ink bg-secondary text-white" : "border-line text-ink hover:border-secondary"}`}
+            className={`rounded-md border-2 px-2.5 py-1 text-xs font-bold transition ${recurrence?.cadence === c.id ? "border-ink bg-secondary text-white" : "border-line text-ink hover:border-secondary"}`}
           >
             {c.label}
           </button>
         ))}
-        {recurrence && (
-          <Button variant="soft" size="sm" className="ml-auto shrink-0 whitespace-nowrap" onClick={() => onChange(null)}>Turn off</Button>
-        )}
+        <button
+          onClick={() => { onChange(null); setOpen(false); }}
+          className="ml-auto text-xs font-bold text-muted underline transition hover:text-ink"
+        >
+          {recurrence ? "Off" : "Cancel"}
+        </button>
       </div>
-    </Section>
+      {recurrence && (
+        <p className="mt-2 text-xs text-muted">Real repeats are created when you lock in — each one independent.</p>
+      )}
+    </div>
   );
 }
