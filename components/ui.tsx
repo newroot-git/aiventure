@@ -181,15 +181,12 @@ export function AvatarStack({
   return (
     <div className="flex items-center">
       <div className="flex -space-x-2">
-        {shown.map((p, i) =>
-          p.pending ? (
-            <div key={i} className="grid place-items-center rounded-full border-2 border-dashed border-ink/40 opacity-60">
-              <Avatar name={p.name} src={p.avatar} size={30} />
-            </div>
-          ) : (
-            <Avatar key={i} name={p.name} src={p.avatar} size={34} ring />
-          ),
-        )}
+        {shown.map((p, i) => (
+          // confirmed ("in") sit in FRONT (z-10); not-yet-confirmed are faded + behind
+          <div key={i} className={`relative ${p.pending ? "z-0 opacity-45" : "z-10"}`}>
+            <Avatar name={p.name} src={p.avatar} size={34} ring />
+          </div>
+        ))}
       </div>
       {extra > 0 && (
         <span className="ml-2 text-sm font-bold text-muted">+{extra}</span>
