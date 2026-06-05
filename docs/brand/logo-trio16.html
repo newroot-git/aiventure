@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AIventure — 16-bit trio marks</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{--cream:#EAE1CF;--muted:#8A7B66;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#161320;color:var(--cream);font-family:'Plus Jakarta Sans',sans-serif;padding:44px 30px 70px}
+  h1{font-family:'Pixelify Sans',monospace;font-size:34px;margin-bottom:4px;color:#fff}
+  .sub{color:var(--muted);margin-bottom:36px;font-size:15px}
+  .rows{display:flex;flex-direction:column;gap:30px;max-width:780px}
+  .row{display:flex;align-items:center;gap:28px}
+  .tile{width:400px;height:160px;border-radius:28px;display:flex;align-items:center;justify-content:center;
+    border:2px solid #000;box-shadow:6px 6px 0 #000;flex:0 0 auto;}
+  .tile canvas{image-rendering:pixelated;height:84px}
+  .meta{display:flex;flex-direction:column;gap:5px}
+  .name{font-family:'Pixelify Sans',monospace;font-weight:700;font-size:20px;color:#fff}
+  .story{font-size:13.5px;color:#cabfa6;max-width:300px}
+  .alt{display:flex;gap:10px;margin-top:8px}
+  .alt .tile{width:70px;height:70px;border-radius:15px;box-shadow:3px 3px 0 #000}
+  .alt .tile canvas{height:40px}
+  .legend{margin-top:44px;font-size:13px;color:var(--muted);max-width:700px;line-height:1.6}
+</style>
+</head>
+<body>
+  <h1>AIventure — 16-bit trio marks</h1>
+  <div class="sub">Same three-glyph idea, now 16×16 with outlines + shade ramps. SNES-era depth.</div>
+  <div class="rows" id="rows"></div>
+  <div class="legend">Each trio on its dark tile, then on cream + terracotta (favicon reality check). Pick a trio + home tile colour and I'll lock it as the app icon / PWA / nav mark. Any glyph swappable.</div>
+
+<script>
+const N=16;
+// palette ramps: [outline, shadow, base, light, hl]
+const P={
+  gold:['#8A5A12','#C98A1E','#EBA92C','#F4C760','#FBE39A'],
+  red:['#7A1F12','#A2331F','#CE3B2A','#E0573F','#F08A72'],
+  green:['#1C4A2E','#2E7B4E','#3E9160','#5BB37F','#8FD3A8'],
+  blue:['#1B3A78','#2A56A8','#3D6FD0','#6492E0','#9CBCF0'],
+  cream:['#9C8E72','#C7B894','#EAE1CF','#F4EEDD','#FFFFFF'],
+};
+const CREAM='#EAE1CF', WHITE='#FFFFFF', INK='#1E1B16';
+
+// build a 16x16 grid (array of hex|null) from a predicate + palette, with auto-outline + vertical ramp + topleft highlight
+function shape(pred, pal, opt={}){
+  const g=Array.from({length:N},()=>Array(N).fill(null));
+  const S=[];
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++) if(pred(x,y)) S.push([x,y]);
+  if(!S.length) return g;
+  const inS=(x,y)=> x>=0&&x<N&&y>=0&&y<N&&pred(x,y);
+  let minY=N,maxY=0; S.forEach(([x,y])=>{minY=Math.min(minY,y);maxY=Math.max(maxY,y);});
+  const span=Math.max(1,maxY-minY);
+  for(const [x,y] of S){
+    const edge = !(inS(x-1,y)&&inS(x+1,y)&&inS(x,y-1)&&inS(x,y+1));
+    if(edge){ g[y][x]=pal[0]; continue; }
+    const t=(y-minY)/span; // 0 top .. 1 bottom
+    let c = t<0.33?pal[3] : t<0.7?pal[2] : pal[1];
+    // top-left rim highlight
+    if((!inS(x-1,y-1)) && t<0.5) c=pal[4];
+    g[y][x]=c;
+  }
+  return g;
+}
+function stamp(g, cells, color){ cells.forEach(([x,y])=>{ if(x>=0&&x<N&&y>=0&&y<N) g[y][x]=color; }); }
+// overlay one grid onto another (non-null wins)
+function over(base, top){ for(let y=0;y<N;y++)for(let x=0;x<N;x++) if(top[y][x]) base[y][x]=top[y][x]; return base; }
+
+// ---- predicates ----
+const disc=(cx,cy,r)=>(x,y)=> (x-cx)**2+(y-cy)**2 <= r*r+r*0.3;
+const diamond=(cx,cy,r)=>(x,y)=> Math.abs(x-cx)+Math.abs(y-cy)<=r;
+
+// ---- glyph builders -> return 16x16 grid ----
+const GB={
+  spark(pal){ // 4-point star, elongated
+    const cx=7.5,cy=7.5;
+    const g=shape((x,y)=>{
+      const dx=Math.abs(x-cx),dy=Math.abs(y-cy);
+      return (dx*2.3+dy<=8) || (dy*2.3+dx<=8);
+    }, pal);
+    // bright core + tiny sparkle dots
+    stamp(g,[[7,7],[8,7],[7,8],[8,8]], pal[4]);
+    return g;
+  },
+  star(pal){ return GB.spark(pal); },
+  pin(pal){
+    const cx=7.5,cyH=6,rH=5,py=15;
+    const g=shape((x,y)=>{
+      if(disc(cx,cyH,rH)(x,y)) return true;
+      if(y>=cyH && y<=py){ const hw=rH*(py-y)/(py-cyH); return Math.abs(x-cx)<=hw; }
+      return false;
+    }, pal);
+    // hole (cream, shaded)
+    const hole=shape(disc(cx,cyH-0.3,2.1), P.cream);
+    return over(g,hole);
+  },
+  peak(pal){
+    const g=shape((x,y)=> y>=1 && y<=14 && Math.abs(x-8)<= (y-1)/13*7 , pal);
+    // snow cap on top ~4 rows interior
+    const cap=shape((x,y)=> y>=2 && y<=5 && Math.abs(x-8)<= (y-1)/13*7 -1 , P.cream);
+    return over(g,cap);
+  },
+  heart(pal){
+    const g=shape((x,y)=>{
+      if(disc(5,5,3.4)(x,y)) return true;
+      if(disc(10.5,5,3.4)(x,y)) return true;
+      if(y>=4 && y<=15){ const hw=7.5*(15-y)/11; return Math.abs(x-7.75)<=hw && y>=5; }
+      return false;
+    }, pal);
+    return g;
+  },
+  compass(pal){ // diamond, top half accent(gold), bottom base
+    const g=shape(diamond(7.5,7.5,7), pal);
+    // recolor top half lighter using gold ramp overlaid
+    for(let y=0;y<8;y++)for(let x=0;x<N;x++){ if(g[y][x] && g[y][x]!==pal[0]){ const t=y/8; g[y][x]= t<0.4?P.gold[4]:P.gold[3]; } }
+    stamp(g,[[7,7],[8,7],[7,8],[8,8]],pal[1]);
+    return g;
+  },
+  flag(pal){
+    const g=Array.from({length:N},()=>Array(N).fill(null));
+    // pole
+    const pole=shape((x,y)=> x>=4&&x<=5 && y>=1&&y<=15, P.cream);
+    over(g,pole);
+    // pennant (waving) red
+    const fl=shape((x,y)=>{
+      if(y<2||y>7) return false;
+      const right = 13 - (Math.abs(y-4))*0; // rectangle-ish
+      // wavy bottom edge
+      const bottom = (y<=5);
+      return x>=6 && x<= (y<=4?13:12) && bottom;
+    }, pal);
+    over(g,fl);
+    // base ground
+    stamp(g, [[3,15],[4,15],[5,15],[6,15],[2,15]], P.cream[1]);
+    return g;
+  },
+  tent(pal){
+    const g=shape((x,y)=> y>=2 && y<=14 && Math.abs(x-8)<= (y-2)/12*7.5 , pal);
+    // door (dark triangle center)
+    const door=shape((x,y)=> y>=7&&y<=14 && Math.abs(x-8)<= (y-7)/7*2.2 , {0:pal[0],1:pal[0],2:pal[0],3:pal[0],4:pal[0]});
+    over(g,door);
+    // pole tip + a highlight ridge
+    stamp(g,[[8,1],[8,2]],P.gold[3]);
+    return g;
+  },
+};
+
+function trioCanvas(items){
+  const gap=2, W=N*3+gap*2;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=N;
+  const ctx=cv.getContext('2d');
+  items.forEach((it,i)=>{
+    const g=GB[it.g](P[it.pal]);
+    const ox=i*(N+gap);
+    for(let y=0;y<N;y++)for(let x=0;x<N;x++) if(g[y][x]){ ctx.fillStyle=g[y][x]; ctx.fillRect(ox+x,y,1,1);}
+  });
+  return cv;
+}
+
+const TRIOS=[
+  {name:'Spark · Pin · Peak', tile:'#211C2E',
+   story:'The AI sparks an idea → grounds it in a real place → you go on the adventure. The product in three.',
+   items:[{g:'spark',pal:'gold'},{g:'pin',pal:'red'},{g:'peak',pal:'green'}]},
+  {name:'Crew · Spark · Peak', tile:'#211C2E',
+   story:'Your crew + the AI spark = a real adventure together. People-first.',
+   items:[{g:'heart',pal:'red'},{g:'spark',pal:'gold'},{g:'peak',pal:'blue'}]},
+  {name:'Pin · Heart · Star', tile:'#211C2E',
+   story:'A real place, the people, the memory you keep. Where / who / what stays.',
+   items:[{g:'pin',pal:'blue'},{g:'heart',pal:'red'},{g:'star',pal:'gold'}]},
+  {name:'Spark · Compass · Flag', tile:'#211C2E',
+   story:'Idea → direction → you made it. The whole arc.',
+   items:[{g:'spark',pal:'gold'},{g:'compass',pal:'blue'},{g:'flag',pal:'red'}]},
+  {name:'Star · Pin · Tent', tile:'#211C2E',
+   story:'Under the stars, a real spot, out with the crew. Pure get-outside.',
+   items:[{g:'star',pal:'gold'},{g:'pin',pal:'red'},{g:'tent',pal:'green'}]},
+];
+
+const rows=document.getElementById('rows');
+TRIOS.forEach((t,i)=>{
+  const row=document.createElement('div');row.className='row';
+  const tile=document.createElement('div');tile.className='tile';tile.style.background=t.tile;
+  tile.appendChild(trioCanvas(t.items));
+  row.appendChild(tile);
+  const meta=document.createElement('div');meta.className='meta';
+  meta.innerHTML=`<div class="name">${i+1}. ${t.name}</div><div class="story">${t.story}</div>`;
+  const alt=document.createElement('div');alt.className='alt';
+  ['#EAE1CF','#CE3B2A'].forEach(bg=>{
+    const at=document.createElement('div');at.className='tile';at.style.background=bg;
+    at.appendChild(trioCanvas(t.items));
+    alt.appendChild(at);
+  });
+  meta.appendChild(alt);
+  row.appendChild(meta);
+  rows.appendChild(row);
+});
+</script>
+</body>
+</html>

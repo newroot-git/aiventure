@@ -172,7 +172,8 @@ export function AvatarStack({
   people,
   max = 5,
 }: {
-  people: { name?: string; avatar?: string | null }[];
+  // `pending` = invited but not confirmed yet → shown dashed + faded
+  people: { name?: string; avatar?: string | null; pending?: boolean }[];
   max?: number;
 }) {
   const shown = people.slice(0, max);
@@ -180,9 +181,15 @@ export function AvatarStack({
   return (
     <div className="flex items-center">
       <div className="flex -space-x-2">
-        {shown.map((p, i) => (
-          <Avatar key={i} name={p.name} src={p.avatar} size={34} ring />
-        ))}
+        {shown.map((p, i) =>
+          p.pending ? (
+            <div key={i} className="grid place-items-center rounded-full border-2 border-dashed border-ink/40 opacity-60">
+              <Avatar name={p.name} src={p.avatar} size={30} />
+            </div>
+          ) : (
+            <Avatar key={i} name={p.name} src={p.avatar} size={34} ring />
+          ),
+        )}
       </div>
       {extra > 0 && (
         <span className="ml-2 text-sm font-bold text-muted">+{extra}</span>

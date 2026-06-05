@@ -745,12 +745,24 @@ export function PlanView({
       {/* who */}
       <div className="mt-4">
         <Section icon={<Users size={15} />} label="Who's in" tone="success">
-          <div className="mb-3 flex items-center justify-between">
-            <AvatarStack people={people} />
-            <span className="text-sm font-bold text-muted">
-              {members.filter((m) => m.rsvp === "in").length} {effRecurrence ? "in this week" : "going"}
-            </span>
-          </div>
+          {(() => {
+            // who's declined drops off; not-yet-confirmed (maybe / invited) show dashed + faded
+            const present = members.filter((m) => m.rsvp !== "out");
+            const inCount = members.filter((m) => m.rsvp === "in").length;
+            const maybeCount = present.length - inCount;
+            const stack = present
+              .slice()
+              .sort((a, b) => (a.rsvp === "in" ? 0 : 1) - (b.rsvp === "in" ? 0 : 1))
+              .map((m) => ({ name: m.profile?.name, avatar: m.profile?.avatar, pending: m.rsvp !== "in" }));
+            return (
+              <div className="mb-3 flex items-center justify-between">
+                <AvatarStack people={stack} />
+                <span className="text-sm font-bold text-muted">
+                  {inCount} {effRecurrence ? "in this week" : "going"}{maybeCount > 0 ? ` · ${maybeCount} pending` : ""}
+                </span>
+              </div>
+            );
+          })()}
           <RSVPControl value={rsvp} onChange={changeRsvp} />
           {/* link = the invite. Always offer it (no-install join); friend-picker only if you have friends */}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -904,7 +916,8 @@ function SlotShell({
           </span>
         )}
         <span className="font-heading text-base font-bold">{slot.label}</span>
-        {time && <span className="inline-flex items-center gap-1 text-xs font-bold text-muted"><Clock size={11} /> {time}</span>}
+        {/* single-step plans take their time from the When section, not a per-step time */}
+        {time && !single && <span className="inline-flex items-center gap-1 text-xs font-bold text-muted"><Clock size={11} /> {time}</span>}
         <div className="ml-auto flex items-center gap-2">
           {onRefresh && (
             <button
@@ -1049,7 +1062,8 @@ const PlanSlot = React.memo(function PlanSlot({
               <button onClick={() => setExpanded(true)} className="text-sm font-bold text-muted underline">
                 Change pick
               </button>
-              <TimeChip value={chosenTime(slot)} onChange={(t) => onSetSlotTime(slot.key, slot.day, t)} />
+              {/* per-step time only for multi-step; single-step uses the plan's When */}
+              {!single && <TimeChip value={chosenTime(slot)} onChange={(t) => onSetSlotTime(slot.key, slot.day, t)} />}
             </div>
             <SlotAddMenu
               slot={slot} isOwner={isOwner} placeArea={placeArea} refining={refining}
