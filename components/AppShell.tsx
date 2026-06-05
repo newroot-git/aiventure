@@ -2,8 +2,11 @@
 import * as React from "react";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Users, CalendarDays, Compass, ChevronsUpDown, Loader2 } from "lucide-react";
+import { ChevronsUpDown, Loader2 } from "lucide-react";
+import { PixelHome, PixelCalendar, PixelExplore, PixelCrew } from "./pixel-icons";
 import { Avatar } from "./ui";
+
+type PixelIcon = React.ComponentType<{ size?: number; className?: string }>;
 import { QuickMenu } from "./QuickMenu";
 import type { Profile } from "@/lib/types";
 
@@ -11,10 +14,10 @@ import type { Profile } from "@/lib/types";
 const FALLBACK_USER = { id: "", name: "You", avatar: null } as unknown as Profile;
 
 const TABS = [
-  { href: "/plans", label: "Home", Icon: Home, img: "home" },
-  { href: "/calendar", label: "Calendar", Icon: CalendarDays, img: "calendar" },
-  { href: "/explore", label: "Explore", Icon: Compass, img: "explore" },
-  { href: "/groups", label: "Crew", Icon: Users, img: "crew" },
+  { href: "/plans", label: "Home", Icon: PixelHome },
+  { href: "/calendar", label: "Calendar", Icon: PixelCalendar },
+  { href: "/explore", label: "Explore", Icon: PixelExplore },
+  { href: "/groups", label: "Crew", Icon: PixelCrew },
 ];
 
 export function AppShell({
@@ -172,7 +175,7 @@ function SideLink({
 }: {
   href: string;
   label: string;
-  Icon: typeof Home;
+  Icon: PixelIcon;
   active: boolean;
   badge?: number;
 }) {
@@ -198,27 +201,26 @@ function SideLink({
 function NavItem({
   href,
   label,
-  img,
+  Icon,
   active,
 }: {
   href: string;
   label: string;
-  img: string;
+  Icon: PixelIcon;
   active: boolean;
 }) {
   return (
     <Link
       href={href}
-      className="flex min-h-[44px] flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-bold"
+      className="flex min-h-[44px] flex-col items-center justify-center gap-1 py-1 text-[11px] font-bold"
     >
-      {/* pixel-art sprite — full colour when active, dimmed when not */}
-      <span className="relative grid h-8 w-8 place-items-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`/img/nav/${img}.png`}
-          alt=""
-          className={`pixelated h-8 w-8 object-contain transition ${active ? "" : "opacity-45"}`}
-        />
+      {/* active tab = chunky pixel chip (ink border + tint), with a pixel icon */}
+      <span
+        className={`relative grid h-9 w-9 place-items-center rounded-md border-2 transition ${
+          active ? "border-ink bg-primary-soft text-primary-deep" : "border-transparent text-muted"
+        }`}
+      >
+        <Icon size={20} />
         <span className="absolute -right-2 -top-2"><LinkPending /></span>
       </span>
       <span className={active ? "text-primary-deep" : "text-muted"}>{label}</span>
