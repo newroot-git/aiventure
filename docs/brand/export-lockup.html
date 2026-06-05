@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>lockup export</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@700&display=swap" rel="stylesheet" />
+<style>body{background:#333;margin:0;padding:20px;display:flex;flex-direction:column;gap:14px}img{display:block;max-width:900px}</style>
+</head>
+<body>
+<script>
+const N=36, SCX=18, SCY=16, SR=14, FR=[11,18,25], HY=22, BASE=31, HR=2.6;
+const inDisc=(x,y,cx,cy,r)=> (x-cx)**2+(y-cy)**2 <= r*r + r*0.35;
+function friend(x,y){ for(const fx of FR){ if(inDisc(x,y,fx,HY,HR)) return true; if(y>=HY+1&&y<=BASE){ const t=(y-(HY+1))/(BASE-(HY+1)); const half=1.1+t*2.4; if(Math.abs(x-fx)<=half) return true; } } return false; }
+
+const CELL=10;                 // mark pixel size -> mark 360
+const MARK=N*CELL;             // 360
+const H=MARK;                  // canvas height
+const PAD=40;
+const GAP=44;
+const FONT=210;                // text px
+
+function lock(fg,bg){
+  // measure
+  const probe=document.createElement('canvas').getContext('2d');
+  probe.font=`700 ${FONT}px "Pixelify Sans"`;
+  const tw=Math.ceil(probe.measureText('AIventure').width);
+  const W=PAD+MARK+GAP+tw+PAD;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H+PAD; // a little vertical breathing room
+  const ctx=cv.getContext('2d');
+  if(bg){ ctx.fillStyle=bg; ctx.fillRect(0,0,cv.width,cv.height); }
+  // mark
+  ctx.fillStyle=fg;
+  const oy=Math.round((cv.height-MARK)/2);
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){ if(inDisc(x,y,SCX,SCY,SR)&&!friend(x,y)) ctx.fillRect(PAD+x*CELL, oy+y*CELL, CELL, CELL); }
+  // text
+  ctx.fillStyle=fg;
+  ctx.font=`700 ${FONT}px "Pixelify Sans"`;
+  ctx.textBaseline='middle';
+  ctx.fillText('AIventure', PAD+MARK+GAP, Math.round(cv.height/2)+6);
+  return cv;
+}
+
+async function run(){
+  await document.fonts.load(`700 ${FONT}px "Pixelify Sans"`);
+  await document.fonts.ready;
+  const variants={
+    bow: lock('#000000','#FFFFFF'),
+    wob: lock('#FFFFFF','#000000'),
+    blackT: lock('#000000', null),
+    whiteT: lock('#FFFFFF', null),
+  };
+  window.__locks={};
+  for(const k in variants){
+    window.__locks[k]=variants[k].toDataURL('image/png').split(',')[1];
+    const img=new Image(); img.src='data:image/png;base64,'+window.__locks[k]; document.body.appendChild(img);
+  }
+  window.__ready=true;
+}
+run();
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AIventure — see/hear/speak-no riff</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{--muted:#8A7B66;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#161320;color:#EAE1CF;font-family:'Plus Jakarta Sans',sans-serif;padding:44px 30px 80px}
+  h1{font-family:'Pixelify Sans',monospace;font-size:30px;margin-bottom:4px;color:#fff}
+  .sub{color:var(--muted);margin-bottom:34px;font-size:15px;max-width:640px;line-height:1.5}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;max-width:1160px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .frame{width:240px;height:240px;border:3px solid #000;box-shadow:7px 7px 0 #000;border-radius:50px;overflow:hidden}
+  .frame img{width:100%;height:100%;object-fit:cover;display:block}
+  .name{font-family:'Pixelify Sans',monospace;font-weight:700;font-size:15px;color:#fff}
+  .chips{display:flex;gap:10px;align-items:center;margin-top:2px}
+  .chips .frame{width:58px;height:58px;border-radius:14px;box-shadow:3px 3px 0 #000}
+  .chips .ci{border-radius:50%}
+  .chips .mini{width:26px;height:26px;border-radius:6px;box-shadow:2px 2px 0 #000}
+  .legend{margin-top:40px;font-size:13px;color:var(--muted);max-width:720px;line-height:1.6}
+</style>
+</head>
+<body>
+  <h1>AIventure — see no / hear no / speak no</h1>
+  <div class="sub">The anti-social-media riff: switch off the feed, the noise, the chatter — and go outside. Each big as an app icon + favicon chips (squircle / circle / 26px) so you can see it hold small.</div>
+  <div class="grid" id="grid"></div>
+  <div class="legend">Cropping tighter on the three figures makes it read even better small — easy to do once you pick one. Pick a number (or say it's not it) and I'll lock the icon set + lockup.</div>
+<script>
+const OPTS=[['monkey-flat','1. Flat — best small'],['monkey-seated','2. Seated — cutest'],['monkey-front','3. Front — clearest'],['monkey-silhouette','4. Silhouette — moody']];
+const grid=document.getElementById('grid');
+OPTS.forEach(([f,name])=>{
+  const c=document.createElement('div');c.className='cell';
+  c.innerHTML=`<div class="frame"><img src="logo-gen/${f}.png"></div>
+    <div class="name">${name}</div>
+    <div class="chips">
+      <div class="frame"><img src="logo-gen/${f}.png"></div>
+      <div class="frame ci"><img src="logo-gen/${f}.png"></div>
+      <div class="frame mini"><img src="logo-gen/${f}.png"></div>
+    </div>`;
+  grid.appendChild(c);
+});
+</script>
+</body>
+</html>

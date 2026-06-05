@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AIventure — sun mark (logo)</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{--muted:#8A7B66;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#161320;color:#EAE1CF;font-family:'Plus Jakarta Sans',sans-serif;padding:44px 30px 90px}
+  h1{font-family:'Pixelify Sans',monospace;font-size:30px;margin-bottom:4px;color:#fff}
+  .sub{color:var(--muted);margin-bottom:34px;font-size:15px;max-width:680px;line-height:1.5}
+  .rowlabel{font-family:'Pixelify Sans',monospace;font-size:15px;color:#fff;margin:30px 0 12px}
+  .row{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:9px}
+  .tile{border:3px solid #000;box-shadow:5px 5px 0 #000;border-radius:34px;display:flex;align-items:center;justify-content:center}
+  .tile.lg{width:170px;height:170px}
+  .tile canvas{image-rendering:pixelated;width:78%;height:78%}
+  .tile.lg canvas{width:74%;height:74%}
+  .cap{font-size:11.5px;color:var(--muted)}
+  .sizes{display:flex;gap:12px;align-items:center}
+  .sizes .tile{border-radius:12px;box-shadow:2px 2px 0 #000}
+  .s60{width:60px;height:60px} .s30{width:30px;height:30px;border-radius:7px} .s18{width:18px;height:18px;border-radius:4px;border-width:2px}
+  .lock{display:flex;align-items:center;gap:18px;background:#0f0d16;border:3px solid #000;border-radius:22px;padding:18px 26px;box-shadow:5px 5px 0 #000;margin-top:8px}
+  .lock.light{background:#EAE1CF}
+  .lock .tile{width:84px;height:84px;border-radius:20px}
+  .word{font-family:'Pixelify Sans',monospace;font-size:44px;letter-spacing:1px;color:#EAE1CF}
+  .lock.light .word{color:#1E1B16}
+  .legend{margin-top:40px;font-size:13px;color:var(--muted);max-width:720px;line-height:1.6}
+</style>
+</head>
+<body>
+  <h1>AIventure — the sun mark</h1>
+  <div class="sub">One colour, pixel, the three of you sat in the sun. Four constructions × a few colourways, plus real icon sizes (60 / 30 / 18px) and a wordmark lockup.</div>
+  <div id="out"></div>
+  <div class="legend">Pick a construction (A–D) + a colour, and I'll lock the icon set (app/PWA/favicon), nav mark + wordmark lockup, and wire it into the app.</div>
+
+<script>
+const N=36;                       // pixel grid
+const SCX=18, SCY=16, SR=14;      // sun
+const FR=[{x:11},{x:18},{x:25}];  // three friends
+const HY=22, BASE=31, HR=2.6;     // friend head row, base row, head radius
+
+function inDisc(x,y,cx,cy,r){ return (x-cx)**2+(y-cy)**2 <= r*r + r*0.35; }
+
+// returns Set of "x,y" cells covered by the three seated friends (head + shoulders)
+function friendCells(){
+  const s=new Set();
+  for(const f of FR){
+    for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+      // head
+      if(inDisc(x,y,f.x,HY,HR)){ s.add(x+','+y); continue; }
+      // shoulders/body: widen from ~1 at neck to ~3.4 at base
+      if(y>=HY+1 && y<=BASE){
+        const t=(y-(HY+1))/(BASE-(HY+1));
+        const half=1.1 + t*2.4;
+        if(Math.abs(x-f.x)<=half) s.add(x+','+y);
+      }
+    }
+  }
+  return s;
+}
+
+// build a grid (bool filled) for a construction; returns 2D array
+function buildGrid(kind){
+  const g=Array.from({length:N},()=>Array(N).fill(false));
+  const fc=friendCells();
+  const isFriend=(x,y)=>fc.has(x+','+y);
+
+  if(kind==='outline'){
+    // ring sun (outline) + solid friends sitting on a baseline
+    for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+      const d=Math.sqrt((x-SCX)**2+(y-SCY)**2);
+      if(d<=SR+0.3 && d>=SR-1.6) g[y][x]=true;       // ring
+    }
+    // horizon baseline across the sun
+    for(let x=SCX-SR;x<=SCX+SR;x++){ if(inDisc(x,BASE,SCX,SCY,SR)) g[BASE][x]=true; g[BASE] && (g[BASE][x]=g[BASE][x]||Math.abs(x-SCX)<=SR-1); }
+    // friends solid
+    for(const k of fc){ const [x,y]=k.split(',').map(Number); if(y<=BASE) g[y][x]=true; }
+    return g;
+  }
+
+  // FILLED sun base for the rest
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++) if(inDisc(x,y,SCX,SCY,SR)) g[y][x]=true;
+
+  if(kind==='solid' || kind==='bands' || kind==='ground'){
+    // knock out the three friends (negative space)
+    for(const k of fc){ const [x,y]=k.split(',').map(Number); if(x>=0&&x<N&&y>=0&&y<N) g[y][x]=false; }
+  }
+  if(kind==='bands'){
+    // retro horizontal slats knocked out of the UPPER sun (above the friends)
+    [SCY-7, SCY-3, SCY+1].forEach(by=>{ for(let x=0;x<N;x++) if(inDisc(x,by,SCX,SCY,SR)) g[by][x]=false; });
+  }
+  if(kind==='ground'){
+    // a 1px gap then the friends sit on the sun's lower rim already; add a thin horizon shelf below sun
+    for(let x=SCX-SR+2;x<=SCX+SR-2;x++){ g[BASE+1] && (g[BASE+1][x]=true); }
+  }
+  return g;
+}
+
+function canvasOf(kind,color){
+  const g=buildGrid(kind);
+  const cv=document.createElement('canvas');cv.width=N;cv.height=N;
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle=color;
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++) if(g[y][x]) ctx.fillRect(x,y,1,1);
+  return cv;
+}
+
+const COLORS=[
+  ['#1E1B16','#F5EFE1','ink on cream'],
+  ['#CE3B2A','#F5EFE1','terracotta'],
+  ['#EBA92C','#241F33','gold on night'],
+  ['#F5EFE1','#1E1B16','cream on ink'],
+];
+const KINDS=[
+  ['solid','A — solid sun, friends knocked out'],
+  ['bands','B — solid + retro sun bands'],
+  ['ground','C — solid + horizon shelf'],
+  ['outline','D — outline sun + solid friends'],
+];
+
+const out=document.getElementById('out');
+KINDS.forEach(([kind,label])=>{
+  const h=document.createElement('div');h.className='rowlabel';h.textContent=label;out.appendChild(h);
+  const row=document.createElement('div');row.className='row';
+  COLORS.forEach(([fg,bg,cname])=>{
+    const cell=document.createElement('div');cell.className='cell';
+    const tile=document.createElement('div');tile.className='tile lg';tile.style.background=bg;tile.appendChild(canvasOf(kind,fg));
+    cell.appendChild(tile);
+    const cap=document.createElement('div');cap.className='cap';cap.textContent=cname;cell.appendChild(cap);
+    row.appendChild(cell);
+  });
+  // size test using ink-on-cream
+  const sizes=document.createElement('div');sizes.className='sizes';
+  [['s60',60],['s30',30],['s18',18]].forEach(([cls])=>{
+    const t=document.createElement('div');t.className='tile '+cls;t.style.background='#F5EFE1';t.appendChild(canvasOf(kind,'#1E1B16'));sizes.appendChild(t);
+  });
+  const sc=document.createElement('div');sc.className='cell';sc.appendChild(sizes);
+  const scl=document.createElement('div');scl.className='cap';scl.textContent='60 / 30 / 18px';sc.appendChild(scl);
+  row.appendChild(sc);
+  out.appendChild(row);
+});
+
+// lockups using A terracotta
+const lr=document.createElement('div');lr.className='rowlabel';lr.textContent='Wordmark lockup (construction A)';out.appendChild(lr);
+const lrow=document.createElement('div');lrow.className='row';
+[['','#CE3B2A'],['light','#1E1B16']].forEach(([mode,fg])=>{
+  const l=document.createElement('div');l.className='lock '+mode;
+  const t=document.createElement('div');t.className='tile';t.style.background=mode==='light'?'#EAE1CF':'#0f0d16';t.appendChild(canvasOf('solid',fg));
+  const w=document.createElement('div');w.innerHTML=`<div class="word">AIventure</div>`;
+  l.appendChild(t);l.appendChild(w);lrow.appendChild(l);
+});
+out.appendChild(lrow);
+</script>
+</body>
+</html>

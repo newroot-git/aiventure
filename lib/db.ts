@@ -476,13 +476,42 @@ export async function seedDemoAccount(name: string): Promise<{ userId: string }>
     if (data) crew.push((data as unknown as Row).id as string);
   }
 
-  // a group with the whole crew
-  const { data: grp } = await db.from("groups").insert({ name: "The Usual Crew", owner_id: userId } as never).select("id").single();
+  // a group with the whole crew (emoji column repurposed as the description)
+  const { data: grp } = await db.from("groups").insert({
+    name: "The Usual Crew", owner_id: userId,
+    emoji: "Our go-to crew for weekends — hikes, long lunches and the odd big night out.",
+  } as never).select("id").single();
   const groupId = (grp as unknown as Row | null)?.id as string | undefined;
   if (groupId) {
     await db.from("group_members").insert(
       [userId, ...crew].map((pid) => ({ group_id: groupId, profile_id: pid })) as never,
     );
+    // a past adventure together (shows in the group's history) + an upcoming one
+    const groupMembers = [userId, ...crew];
+    const pastSlug = planSlug(`${Date.now()}-demo-grp-past`);
+    const { data: gp } = await db.from("plans").insert({
+      slug: pastSlug, title: "Sunset hike + pizza", intent: "hike then pizza", activity: "Sunset hike + pizza",
+      status: "completed", visibility: "group", creator_id: userId, group_id: groupId, ai_empowered: true,
+      cover_hue: "hike", place_address: "Box Hill", place_name: "Box Hill", adventure_no: 1,
+      completed_at: new Date(Date.now() - 14 * 86400_000).toISOString(),
+    } as never).select("id").single();
+    const gpId = (gp as unknown as Row | null)?.id as string | undefined;
+    if (gpId) {
+      await writeMeta(gpId, { scaffold: [{ key: "plan", label: "The plan", day: 1, order: 0 }] });
+      await db.from("plan_members").insert(groupMembers.map((pid) => ({ plan_id: gpId, profile_id: pid, rsvp: "in", joined_via: "app" })) as never);
+    }
+    const soonSlug = planSlug(`${Date.now()}-demo-grp-soon`);
+    const { data: gu } = await db.from("plans").insert({
+      slug: soonSlug, title: "Bouldering night", intent: "bouldering session", activity: "Bouldering night",
+      status: "locked", visibility: "group", creator_id: userId, group_id: groupId, ai_empowered: true,
+      cover_hue: "climb", place_address: "The Castle", place_name: "The Castle",
+      starts_at: new Date(Date.now() + 5 * 86400_000).toISOString(),
+    } as never).select("id").single();
+    const guId = (gu as unknown as Row | null)?.id as string | undefined;
+    if (guId) {
+      await writeMeta(guId, { scaffold: [{ key: "plan", label: "The plan", day: 1, order: 0 }] });
+      await db.from("plan_members").insert(groupMembers.map((pid) => ({ plan_id: guId, profile_id: pid, rsvp: pid === userId ? "in" : "maybe", joined_via: "app" })) as never);
+    }
   }
 
   // a pending nudge from the first crew member (+ its notification)
@@ -561,12 +590,15 @@ export async function getFriends(): Promise<{ profile: Profile; shared: string[]
 }
 
 /** Create a group with the given members (owner = current user). Returns its id. */
-export async function createGroup(name: string, memberIds: string[]): Promise<{ id: string }> {
+export async function createGroup(name: string, memberIds: string[], description?: string): Promise<{ id: string }> {
   const db = supabaseAdmin();
   const me = await currentUserId();
   if (!me) throw new Error("sign in required");
   const clean = (name ?? "").trim().slice(0, 60) || "New crew";
-  const { data: g, error } = await db.from("groups").insert({ name: clean, owner_id: me } as never).select("id").single();
+  // the legacy `emoji` column is repurposed to hold the group's description (text);
+  // we never use emojis. Blank by default (no leftover default glyph).
+  const desc = (description ?? "").trim().slice(0, 280);
+  const { data: g, error } = await db.from("groups").insert({ name: clean, owner_id: me, emoji: desc } as never).select("id").single();
   if (error || !g) throw new Error(error?.message ?? "could not create group");
   const gid = (g as Row).id as string;
   // owner always a member; dedupe + cap; only keep string ids
@@ -575,7 +607,23 @@ export async function createGroup(name: string, memberIds: string[]): Promise<{ 
   return { id: gid };
 }
 
-export interface GroupCard { id: string; name: string; members: Profile[] }
+/** Update a group's description (owner only). Stored in the repurposed `emoji` column. */
+export async function setGroupDescription(id: string, description: string): Promise<void> {
+  const db = supabaseAdmin();
+  const me = await currentUserId();
+  if (!me) throw new Error("sign in required");
+  const { data: g } = await db.from("groups").select("owner_id").eq("id", id).maybeSingle();
+  if (!g || (g as Row).owner_id !== me) throw new Error("only the group owner can edit it");
+  await db.from("groups").update({ emoji: (description ?? "").trim().slice(0, 280) } as never).eq("id", id);
+}
+
+// the repurposed emoji column → description ("" if blank or a leftover default glyph)
+function groupDesc(emoji: unknown): string {
+  const s = typeof emoji === "string" ? emoji.trim() : "";
+  return s === "🌿" ? "" : s;
+}
+
+export interface GroupCard { id: string; name: string; description: string; members: Profile[] }
 
 export async function getUserGroups(): Promise<GroupCard[]> {
   const db = supabaseAdmin();
@@ -588,11 +636,12 @@ export async function getUserGroups(): Promise<GroupCard[]> {
   return ((data as Row[]) ?? []).map((g) => ({
     id: g.id as string,
     name: g.name as string,
+    description: groupDesc(g.emoji),
     members: ((g.group_members as Row[]) ?? []).map((m) => mapProfile(m.profile as Row)).filter((p): p is Profile => !!p),
   }));
 }
 
-export async function getGroup(id: string): Promise<{ group: GroupCard; plans: PlanCard[] } | null> {
+export async function getGroup(id: string): Promise<{ group: GroupCard; plans: PlanCard[]; isOwner: boolean } | null> {
   const db = supabaseAdmin();
   const me = await currentUserId();
   if (!me) return null;
@@ -607,10 +656,11 @@ export async function getGroup(id: string): Promise<{ group: GroupCard; plans: P
   const { data: plans } = await db.from("plans").select(PLAN_SELECT).eq("group_id", id).order("created_at", { ascending: false });
   return {
     group: {
-      id: gr.id as string, name: gr.name as string,
+      id: gr.id as string, name: gr.name as string, description: groupDesc(gr.emoji),
       members: ((gr.group_members as Row[]) ?? []).map((m) => mapProfile(m.profile as Row)).filter((p): p is Profile => !!p),
     },
     plans: ((plans as Row[]) ?? []).map(mapPlanCard),
+    isOwner,
   };
 }
 

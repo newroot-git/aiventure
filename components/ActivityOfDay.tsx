@@ -26,7 +26,7 @@ export function ActivityOfDay({ idea, dayKey }: { idea: Idea; dayKey: string }) 
       <Link href={`/new?scope=single&intent=${encodeURIComponent(idea.q)}`} className="block transition active:translate-x-1 active:translate-y-1 active:shadow-none">
         <div className="relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`/img/cover-${idea.tile}.png`} alt="" className="h-32 w-full border-b-2 border-ink/10 object-cover" />
+          <img src={`/img/cover-${idea.tile}.png`} alt="" className="h-28 w-full border-b-2 border-ink/10 object-cover" />
           <div className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-md border-2 border-ink bg-accent px-2 py-0.5 text-xs font-bold text-ink shadow-hard-sm">
             <Sparkles size={12} /> Activity of the day
           </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Plus, CalendarDays, MapPin, Award } from "lucide-react";
 import { Card, Pill, Button, Avatar } from "@/components/ui";
+import { GroupDescription } from "@/components/GroupDescription";
 import { getGroup, type PlanCard } from "@/lib/db";
 
 export default async function GroupDetail({
@@ -12,7 +13,7 @@ export default async function GroupDetail({
   const { id } = await params;
   const data = await getGroup(id);
   if (!data) notFound();
-  const { group, plans } = data;
+  const { group, plans, isOwner } = data;
   const upcoming = plans.filter((p) => p.status === "upcoming");
   const past = plans.filter((p) => p.status === "past");
 
@@ -24,7 +25,8 @@ export default async function GroupDetail({
 
       <div className="mt-4">
         <h1 className="font-display text-3xl font-bold">{group.name}</h1>
-        <p className="mt-1 text-[15px] text-muted">{group.members.length} members</p>
+        <p className="mt-1 text-[15px] text-muted">{group.members.length} members · {past.length} adventure{past.length === 1 ? "" : "s"} together</p>
+        <GroupDescription groupId={group.id} initial={group.description} isOwner={isOwner} />
       </div>
 
       <Card className="mt-5 p-5">
