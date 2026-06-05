@@ -189,17 +189,6 @@ const CSS = `
 .lp.js-motion .reveal{opacity:0; transform:translateY(22px); transition:opacity .6s ease, transform .6s ease}
 .lp.js-motion .reveal.in{opacity:1; transform:none}
 
-/* ---- game chrome: HUD bar ---- */
-.lp .hud{position:fixed; top:0; left:0; right:0; height:42px; z-index:8; display:flex; align-items:center; gap:14px;
-  padding:0 14px; background:rgba(36,31,51,.84); backdrop-filter:blur(6px); border-bottom:2px solid var(--ink)}
-.lp .hud-wm{font-family:var(--font-display); font-size:18px; color:#fff; line-height:1}
-.lp .hud-wm b{color:var(--gold)}
-.lp .hud-score{font-family:var(--font-display); font-size:11px; letter-spacing:1px; color:rgba(255,255,255,.55)}
-.lp .hud-start{margin-left:auto; font-family:var(--font-display); font-size:13px; color:var(--ink); background:var(--gold);
-  border:2px solid var(--ink); padding:5px 13px; border-radius:6px; box-shadow:2px 2px 0 var(--ink); cursor:pointer}
-.lp .hud-start:active{transform:translate(2px,2px); box-shadow:0 0 0 var(--ink)}
-@media(max-width:560px){ .lp .hud-score{display:none} }
-
 /* ---- retro device screens around app demos ---- */
 .lp .screen{background:var(--night); border:3px solid var(--ink); border-radius:14px; padding:9px; box-shadow:var(--shadow); position:relative; overflow:hidden}
 .lp .screen-bar{display:flex; align-items:center; gap:6px; padding:2px 5px 8px}
@@ -281,12 +270,6 @@ export default function Home() {
   return (
     <main className="lp" ref={rootRef}>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
-
-      {/* HUD */}
-      <div className="hud">
-        <span className="hud-wm">AI<b>venture</b></span>
-        <Link className="hud-start" href="/signin" onPointerDown={blip}>▶ Start</Link>
-      </div>
 
       {/* HERO */}
       <header className="hero">
