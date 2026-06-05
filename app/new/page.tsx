@@ -44,6 +44,7 @@ function NewPlanFlow() {
   const params = useSearchParams();
   const scopeParam = params.get("scope") as PlanScope | null;
   const intentParam = params.get("intent");
+  const groupParam = params.get("group"); // arriving from a group page → scope the plan to it
   const [scope, setScope] = React.useState<PlanScope | null>(scopeParam);
   const [phase, setPhase] = React.useState<"config" | "loading">("config");
   const [error, setError] = React.useState<string | null>(null);
@@ -59,12 +60,12 @@ function NewPlanFlow() {
   const [nights, setNights] = React.useState(3);
   const [tick, setTick] = React.useState(0);
 
-  // who
-  const [whoMode, setWhoMode] = React.useState<WhoMode>("just-me");
+  // who (pre-selected to the group when arriving from a group page)
+  const [whoMode, setWhoMode] = React.useState<WhoMode>(groupParam ? "group" : "just-me");
   const [friends, setFriends] = React.useState<Friend[]>([]);
   const [groups, setGroups] = React.useState<Group[]>([]);
   const [invited, setInvited] = React.useState<string[]>([]);
-  const [groupId, setGroupId] = React.useState<string>("");
+  const [groupId, setGroupId] = React.useState<string>(groupParam ?? "");
 
   // when
   const [whenMode, setWhenMode] = React.useState<WhenMode>("unsure");
@@ -207,7 +208,7 @@ function NewPlanFlow() {
           location,
           aiBuild,
           // who
-          visibility: whoMode === "open" ? "open" : "invite",
+          visibility: whoMode === "open" ? "open" : whoMode === "group" ? "group" : "invite",
           groupId: !surprise && whoMode === "group" ? groupId || null : null,
           inviteIds: !surprise && whoMode === "people" ? invited : [],
           // when

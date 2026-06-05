@@ -41,7 +41,7 @@ export default async function GroupDetail({
         </div>
       </Card>
 
-      <Link href="/new" className="mt-4 block">
+      <Link href={`/new?group=${group.id}`} className="mt-4 block">
         <Button variant="primary" size="lg" className="w-full">
           <Plus size={18} /> Start a plan with {group.name}
         </Button>
