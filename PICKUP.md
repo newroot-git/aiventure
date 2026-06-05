@@ -1,10 +1,19 @@
 # AIventure — Pickup
 
-Last session: 2026-06-04 (moody audit + hardening pass). UCWS Singapore hackathon (Agent track). Style LOCKED: lush pixel landscapes, **NO emojis**, lucide icons + initials/image avatars. Brand "Earthbound & Stargazing".
+Last session: 2026-06-05 (tester-feedback batch — 8 fixes). UCWS Singapore hackathon (Agent track). Style LOCKED: lush pixel landscapes, **NO emojis**, lucide icons + initials/image avatars. Brand "Earthbound & Stargazing".
 
 ## LIVE
-- **Prod: https://aiventure-swart.vercel.app** — repo `newroot-git/aiventure` @ **`246e813`** → push main auto-deploys. Vercel project `newroot/aiventure` (account `newrootio`, team `newroot`). Local dev `PORT=3210 npm run dev`; `.env.local` has `NEXT_PUBLIC_DEV_SWITCH=1` (dev profile-switcher; OFF in prod — verified).
-- Deploy verified post-push: `/signin` 200, `/` 200, **`/api/whoami` now 404** (gate live + DEV_SWITCH off in prod).
+- **Prod: https://aiventure-swart.vercel.app** — repo `newroot-git/aiventure` @ **`4b188ec`** → push main auto-deploys. Vercel project `newroot/aiventure` (account `newrootio`, team `newroot`). Local dev `PORT=3210 npm run dev`; `.env.local` has `NEXT_PUBLIC_DEV_SWITCH=1` (dev profile-switcher; OFF in prod — verified).
+
+## Tester-feedback batch (2026-06-05) — all 8 SHIPPED + verified live via Playwright
+- **#7 broken mock plans KILLED (this also explained #1):** `/p/[slug]` now `notFound()` instead of falling back to `MOCK_PLAN`. The community "Around you"/Explore cards pointed at a seed demo slug (`wild-otter-42`) with no real DB row, so every action on them silently failed — that's why "adding a custom spot didn't add it." On a REAL plan, add-custom works (verified, both typed + search-result paths). `getOpenEvents`/`getCommunities` return `[]` for now (code commented-kept for the real community rebuild later); Home around-you hidden, Explore shows a "Communities are coming" empty state. **Community is a deliberate later rebuild — back it onto real `visibility='open'` plans.**
+- **#2 date+time:** WhenPicker multiple-mode now stores day-coords and applies the chosen TIME to all picked dates at Done — changing time after picking dates no longer loses it. Verified (picked 20+27 June, set 14:00 after → both show 14:00).
+- **#3:** Planning/Locked lifecycle pill on plan cards (home + calendar). PlanCard gained `phase`.
+- **#8:** Recurring control moved up to sit with the date/time selection (above "When works?").
+- **#4:** Slot controls consolidated into ONE `+ Add to this step` menu (Search a place / Ask AI). `SlotAddMenu` + `SlotAskAi` in PlanView.
+- **#6:** Ask-AI now APPENDS ideas (keeps existing); `Replace all with fresh ideas` is a separate link. `refineSlot(...append)`, regenSlotOptions skips delete when append. Verified (Dishoom kept + 3 added).
+- **#5:** `Ask AI to find "<text>"` resolves a specific named venue OSM can't surface (restored `resolvePlace` in ai.ts + `addResolvedPlace` + add-option `ai:true` path, auth+rate-limited). Verified (Dishoom Shoreditch resolved).
+- Zero console errors across the live run; all test plans cleaned up.
 
 ## What shipped this session — full audit + fixes (all live)
 Ran a 4-agent moody code audit, then fixed everything. `next build` green, `tsc` clean.
