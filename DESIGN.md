@@ -72,13 +72,17 @@ Base 4px. Scale: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 56 / 72. Generous whitesp
 ## Radii (generous — the "bubbly" feel comes from rounding + soft color, not a childish font)
 `--radius-sm 10px` · `--radius-md 14px` · `--radius-lg 20px` · `--radius-xl 28px` · `--radius-2xl 36px` · pills `rounded-full`.
 
-## Shadows (soft, never harsh)
-- `--shadow-soft`: `0 2px 8px rgba(42,38,34,.05), 0 10px 28px rgba(42,38,34,.05)`
-- `--shadow-pop`: `0 12px 30px rgba(242,84,45,.18)` (primary actions, the Adventure card)
+## Shadows (HARD pixel offsets — this is the look)
+The shipped system is the pixel-game language: **hard black offset shadows**, no blur.
+- `.shadow-hard`: `4px 4px 0 0 ink` — cards, sections, primary buttons, feature surfaces.
+- `.shadow-hard-sm`: `3px 3px 0 0 ink` — inline/dense cards, chips, small toggles, icon bubbles.
+- `.press-hard`: on `:active` translate `4px,4px` and drop the shadow → the satisfying "sink".
+- Pair every surface/button with **`border-2 border-ink`** (full ink, not `/10`).
+- ~~`shadow-soft` / `shadow-pop`~~ are RETIRED from UI chrome. Keep blur/glow only inside `.aurora` gradient hero, `PixelScene`, and the `AdventureCard` (intentionally atmospheric).
 
 ## Components (define before building — Phase 3)
-- **Button** — `rounded-full`, generous padding, `shadow-pop` on primary, gentle press-scale (active:scale-95). Variants: primary (coral), secondary (green), ghost, soft. Sizes sm/md/lg. States: default/hover/press/disabled/loading.
-- **Card** — `rounded-2xl`, `bg-surface`, `shadow-soft`, soft `border-line`. No side-border accents.
+- **Button** — `rounded-md`, `border-2 border-ink`, `shadow-hard` (+ `press-hard` sink). Variants: primary (red), secondary (blue), soft (surface), ghost. Sizes sm/md/lg.
+- **Card / Section** — `rounded-xl`, `bg-surface`, `border-2 border-ink`, `shadow-hard` (or `shadow-hard-sm` for dense). No side-border accents. Icon bubbles inside get `border-2 border-ink shadow-hard-sm` + a tint fill for meaning colour.
 - **Pill / Tag** — `rounded-full`, soft tint bg + matching text (interest tags, status, visibility). Selectable variant for onboarding.
 - **Avatar / AvatarStack** — rounded, warm ring; stack shows "who's in".
 - **Input / Textarea** — `rounded-xl`, soft surface-2 fill, clear focus ring (primary).
@@ -90,7 +94,9 @@ Base 4px. Scale: 4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 56 / 72. Generous whitesp
 - **AdventureCard** — the signature completion trophy. Bold, warm gradient, stamp, stats, "Adventure #N", share button.
 
 ### What makes components feel like THIS app
-Everything is pill/blob-round, warm-tinted, soft-shadowed, with a satisfying micro press-scale. The "grounded ✨" source chip on every suggestion is unique — it's the trust signal that says *this is a real place, not AI making things up*.
+Chunky pixel-game UI: 2px ink borders, hard offset shadows, the `press-hard` sink, warm retro-tinted fills. The grounded source chip (lucide `Sparkles` + label, secondary tint) on every suggestion is the trust signal that says *this is a real place, not AI making things up*.
+
+> **Palette table below is STALE** (old terracotta era). The live tokens are in `app/globals.css` `@theme` (red `#CE3B2A`, bg `#EAE1CF`, surface `#F5EFE1`, ink `#1E1B16`, …) — that file is the single source of truth.
 
 ## Iconography & the NO-EMOJI rule (hard)
 - **Never use emojis** — not in UI, not in copy, not in data, not in avatars. This is absolute (Josh's standing rule).

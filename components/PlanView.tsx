@@ -129,9 +129,9 @@ function Section({
     success: "bg-success-soft text-success",
   }[tone];
   return (
-    <section className={`rounded-xl border-2 border-ink/10 bg-surface p-5 shadow-soft ${className ?? ""}`}>
+    <section className={`rounded-xl border-2 border-ink bg-surface p-5 shadow-hard ${className ?? ""}`}>
       <div className="mb-3 flex items-center gap-2">
-        <span className={`grid h-7 w-7 place-items-center rounded-md ${toneCls}`}>{icon}</span>
+        <span className={`grid h-7 w-7 place-items-center rounded-md border-2 border-ink shadow-hard-sm ${toneCls}`}>{icon}</span>
         <span className="text-xs font-bold uppercase tracking-wider text-muted">{label}</span>
       </div>
       {children}
@@ -430,15 +430,15 @@ export function PlanView({
         )}
         <div className="absolute inset-x-0 top-0 flex flex-wrap gap-2 p-3">
           {phase === "locked" ? (
-            <Pill tone="success" className="border-2 border-ink/10"><Lock size={13} /> Locked in</Pill>
+            <Pill tone="success"><Lock size={13} /> Locked in</Pill>
           ) : (
-            <Pill tone="accent" className="border-2 border-ink/10"><Sparkles size={13} /> Planning</Pill>
+            <Pill tone="accent"><Sparkles size={13} /> Planning</Pill>
           )}
           {multiDay && (
-            <Pill tone="primary" className="border-2 border-ink/10"><Route size={13} /> {dayNums.length}-day trip</Pill>
+            <Pill tone="primary"><Route size={13} /> {dayNums.length}-day trip</Pill>
           )}
           {effRecurrence && (
-            <Pill tone="secondary" className="border-2 border-ink/10"><Repeat size={13} /> Weekly</Pill>
+            <Pill tone="secondary"><Repeat size={13} /> Weekly</Pill>
           )}
         </div>
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent p-4 pt-10">
@@ -684,7 +684,7 @@ export function PlanView({
         )}
 
         {!isOwner ? (
-          <p className="rounded-xl border-2 border-ink/10 bg-surface-2/50 px-4 py-3 text-center text-sm font-bold text-muted">
+          <p className="rounded-xl border-2 border-ink bg-surface-2/50 px-4 py-3 text-center text-sm font-bold text-muted">
             {phase === "locked" ? "Locked in by the owner." : "Vote and add ideas — the owner locks it in."}
           </p>
         ) : phase === "open" ? (

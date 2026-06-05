@@ -40,7 +40,7 @@ export default async function HomePage() {
           <Link key={iv.id} href="/invites" className="block">
             <Card className="flex items-center gap-3 p-3 transition active:scale-[0.99]">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/img/icons/invite.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink/10 object-cover" />
+              <img src="/img/icons/invite.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink object-cover" />
               <div className="min-w-0 flex-1 text-sm"><b>{iv.fromLabel}</b> invited you · <span className="text-muted">{iv.activity}</span></div>
               <ChevronRight size={18} className="shrink-0 text-muted" />
             </Card>
@@ -49,7 +49,7 @@ export default async function HomePage() {
         {nudges.length > 0 && (
           <Card className="flex items-center gap-3 p-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/img/icons/nudge.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink/10 object-cover" />
+            <img src="/img/icons/nudge.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink object-cover" />
             <div className="min-w-0 flex-1 text-sm">
               <b>{nudges.length} nudge{nudges.length > 1 ? "s" : ""}</b> waiting · <span className="text-muted">tap the inbox to respond</span>
             </div>
@@ -79,7 +79,7 @@ export default async function HomePage() {
                   <div className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={op.cover} alt="" className="h-32 w-full border-b-2 border-ink/10 object-cover" />
-                    <div className="absolute left-3 top-3"><Pill tone="secondary" className="border-2 border-ink/10"><Users size={12} /> {op.community}</Pill></div>
+                    <div className="absolute left-3 top-3"><Pill tone="secondary"><Users size={12} /> {op.community}</Pill></div>
                   </div>
                   <div className="p-4">
                     <h3 className="font-heading font-bold leading-snug">{op.activity}</h3>
@@ -106,11 +106,11 @@ function PlanRow({ plan }: { plan: PlanCard }) {
         <div className="relative">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={plan.cover} alt="" className="h-40 w-full border-b-2 border-ink/10 object-cover" />
-          <div className="absolute left-3 top-3"><Pill tone="secondary" className="border-2 border-ink/10">{plan.groupName}</Pill></div>
+          <div className="absolute left-3 top-3"><Pill tone="secondary">{plan.groupName}</Pill></div>
           {plan.phase === "locked" ? (
-            <div className="absolute right-3 top-3"><Pill tone="success" className="border-2 border-ink/10"><Lock size={12} /> Locked in</Pill></div>
+            <div className="absolute right-3 top-3"><Pill tone="success"><Lock size={12} /> Locked in</Pill></div>
           ) : plan.phase === "open" ? (
-            <div className="absolute right-3 top-3"><Pill tone="accent" className="border-2 border-ink/10"><Sparkles size={12} /> Planning</Pill></div>
+            <div className="absolute right-3 top-3"><Pill tone="accent"><Sparkles size={12} /> Planning</Pill></div>
           ) : null}
         </div>
         <div className="p-4">

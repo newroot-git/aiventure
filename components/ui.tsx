@@ -51,8 +51,8 @@ export function Card({
   return (
     <div
       className={cx(
-        "rounded-xl border-2 border-ink/10 bg-surface",
-        hard ? "shadow-hard" : "shadow-soft",
+        "rounded-xl border-2 border-ink bg-surface",
+        hard ? "shadow-hard" : "shadow-hard-sm",
         className,
       )}
       {...props}
@@ -79,7 +79,7 @@ export function Pill({
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-bold",
+        "inline-flex items-center gap-1.5 rounded-md border-2 border-ink px-2.5 py-1 text-sm font-bold",
         PILL_TONE[tone],
         className,
       )}
@@ -144,7 +144,7 @@ export function Avatar({
     return (
       <span
         className={cx(
-          "inline-block overflow-hidden rounded-md border-2 border-ink/15",
+          "inline-block overflow-hidden rounded-md border-2 border-ink",
           ring && "ring-2 ring-surface",
         )}
         style={{ width: size, height: size }}
@@ -157,7 +157,7 @@ export function Avatar({
   return (
     <span
       className={cx(
-        "inline-grid place-items-center rounded-md border-2 border-ink/15 font-bold uppercase",
+        "inline-grid place-items-center rounded-md border-2 border-ink font-bold uppercase",
         toneFor(name),
         ring && "ring-2 ring-surface",
       )}

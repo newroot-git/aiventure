@@ -48,7 +48,7 @@ export default async function LogPage() {
           return (
             <Link key={k} href={`/log/${k}`} className="block">
               <Card hard className="flex items-center gap-4 p-4 transition active:translate-x-1 active:translate-y-1 active:shadow-none">
-                <Tile name={items[0].tile} className="h-16 w-16 shrink-0 border-2 border-ink/10" />
+                <Tile name={items[0].tile} className="h-16 w-16 shrink-0 border-2 border-ink" />
                 <div className="flex-1">
                   <h3 className="font-display text-lg font-bold">{monthLabel(k)}</h3>
                   <p className="text-sm text-muted">

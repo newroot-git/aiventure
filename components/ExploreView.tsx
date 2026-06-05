@@ -22,7 +22,7 @@ export function ExploreView({ communities, events }: { communities: CommunityCar
         <h1 className="font-display text-3xl font-bold">Explore</h1>
         <p className="mt-1 text-[15px] text-muted">Find communities, open plans, and things to get in on near you.</p>
         <Card className="mt-6 flex flex-col items-center gap-2 p-8 text-center">
-          <span className="grid h-12 w-12 place-items-center rounded-md border-2 border-ink/10 bg-secondary-soft text-secondary"><Compass size={24} /></span>
+          <span className="grid h-12 w-12 place-items-center rounded-md border-2 border-ink bg-secondary-soft text-secondary"><Compass size={24} /></span>
           <h2 className="mt-1 font-display text-lg font-bold">Communities are coming</h2>
           <p className="max-w-xs text-sm text-muted">Open plans and communities near you will show up here. For now, start your own plan or nudge a mate.</p>
           <Link href="/new" className="mt-2"><Button variant="primary" size="sm">Create a plan</Button></Link>
@@ -49,7 +49,7 @@ export function ExploreView({ communities, events }: { communities: CommunityCar
               <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={op.cover} alt="" className="h-32 w-full border-b-2 border-ink/10 object-cover" />
-                <div className="absolute left-3 top-3"><Pill tone="secondary" className="border-2 border-ink/10"><Users size={12} /> {op.community}</Pill></div>
+                <div className="absolute left-3 top-3"><Pill tone="secondary"><Users size={12} /> {op.community}</Pill></div>
               </div>
               <div className="p-4">
                 <h3 className="font-heading font-bold leading-snug">{op.activity}</h3>
@@ -69,7 +69,7 @@ export function ExploreView({ communities, events }: { communities: CommunityCar
           const on = joined.includes(c.id);
           return (
             <Card key={c.id} className="flex items-center gap-3 p-4">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md border-2 border-ink/10 bg-success-soft text-success"><Users size={22} /></span>
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md border-2 border-ink bg-success-soft text-success"><Users size={22} /></span>
               <div className="min-w-0 flex-1">
                 <h3 className="truncate font-bold">{c.name}</h3>
                 <div className="mt-1 flex items-center gap-2">

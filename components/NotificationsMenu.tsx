@@ -9,7 +9,7 @@ import type { InviteCard, NudgeCard, NotificationCard } from "@/lib/db";
 
 function PixelIcon({ name }: { name: string }) {
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={`/img/icons/${name}.png`} alt="" className="pixelated h-9 w-9 shrink-0 rounded-md border-2 border-ink/10 object-cover" />;
+  return <img src={`/img/icons/${name}.png`} alt="" className="pixelated h-9 w-9 shrink-0 rounded-md border-2 border-ink object-cover" />;
 }
 
 export interface NotifData {

@@ -117,11 +117,11 @@ export function RSVPControl({
             key={o.value}
             onClick={() => onChange?.(o.value)}
             className={cx(
-              "flex flex-1 items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold transition active:scale-95 border",
-              active && o.value === "in" && "bg-success text-white border-success shadow-pop",
-              active && o.value === "maybe" && "bg-accent text-ink border-accent",
-              active && o.value === "out" && "bg-surface-2 text-muted border-line",
-              !active && "bg-surface text-ink border-line hover:border-primary/30",
+              "flex flex-1 items-center justify-center gap-1.5 rounded-md border-2 border-ink py-3 text-sm font-bold shadow-hard-sm press-hard",
+              active && o.value === "in" && "bg-success text-white",
+              active && o.value === "maybe" && "bg-accent text-ink",
+              active && o.value === "out" && "bg-surface-2 text-muted",
+              !active && "bg-surface text-ink",
             )}
           >
             <o.Icon size={16} />
@@ -141,7 +141,7 @@ export function KeyInfoChips({ items }: { items: KeyInfo[] }) {
       {items.map((k, i) => (
         <span
           key={i}
-          className="inline-flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm font-medium text-ink"
+          className="inline-flex items-center gap-2 rounded-md border-2 border-ink bg-surface-2 px-3 py-2 text-sm font-bold text-ink"
         >
           <Check size={15} className="text-secondary" />
           {k.label}

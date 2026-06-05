@@ -47,7 +47,7 @@ function LogCard({ plan }: { plan: PlanCard }) {
           <img src={plan.cover} alt="" className="h-40 w-full border-b-2 border-ink/10 object-cover" />
           {plan.adventureNo && (
             <div className="absolute left-3 top-3">
-              <Pill tone="accent" className="border-2 border-ink/10">
+              <Pill tone="accent">
                 <Award size={13} /> Adventure {plan.adventureNo}
               </Pill>
             </div>
