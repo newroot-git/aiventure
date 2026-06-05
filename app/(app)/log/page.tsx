@@ -19,11 +19,14 @@ function monthLabel(key: string) {
 
 export default async function LogPage() {
   const all = await getUserPlans();
-  const past = all.filter((p) => p.status === "past" && p.date);
+  // every completed plan is an adventure — even a date-less one. Fall back to its
+  // completion date for the month bucket so it never silently vanishes from the log.
+  const past = all.filter((p) => p.status === "past");
+  const bucketOf = (p: PlanCard) => { const d = p.date || p.completedAt || ""; return d ? monthKey(d) : ""; };
 
   // group by month, newest first
   const groups: Record<string, PlanCard[]> = {};
-  for (const p of past) (groups[monthKey(p.date)] ??= []).push(p);
+  for (const p of past) { const k = bucketOf(p); if (k) (groups[k] ??= []).push(p); }
   const keys = Object.keys(groups).sort().reverse();
 
   return (

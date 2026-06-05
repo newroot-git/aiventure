@@ -17,7 +17,8 @@ export default async function LogMonth({
   const [y, m] = ym.split("-");
   const label = m ? `${MONTHS[+m - 1]} ${y}` : ym;
   const all = await getUserPlans();
-  const items = all.filter((p) => p.status === "past" && p.date.startsWith(ym));
+  // bucket by the plan's date, or its completion date when it had no fixed day
+  const items = all.filter((p) => p.status === "past" && (p.date || p.completedAt || "").startsWith(ym));
 
   return (
     <div>

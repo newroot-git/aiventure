@@ -55,6 +55,19 @@ function mapsUrl(q?: string) {
   return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : undefined;
 }
 
+// clamp + escape user free-text before interpolating into a prompt (injection + JSON safety)
+function sanitize(s: string | undefined, maxLen: number): string {
+  if (!s) return "";
+  return s
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\x00-\x1F\x7F]/g, " ") // strip control chars
+    .replace(/`/g, "'")               // collapse backticks
+    .replace(/"/g, "'")               // escape stray double-quotes
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLen);
+}
+
 // strip markdown fences / prose and parse the first JSON value
 function parseJson(text: string): unknown {
   let t = text.trim();
@@ -62,18 +75,30 @@ function parseJson(text: string): unknown {
   if (fence) t = fence[1].trim();
   const start = t.search(/[[{]/);
   if (start > 0) t = t.slice(start);
-  return JSON.parse(t);
+  try {
+    return JSON.parse(t);
+  } catch {
+    throw new Error("model returned malformed JSON");
+  }
 }
+
+let loggedModel = false;
 
 async function callOpenRouter(system: string, user: string, maxTokens = 1500): Promise<string> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("OPENROUTER_API_KEY missing");
   const model = process.env.OPENROUTER_MODEL || "anthropic/claude-sonnet-4.5";
+  if (!loggedModel) {
+    console.warn(`[ai] OpenRouter model resolved: ${model}`);
+    loggedModel = true;
+  }
 
   const ctrl = new AbortController();
-  const timeout = setTimeout(() => ctrl.abort(), 38000);
+  // fire before the route's maxDuration so we surface a clean error, not a hard cut
+  const timeout = setTimeout(() => ctrl.abort(), 25000);
+  let res: Response;
   try {
-    const res = await fetch(ENDPOINT, {
+    res = await fetch(ENDPOINT, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
@@ -91,12 +116,25 @@ async function callOpenRouter(system: string, user: string, maxTokens = 1500): P
       }),
       signal: ctrl.signal,
     });
-    const json = await res.json();
-    if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${JSON.stringify(json).slice(0, 200)}`);
-    return json.choices?.[0]?.message?.content ?? "";
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") throw new Error("model timed out");
+    throw e;
   } finally {
     clearTimeout(timeout);
   }
+
+  // read raw text first — gateway errors (502/504/rate-limit) often return HTML, not JSON
+  const body = await res.text();
+  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${body.slice(0, 200)}`);
+  let json: { choices?: { message?: { content?: string } }[] };
+  try {
+    json = JSON.parse(body);
+  } catch {
+    throw new Error(`OpenRouter returned non-JSON: ${body.slice(0, 200)}`);
+  }
+  const content = json.choices?.[0]?.message?.content ?? "";
+  if (!content.trim()) throw new Error("model returned empty content");
+  return content;
 }
 
 const SYSTEM = `You are AIventure's planning agent. You turn a loose intent into real, specific, doable suggestions for a friend group.
@@ -123,16 +161,21 @@ function cleanOption(o: DropOptionOut): DropOptionOut {
   };
 }
 
+// drop options the LLM returned without a usable title (blank card + "undefined" Maps link)
+function hasTitle(o: DropOptionOut | undefined): o is DropOptionOut {
+  return !!o && typeof o.title === "string" && o.title.trim().length > 0;
+}
+
 // Generate a plan as an ordered list of slots, each holding voteable options.
 // one-thing/surprise → 1 slot · a day → 3-4 slots · a trip → 2-4 slots per day.
 export async function generateDrop(input: DropInput): Promise<{ title: string; area: string; slots: DropSlot[] }> {
-  const intent = (input.intent || "").slice(0, 500);
+  const intent = sanitize(input.intent, 500);
   const location = input.location || "London, UK";
-  const interests = (input.interests || []).slice(0, 12).join(", ") || "a bit of everything";
+  const interests = (input.interests || []).slice(0, 12).map((i) => sanitize(i, 60)).filter(Boolean).join(", ") || "a bit of everything";
   const ctx = `Default location: ${location}
-Crew: ${input.who || "a few friends"}
-When: ${input.when || "soon"}
-Budget: ${input.budget || "flexible"}
+Crew: ${sanitize(input.who, 120) || "a few friends"}
+When: ${sanitize(input.when, 120) || "soon"}
+Budget: ${sanitize(input.budget, 120) || "flexible"}
 Crew interests: ${interests}
 Intent: "${intent}"
 
@@ -165,18 +208,44 @@ Return STRICT JSON only: {"title","area","slots":[{"key","label","day","options"
 "key" = a short lowercase slug for the slot (e.g. "food", "main", "after"). "time" = optional "HH:MM" for that step.
 Make picks genuinely varied and tailored to the intent — not a generic highlights list.`;
 
-  const raw = await callOpenRouter(SYSTEM, user, input.scope === "trip" ? 3000 : 2000);
-  const parsed = parseJson(raw) as { title?: string; area?: string; slots?: DropSlot[] };
-  const slots = (parsed.slots || [])
-    .filter((s) => Array.isArray(s.options) && s.options.length > 0)
-    .map((s, i) => ({
-      key: (s.key || `slot${i}`).toString().toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24) || `slot${i}`,
-      label: s.label || "Pick one",
-      day: s.day && s.day > 0 ? s.day : 1,
-      fixed: !!s.fixed,
-      options: s.options.map(cleanOption),
-    }));
-  return { title: (parsed.title || "").slice(0, 80), area: (parsed.area || "").slice(0, 120), slots };
+  const maxTokens = input.scope === "trip" ? 3000 : 2000;
+  let lastTitle = "";
+  let lastArea = "";
+
+  // one model call + parse; retry once on a parse/empty failure before giving up
+  const run = async (): Promise<DropSlot[]> => {
+    const raw = await callOpenRouter(SYSTEM, user, maxTokens);
+    const parsed = parseJson(raw) as { title?: string; area?: string; slots?: DropSlot[] };
+    lastTitle = (parsed.title || "").slice(0, 80);
+    lastArea = (parsed.area || "").slice(0, 120);
+    return (parsed.slots || [])
+      .filter((s) => Array.isArray(s.options) && s.options.length > 0)
+      .map((s, i) => ({
+        key: (s.key || `slot${i}`).toString().toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24) || `slot${i}`,
+        label: s.label || "Pick one",
+        day: s.day && s.day > 0 ? s.day : 1,
+        fixed: !!s.fixed,
+        options: s.options.filter(hasTitle).map(cleanOption),
+      }))
+      .filter((s) => s.options.length > 0);
+  };
+
+  let slots: DropSlot[];
+  try {
+    slots = await run();
+  } catch (e) {
+    if (e instanceof Error && /malformed JSON|empty content/.test(e.message)) {
+      slots = await run(); // single retry, same inputs
+    } else {
+      throw e;
+    }
+  }
+
+  // never persist a hollow plan — surface a real error so the caller returns a 502
+  if (slots.length === 0 || slots.every((s) => s.options.length === 0)) {
+    throw new Error("model returned no valid options");
+  }
+  return { title: lastTitle, area: lastArea, slots };
 }
 
 // Regenerate the voteable options for ONE slot (used by per-slot refine).
@@ -186,18 +255,23 @@ export async function generateSlotOptions(
   location = "London, UK",
   feedback?: string,
 ): Promise<DropOptionOut[]> {
-  const steer = feedback?.trim() ? `\nImportant preference for this step: ${feedback.trim()}` : "";
-  const user = `Location: ${location}. Plan: "${intent}".
+  const safeLabel = sanitize(slotLabel, 80);
+  const safeIntent = sanitize(intent, 500);
+  const safeFeedback = sanitize(feedback, 300);
+  const steer = safeFeedback ? `\nImportant preference for this step: ${safeFeedback}` : "";
+  const user = `Location: ${location}. Plan: "${safeIntent}".
 ALL picks MUST be in ${location} (the same place as the rest of this plan — never drift to another city).
-Suggest EXACTLY 3 distinct, voteable options for the "${slotLabel}" step of this plan.${steer}
+Suggest EXACTLY 3 distinct, voteable options for the "${safeLabel}" step of this plan.${steer}
 Every option MUST have a "subtitle" (type · rough price · area).
 Return STRICT JSON only: {"options":[{"title","subtitle","why","place_name","map_query","tile","time"}]}.
 "tile" = best-fit from: ${TILES.join(", ")}. Keep "why" to one short, warm sentence.`;
   try {
     const raw = await callOpenRouter(SYSTEM, user, 1200);
     const parsed = parseJson(raw) as { options?: DropOptionOut[] };
-    return (parsed.options || []).map(cleanOption);
-  } catch {
+    return (parsed.options || []).filter(hasTitle).map(cleanOption);
+  } catch (e) {
+    // re-throw hard failures (missing key / timeout / non-ok HTTP); only swallow genuinely-empty results
+    if (e instanceof Error && /OPENROUTER_API_KEY missing|model timed out|OpenRouter \d{3}|non-JSON/.test(e.message)) throw e;
     return [];
   }
 }
@@ -205,7 +279,7 @@ Return STRICT JSON only: {"options":[{"title","subtitle","why","place_name","map
 // Resolve a free-typed place/business into ONE real, specific venue (the "ask AI
 // to find this exact place" path — when OSM search can't surface a named spot).
 export async function resolvePlace(query: string, location = "London, UK"): Promise<DropOptionOut | null> {
-  const q = (query || "").trim().slice(0, 200);
+  const q = sanitize(query, 200);
   if (!q) return null;
   const user = `In ${location}, the user typed: "${q}".
 Resolve it to ONE real, specific, named place/venue/business that best matches (fix spelling; pick the most likely real place in or near ${location}).
@@ -214,7 +288,7 @@ Return STRICT JSON only: {"title","subtitle","why","place_name","map_query","til
   try {
     const raw = await callOpenRouter(SYSTEM, user, 500);
     const o = parseJson(raw) as DropOptionOut;
-    if (!o?.title) return null;
+    if (!hasTitle(o)) return null;
     return cleanOption(o);
   } catch {
     return null;

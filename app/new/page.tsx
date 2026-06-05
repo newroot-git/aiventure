@@ -88,6 +88,14 @@ function NewPlanFlow() {
     return () => ctrl.abort();
   }, []);
 
+  // prefill the location from the saved onboarding profile's home area (same store as interests)
+  React.useEffect(() => {
+    try {
+      const home = JSON.parse(localStorage.getItem("aiventure_profile") || "{}").home_area;
+      if (typeof home === "string" && home.trim()) setAreas((p) => (p.length ? p : [home.trim()]));
+    } catch {}
+  }, []);
+
   // deep-link / quick-menu "surprise" → fire instantly, no questions
   React.useEffect(() => {
     if (scopeParam === "surprise") doSurprise();
@@ -318,7 +326,7 @@ function NewPlanFlow() {
             </div>
           )}
         </div>
-        <p className="mt-1 text-xs text-muted">Search and tap a place, or use your location. Defaults to London if blank.</p>
+        <p className="mt-1 text-xs text-muted">Search and tap a place, or use your location. Defaults to your home area if blank.</p>
       </div>
 
       {/* WHO — one section with all the optionality */}

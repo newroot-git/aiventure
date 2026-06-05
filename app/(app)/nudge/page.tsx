@@ -2,21 +2,53 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Hand, Check } from "lucide-react";
+import { ArrowLeft, Hand, Check, Loader2 } from "lucide-react";
 import { Button, Textarea, SelectTag, Label, Avatar } from "@/components/ui";
-import { MOCK_FRIENDS } from "@/lib/mock";
+import type { Profile } from "@/lib/types";
 
 const WHEN = ["Whenever", "This week", "This weekend", "Soon"];
 
 export default function NudgePage() {
   const router = useRouter();
-  const [picked, setPicked] = React.useState<string[]>([]);
+  const [friends, setFriends] = React.useState<Profile[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [targetId, setTargetId] = React.useState<string | null>(null);
   const [when, setWhen] = React.useState("This weekend");
   const [note, setNote] = React.useState("");
+  const [sending, setSending] = React.useState(false);
   const [sent, setSent] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const toggle = (id: string) =>
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  React.useEffect(() => {
+    const ctrl = new AbortController();
+    fetch("/api/friends", { signal: ctrl.signal })
+      .then((r) => r.json())
+      .then((d) => setFriends(Array.isArray(d.friends) ? d.friends : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+    return () => ctrl.abort();
+  }, []);
+
+  const target = friends.find((f) => f.id === targetId) ?? null;
+
+  async function send() {
+    if (!targetId) return;
+    setError(null);
+    setSending(true);
+    try {
+      const res = await fetch("/api/nudge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toId: targetId, message: note, when }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Couldn't send the nudge.");
+      setSent(true);
+    } catch (e) {
+      setError((e as Error)?.message || "Couldn't send the nudge. Try again.");
+      setSending(false);
+    }
+  }
 
   if (sent) {
     return (
@@ -24,7 +56,7 @@ export default function NudgePage() {
         <span className="grid h-16 w-16 place-items-center rounded-md border-2 border-ink bg-success-soft text-success shadow-hard">
           <Check size={32} />
         </span>
-        <h1 className="mt-5 font-display text-2xl font-bold">Nudge sent</h1>
+        <h1 className="mt-5 font-display text-2xl font-bold">Nudge sent{target ? ` to ${target.name}` : ""}</h1>
         <p className="mt-2 text-[15px] text-muted">
           We&apos;ll let you know when they bite. They can suggest, set a condition,
           or rain-check.
@@ -49,19 +81,29 @@ export default function NudgePage() {
 
       <div className="mt-7">
         <Label>Who?</Label>
-        <div className="mt-3 grid grid-cols-4 gap-3 sm:grid-cols-6">
-          {MOCK_FRIENDS.map((f) => {
-            const on = picked.includes(f.id);
-            return (
-              <button key={f.id} onClick={() => toggle(f.id)} className="flex flex-col items-center gap-1">
-                <span className={on ? "rounded-md ring-2 ring-primary ring-offset-2 ring-offset-bg" : ""}>
-                  <Avatar name={f.name} src={f.avatar} size={52} />
-                </span>
-                <span className="truncate text-xs font-bold">{f.name}</span>
-              </button>
-            );
-          })}
-        </div>
+        {loading ? (
+          <div className="mt-3 flex justify-center text-muted">
+            <Loader2 size={20} className="animate-spin" />
+          </div>
+        ) : friends.length === 0 ? (
+          <p className="mt-3 rounded-xl border-2 border-dashed border-line bg-surface p-4 text-sm text-muted">
+            No mates here yet. Share a plan with someone first, then you can nudge them.
+          </p>
+        ) : (
+          <div className="mt-3 grid grid-cols-4 gap-3 sm:grid-cols-6">
+            {friends.map((f) => {
+              const on = targetId === f.id;
+              return (
+                <button key={f.id} onClick={() => setTargetId(on ? null : f.id)} className="flex flex-col items-center gap-1">
+                  <span className={on ? "rounded-md ring-2 ring-primary ring-offset-2 ring-offset-bg" : ""}>
+                    <Avatar name={f.name} src={f.avatar} size={52} />
+                  </span>
+                  <span className="truncate text-xs font-bold">{f.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="mt-7">
@@ -84,14 +126,21 @@ export default function NudgePage() {
         />
       </div>
 
+      {error && (
+        <p role="alert" className="mt-5 rounded-md border-2 border-[#c0392b] bg-[#c0392b]/10 px-3 py-2 text-sm font-bold text-[#c0392b]">
+          {error}
+        </p>
+      )}
+
       <Button
         variant="primary"
         size="lg"
         className="mt-8 w-full"
-        disabled={picked.length === 0}
-        onClick={() => setSent(true)}
+        disabled={!targetId || sending}
+        onClick={send}
       >
-        <Hand size={18} /> Send nudge ({picked.length})
+        {sending ? <Loader2 size={18} className="animate-spin" /> : <Hand size={18} />}
+        {sending ? "Sending…" : "Send nudge"}
       </Button>
     </div>
   );

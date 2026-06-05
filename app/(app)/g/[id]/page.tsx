@@ -36,10 +36,6 @@ export default async function GroupDetail({
               <span className="text-xs font-bold">{m.name}</span>
             </div>
           ))}
-          <button className="flex flex-col items-center gap-1">
-            <span className="grid h-12 w-12 place-items-center rounded-md border-2 border-dashed border-line text-muted"><Plus size={20} /></span>
-            <span className="text-xs font-bold text-muted">Add</span>
-          </button>
         </div>
       </Card>
 

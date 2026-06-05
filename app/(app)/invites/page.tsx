@@ -1,12 +1,10 @@
-"use client";
-import * as React from "react";
-import { useRouter } from "next/navigation";
-import { Users, UserRound, CalendarDays, Check, X } from "lucide-react";
-import { Card, Pill, Button } from "@/components/ui";
-import { MOCK_INVITES, type Invite } from "@/lib/mock";
+import { Users, UserRound, CalendarDays } from "lucide-react";
+import { Card, Pill } from "@/components/ui";
+import { getInvites } from "@/lib/db";
+import { InviteActions } from "./InviteActions";
 
-export default function InvitesPage() {
-  const [items, setItems] = React.useState(MOCK_INVITES);
+export default async function InvitesPage() {
+  const items = await getInvites();
 
   return (
     <div>
@@ -22,44 +20,26 @@ export default function InvitesPage() {
           </Card>
         ) : (
           items.map((iv) => (
-            <InviteCard
-              key={iv.id}
-              invite={iv}
-              onDismiss={() => setItems((s) => s.filter((x) => x.id !== iv.id))}
-            />
+            <Card key={iv.id} hard className="overflow-hidden p-0">
+              <div className="flex">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={iv.cover} alt="" className="h-auto w-24 shrink-0 border-r-2 border-ink/10 object-cover" />
+                <div className="min-w-0 flex-1 p-4">
+                  <Pill tone={iv.kind === "community" ? "secondary" : "primary"}>
+                    {iv.kind === "community" ? <Users size={12} /> : <UserRound size={12} />}
+                    {iv.fromLabel}
+                  </Pill>
+                  <h3 className="mt-2 font-heading font-bold leading-snug">{iv.activity}</h3>
+                  <div className="mt-1 flex items-center gap-1 text-sm text-muted">
+                    <CalendarDays size={13} /> {iv.dateLabel}
+                  </div>
+                  <InviteActions slug={iv.slug} />
+                </div>
+              </div>
+            </Card>
           ))
         )}
       </div>
     </div>
-  );
-}
-
-function InviteCard({ invite, onDismiss }: { invite: Invite; onDismiss: () => void }) {
-  const router = useRouter();
-  return (
-    <Card hard className="overflow-hidden p-0">
-      <div className="flex">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={invite.cover} alt="" className="h-auto w-24 shrink-0 border-r-2 border-ink/10 object-cover" />
-        <div className="min-w-0 flex-1 p-4">
-          <Pill tone={invite.kind === "community" ? "secondary" : "primary"}>
-            {invite.kind === "community" ? <Users size={12} /> : <UserRound size={12} />}
-            {invite.fromLabel}
-          </Pill>
-          <h3 className="mt-2 font-heading font-bold leading-snug">{invite.activity}</h3>
-          <div className="mt-1 flex items-center gap-1 text-sm text-muted">
-            <CalendarDays size={13} /> {invite.dateLabel}
-          </div>
-          <div className="mt-3 flex gap-2">
-            <Button size="sm" variant="primary" onClick={() => router.push(`/p/${invite.slug}`)}>
-              <Check size={15} /> Accept
-            </Button>
-            <Button size="sm" variant="soft" onClick={onDismiss}>
-              <X size={15} /> Decline
-            </Button>
-          </div>
-        </div>
-      </div>
-    </Card>
   );
 }

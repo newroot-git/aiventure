@@ -12,6 +12,8 @@ export async function GET() {
       id: me?.id ?? null,
       name: me?.name ?? null,
       interests: me?.interests ?? [],
+      interest_notes: me?.interest_notes ?? "",
+      home_area: me?.home_area ?? "",
       needsOnboard: !!me && (me.interests?.length ?? 0) === 0,
     });
   } catch {
@@ -21,7 +23,7 @@ export async function GET() {
 
 // POST: save onboarding / profile edits
 export async function POST(req: Request) {
-  let body: { name?: string; interests?: string[]; interest_notes?: string };
+  let body: { name?: string; interests?: string[]; interest_notes?: string; home_area?: string };
   try {
     body = await req.json();
   } catch {

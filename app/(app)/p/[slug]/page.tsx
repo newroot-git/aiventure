@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PlanView } from "@/components/PlanView";
+import { EnsureGuest } from "@/components/EnsureGuest";
 import { getPlanBySlug, getFriends } from "@/lib/db";
 
 export default async function PlanPage({
@@ -20,6 +21,8 @@ export default async function PlanPage({
 
   return (
     <div className="mx-auto w-full max-w-lg">
+      {/* no identity yet (arrived by link) → mint a guest so they can join, no install */}
+      {data.currentUserId === "" && <EnsureGuest />}
       <Link href="/plans" className="inline-flex items-center gap-1 text-sm font-bold text-muted">
         <ArrowLeft size={15} /> Home
       </Link>

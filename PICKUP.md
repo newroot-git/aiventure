@@ -1,9 +1,47 @@
 # AIventure — Pickup
 
-Last session: 2026-06-05 (tester-feedback batch — 8 fixes). UCWS Singapore hackathon (Agent track). Style LOCKED: lush pixel landscapes, **NO emojis**, lucide icons + initials/image avatars. Brand "Earthbound & Stargazing".
+Last session: 2026-06-05 (full beta-test sweep + fix-all). UCWS Singapore hackathon (Agent track). **NO emojis**. Brand "Earthbound & Stargazing".
+
+## Pickup — 2026-06-05 (beta sweep + fix-all — LATEST)
+- **Was doing:** full black-box beta test (Playwright, fresh signups/onboards) + Claude×4 + Codex audits, then fixed everything found and re-tested in a second loop. All shipped.
+- **Done (all verified live, tsc + build green):**
+  - **P0 no-install join** — `/p/` public in `middleware.ts` + `components/EnsureGuest.tsx` auto-mints a guest on a stranger's first visit; `setRsvp` = link is the capability. Stranger→link→guest→RSVP persists.
+  - **P0 adventures vanished from Log** — `log/page.tsx` + `log/[ym]` fall back to `completed_at` (new `PlanCard.completedAt`); date-less completed plans now show.
+  - Vote double-count fixed (PlanView derives from props + single optimistic delta); real Google-Calendar export (disabled "Set a date first" when undated); home first-run empty state + "For you" hidden-when-empty; `/new` copy fixed (server already defaults blank→home_area).
+  - **Security:** `getFriends` scoped to shared group/plan (was whole userbase); `av_uid` HMAC-signed + httpOnly + secure (`lib/guest.ts`, verified in `currentUserId`); `deleteOption`/`lockDate` optionId scoped to the slug's plan; `updatePlanStatus` legal-transition matrix; votes blocked once locked; real signout (ends Supabase session).
+  - **AI** (`lib/ai.ts`): ok-before-json, guarded parse, empty-content guard, 1 retry, 25s timeout, prompt-input sanitize, drop title-less options.
+  - **Stubs wired + persisted:** profile edit, group create (`/api/groups` POST + `createGroup`), invites (real server page + accept/decline), nudge (real friends, single-select), plus (honest "early list").
+- **Next step / deferred (note, not blockers):** RLS still OFF (service-role everywhere); `currentUserId` uses `getSession` not `getUser` (middleware validates — Supabase logs an advisory warning); in-memory rate limiter per-instance. Close pre-real-launch.
+- **Key files:** `_audit/BETA-SWEEP-2026-06-05.md` (full report + fix log), `lib/db.ts`, `lib/ai.ts`, `lib/guest.ts`, `components/PlanView.tsx`, `components/EnsureGuest.tsx`, `middleware.ts`.
+
+## Pickup — 2026-06-05 (perf + Codex-audit session)
+- **Was doing:** performance/UX overhaul + two full Claude+Codex audits. All committed + pushed to `main` (auto-deploys) @ `a453fc0`.
+- **Done:**
+  - **Codex-via-OpenRouter audit harness** in `_audit/` — scripted adversarial second-opinion probes (`node _audit/codex-audit.mjs` + perf/actions/draftmodel/shellstream); reports saved alongside. Reusable.
+  - **Perceived-perf trio:** `(app)/loading.tsx` skeleton + `cache()` inbox getters + `useLinkStatus` nav spinners; lazy Leaflet + geocode/search caches.
+  - **Optimistic plan editing** (`PlanView.tsx`): instant local edits, non-blocking `router.refresh()` bg-reconcile (12–16ms flip vs ~800ms write). `res.ok` rollback + error toast + **per-field reconcile** (NOT wholesale plan-identity reset — don't reintroduce).
+  - **App-entry speedup:** `updateMyProfile` 3→2 writes (`/api/me` 1043→516ms); **streamed `(app)` shell** (inbox = server component behind `<Suspense>`: `NotificationsMenu.server.tsx` + `NotificationsErrorBoundary.tsx`).
+  - **Security:** member-roster selects trimmed `profiles(*)`→`(id,name,avatar_emoji)` (closed email/notes PII leak via shareable plan links); `respondNudge` idempotent; `clientError` on status+nudge routes.
+- **Next step (highest value):** deferred audit security — `getFriends` returns WHOLE userbase to any guest (needs friendship model), `av_uid` cookie unsigned + not httpOnly (guest impersonation via enumerated UUID), `deleteOption`/`lockDate` unscoped `optionId`, stranger mutations on `open` plans. Demo-safe; close pre-real-launch. Detail in `_audit/`.
+- **Key files:** `components/PlanView.tsx`, `lib/db.ts`, `app/(app)/layout.tsx` + `components/NotificationsMenu.server.tsx`, `_audit/`.
+- **Notes:** optimistic overlay = `optStatus/optChosen/optPlan/optRec`, reconciled per-field vs server truth, rolled back on `!res.ok`. Still-mock stubs (audits flagged, NOT bugs): `profile/edit`, `groups/new`, `nudge`, `invites`. `getUserPlans` ~880ms chain left (masked by skeleton).
+
+## Pickup — 2026-06-05 (cover art restyle)
+- **Was doing:** fixing AIventure cover/banner art — felt "too AI", inconsistent style, wrong sizing for the trip-banner slot.
+- **Done:** regenerated **all 46 covers** in ONE locked style → soft **Ghibli** pixel-art (32-bit fine-dither) + **simplicity guarantee** (2–4 friends max, never crowds, setting is hero, no text/signage), anchored on approved coffee+trip refs, output **3:2 1024×683 full-bleed**. Pipeline = `scripts/rollout-covers.mjs` (retry + auto-deband). 0 fails.
+- **White-band bug Josh caught:** gemini-2.5-flash-image bakes a cream **letterbox** in despite "no borders"; my center-crop kept it = white gap at banner top. Fixed via `scripts/debander.mjs` (ImageMagick `-fuzz 10% -trim` → cover-fit 1024×683). Trim folded into rollout so re-gens self-clean. **Lesson: gemini ignores aspect/no-border prompts — always trim+refit after gen.**
+- **Files:** `public/img/cover-*.png` (46); test gens + original backup in `_cover-work/` (moved OUT of `public/`, won't ship). Revert = `_cover-work/_covers_backup/`. PlanView hero unchanged.
+- **Next step:** eyeball in app (:3210) → if good, commit + push (main auto-deploys). NOT pushed yet.
+
+## Pickup — 2026-06-05 (prior — visual pixel pass + mobile + nav icons)
+- **Was doing:** visual/design consistency + mobile polish on top of a big audit/security/PWA session.
+- **Done this session:** security+perf+dead-code audit shipped; judge-login fix; 8-item tester batch (mock cleanup, date/time, slot-control `+ Add` menu w/ append + AI-find-venue, recurring placement); mobile app-shell + installable PWA; **SW stale-RSC bug fixed** (actions now refresh live); mobile-sizing batch incl **Conor identity fix** (av_uid → guests only); full **pixel visual-consistency pass** (hard ink borders + hard shadows, DESIGN.md aligned); nav icons → **monochrome Pixelarticons** (`components/pixel-icons.tsx`) after Josh rejected AI colour sprites.
+- **Next step:** if Josh likes the pixel nav, roll Pixelarticons app-wide (section bubbles, categories). Conor must reload once to clear stale SW+cookie then re-test signup = his account.
+- **Key files:** `components/AppShell.tsx`, `components/pixel-icons.tsx`, `components/ui.tsx` + `plan.tsx` (pixel components), `public/sw.js`, `lib/db.ts` (currentUserId guest gate), `DESIGN.md`, `docs/VISUAL-CONSISTENCY-PLAN.md`.
+- **⚠️ SHARED TREE:** another Claude has **uncommitted** work (PlanView optimistic-rollback + error toasts, `lib/db.ts`, `app/api/nudge/respond`, `app/api/plans/status`). I committed only my files. Their PlanView had a TS error I patched in the working tree (`plan as unknown as Record<...>`) but did NOT commit — it rides along when they commit. Don't clobber.
 
 ## LIVE
-- **Prod: https://aiventure-swart.vercel.app** — repo `newroot-git/aiventure` @ **`43eb0b1`** → push main auto-deploys.
+- **Prod: https://aiventure-swart.vercel.app** — repo `newroot-git/aiventure` @ **`bcc513a`** → push main auto-deploys. Commit only your own files (shared tree).
 
 ## Mobile sizing + identity batch (2026-06-05, `deea0f7`) — SHIPPED, verified 390px
 - **#6 Conor's new account defaulted to Josh** — two causes: (a) the SW v1 cross-user RSC cache (fixed in v2 earlier); (b) a stale `av_uid` cookie resolving to seeded "Josh" (auth_id null). Now in prod `av_uid` is honoured ONLY for actual minted guest profiles (name `Guest NNNN`); dev-switcher still works under `DEV_SWITCH=1`. Real sessions already win first.
@@ -70,7 +108,7 @@ Ran a 4-agent moody code audit, then fixed everything. `next build` green, `tsc`
 
 ## NOT done — next session
 - **#36 Groups** — create/manage groups (name + pick members), use in `/new` "A group". Not built. Fresh users are in NO groups, so "A group" is empty. db needs `createGroup` + `addGroupMembers` + crew UI.
-- **#37 Smoothness** — keystroke lag fixed; still want optimistic UI on choose, top nav progress bar, route transitions (`template.tsx` exists).
+- **#37 Smoothness** — ✅ DONE 2026-06-05 (perf session): optimistic UI on choose/lock/edits, `useLinkStatus` nav spinners, `(app)/loading.tsx` route skeletons, streamed shell. Keystroke lag already fixed earlier.
 - **Real magic-link auth** — blocked without Josh (needs Supabase config).
 - Consolidate the 3 add affordances (add-own / ask-AI / add-step) — Josh handling separately.
 

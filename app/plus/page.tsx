@@ -20,6 +20,7 @@ const PLANS = [
 
 export default function PlusPage() {
   const [plan, setPlan] = React.useState("year");
+  const [joined, setJoined] = React.useState(false);
 
   return (
     <main className="flex flex-1 flex-col">
@@ -78,12 +79,26 @@ export default function PlusPage() {
           })}
         </div>
 
-        <Button variant="primary" size="lg" className="mt-6 w-full">
-          Start free trial
-        </Button>
-        <p className="mt-3 text-center text-xs text-muted">
-          7 days free, then {plan === "year" ? "£29.99/yr" : "£3.99/mo"}. Cancel anytime.
-        </p>
+        {joined ? (
+          <div className="mt-6 rounded-xl border-2 border-ink bg-success-soft p-5 text-center shadow-hard">
+            <span className="inline-grid h-12 w-12 place-items-center rounded-md border-2 border-ink bg-success text-white">
+              <Check size={24} />
+            </span>
+            <p className="mt-3 font-display text-lg font-bold">You&apos;re on the early list</p>
+            <p className="mt-1 text-sm text-muted">
+              Plus is coming soon — we&apos;ll be in touch before billing ever starts. No charge today.
+            </p>
+          </div>
+        ) : (
+          <>
+            <Button variant="primary" size="lg" className="mt-6 w-full" onClick={() => setJoined(true)}>
+              Join the early list
+            </Button>
+            <p className="mt-3 text-center text-xs text-muted">
+              Plus isn&apos;t live yet — this just adds you to the early list. No charge, no card needed.
+            </p>
+          </>
+        )}
       </section>
     </main>
   );

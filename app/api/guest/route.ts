@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { rateLimit, clientIp } from "@/lib/http";
+import { signGuest, verifyGuest } from "@/lib/guest";
 
 export const runtime = "nodejs";
 
@@ -9,7 +10,7 @@ export const runtime = "nodejs";
 // only mints a new profile when there isn't a valid one.
 export async function POST(req: NextRequest) {
   const db = supabaseAdmin();
-  const existing = req.cookies.get("av_uid")?.value;
+  const existing = verifyGuest(req.cookies.get("av_uid")?.value);
   if (existing) {
     const { data } = await db.from("profiles").select("id").eq("id", existing).maybeSingle();
     if (data) return NextResponse.json({ ok: true, reused: true });
@@ -25,6 +26,13 @@ export async function POST(req: NextRequest) {
   if (error || !data) return NextResponse.json({ error: "could not start guest" }, { status: 500 });
   const id = (data as unknown as { id: string }).id;
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("av_uid", id, { path: "/", maxAge: 60 * 60 * 24 * 30, sameSite: "lax" });
+  // signed + httpOnly so it can't be read by page JS or forged to another uuid
+  res.cookies.set("av_uid", signGuest(id), {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+    sameSite: "lax",
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  });
   return res;
 }

@@ -7,6 +7,9 @@ const PUBLIC = new Set(["/", "/signin", "/onboard"]);
 function isPublic(path: string): boolean {
   if (PUBLIC.has(path)) return true;
   return (
+    // shared plan links are public: link = capability. A fresh visitor lands on the
+    // plan and the page mints a guest so they can join with no install (see EnsureGuest).
+    path.startsWith("/p/") ||
     path.startsWith("/api") ||
     path.startsWith("/auth") ||
     path.startsWith("/_next") ||

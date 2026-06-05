@@ -5,6 +5,7 @@ import { supabaseAdmin } from "./supabase/admin";
 import { supabaseServer } from "./supabase/server";
 import { generateDrop, generateSlotOptions, resolvePlace, mapsUrl, type DropInput, type DropSlot } from "./ai";
 import { planSlug } from "./slug";
+import { verifyGuest } from "./guest";
 import type { Plan, PlanOption, PlanMember, Profile, RSVP, Visibility, PlanStatus } from "./types";
 
 // Map a Supabase auth user → our profile id (link by auth_id, then email, else create).
@@ -42,7 +43,9 @@ export const currentUserId = cache(async (): Promise<string> => {
   } catch {}
   try {
     const c = await cookies();
-    const uid = c.get("av_uid")?.value;
+    // verify the HMAC signature before trusting the cookie's uid (stops impersonation
+    // by setting av_uid=<someone-else's-uuid>). Dev switcher still works via verifyGuest.
+    const uid = verifyGuest(c.get("av_uid")?.value);
     if (uid) {
       // only honour av_uid for genuine guest profiles (no linked auth account) —
       // stops a forged/stale cookie from impersonating a real or seeded user.
@@ -357,7 +360,7 @@ function fmtDateLabel(iso?: string | null): string {
 export interface PlanCard {
   id: string; slug: string; activity: string; dateLabel: string; date: string; startsAtISO: string; place: string;
   groupName: string; members: Profile[]; status: "upcoming" | "past"; phase: PlanStatus; adventureNo?: number;
-  cover: string; tile: string; recurrence?: PlanRecurrence | null;
+  cover: string; tile: string; recurrence?: PlanRecurrence | null; completedAt: string;
 }
 
 function mapPlanCard(r: Row): PlanCard {
@@ -377,6 +380,7 @@ function mapPlanCard(r: Row): PlanCard {
     members,
     status: r.completed_at ? "past" : "upcoming",
     phase: ((r.status as PlanStatus) ?? "open"),
+    completedAt: (r.completed_at as string) || "",
     adventureNo: (r.adventure_no as number) ?? undefined,
     cover: deriveCover(hue) || "/img/cover-hike.png",
     tile: hue,
@@ -451,13 +455,45 @@ export async function getFriends(): Promise<{ profile: Profile; shared: string[]
   const db = supabaseAdmin();
   const me = await currentUserId();
   if (!me) return [];
-  const { data: profiles } = await db.from("profiles").select("*").neq("id", me);
+  // Friends = people I actually share something with (a group or a plan). There's no
+  // global friendships table yet, so this scopes the picker to my real network instead
+  // of returning the entire userbase. New users with no connections get an empty list.
   const groups = await getUserGroups();
+  const connected = new Set<string>();
+  for (const g of groups) for (const m of g.members) if (m.id !== me) connected.add(m.id);
+  const { data: myPlans } = await db.from("plan_members").select("plan_id").eq("profile_id", me);
+  const planIds = ((myPlans as Row[]) ?? []).map((m) => m.plan_id as string);
+  if (planIds.length) {
+    const { data: coMembers } = await db.from("plan_members").select("profile_id").in("plan_id", planIds);
+    for (const m of (coMembers as Row[]) ?? []) {
+      const id = m.profile_id as string;
+      if (id !== me) connected.add(id);
+    }
+  }
+  if (!connected.size) return [];
+  // select only the columns a picker needs — never pull email / private notes
+  const { data: profiles } = await db.from("profiles")
+    .select("id, auth_id, name, avatar_emoji, interests, home_area, is_paid, created_at")
+    .in("id", [...connected]);
   return ((profiles as Row[]) ?? [])
     .map((r) => mapProfile(r))
     .filter((p): p is Profile => !!p)
-    // never leak other people's email / private notes to a friend picker
     .map((p) => ({ profile: { ...p, email: null, interest_notes: null }, shared: groups.filter((g) => g.members.some((m) => m.id === p.id)).map((g) => g.name) }));
+}
+
+/** Create a group with the given members (owner = current user). Returns its id. */
+export async function createGroup(name: string, memberIds: string[]): Promise<{ id: string }> {
+  const db = supabaseAdmin();
+  const me = await currentUserId();
+  if (!me) throw new Error("sign in required");
+  const clean = (name ?? "").trim().slice(0, 60) || "New crew";
+  const { data: g, error } = await db.from("groups").insert({ name: clean, owner_id: me } as never).select("id").single();
+  if (error || !g) throw new Error(error?.message ?? "could not create group");
+  const gid = (g as Row).id as string;
+  // owner always a member; dedupe + cap; only keep string ids
+  const ids = Array.from(new Set([me, ...((memberIds ?? []).filter((x) => typeof x === "string"))])).slice(0, 50);
+  await db.from("group_members").insert(ids.map((pid) => ({ group_id: gid, profile_id: pid })) as never);
+  return { id: gid };
 }
 
 export interface GroupCard { id: string; name: string; members: Profile[] }
@@ -613,11 +649,13 @@ export async function toggleVote(optionId: string): Promise<boolean> {
   const { data: opt } = await db.from("plan_options").select("plan_id").eq("id", optionId).maybeSingle();
   if (!opt) throw new Error("option not found");
   const planId = (opt as Row).plan_id as string;
-  const { data: plan } = await db.from("plans").select("creator_id, visibility").eq("id", planId).maybeSingle();
+  const { data: plan } = await db.from("plans").select("creator_id, visibility, status").eq("id", planId).maybeSingle();
   if (!plan) throw new Error("plan not found");
   const pr = plan as Row;
   if (pr.creator_id !== me && (pr.visibility as string) !== "open" && !(await isMember(planId, me)))
     throw new Error("not your plan");
+  // votes only count while planning — a locked/completed plan is decided
+  if ((pr.status as string) !== "open") throw new Error("voting is closed — this plan is locked in");
   const { data: existing } = await db.from("option_votes")
     .select("option_id").eq("option_id", optionId).eq("profile_id", me).maybeSingle();
   if (existing) {
@@ -633,12 +671,10 @@ export async function setRsvp(slug: string, rsvp: RSVP): Promise<void> {
   const db = supabaseAdmin();
   const me = await currentUserId();
   if (!me) throw new Error("sign in required");
+  // Link = capability: anyone who can open the plan by its (unguessable) slug may
+  // join + RSVP. No-install participation is the core promise — don't gate it behind
+  // invites. RSVP makes them a member, which then unlocks voting/adding ideas.
   const plan = await planAuth(slug);
-  // you may RSVP only if you own it, are already in, it's open, or you were invited
-  if (
-    plan.creatorId !== me && plan.visibility !== "open" &&
-    !(await isMember(plan.id, me)) && !(await hasInvite(slug, me))
-  ) throw new Error("not invited to this plan");
   await db.from("plan_members").upsert(
     { plan_id: plan.id, profile_id: me, rsvp, joined_via: "app" } as never,
     { onConflict: "plan_id,profile_id" } as never,
@@ -664,12 +700,16 @@ export async function addDateOption(slug: string, iso: string): Promise<void> {
 export async function lockDate(slug: string, optionId: string): Promise<void> {
   await assertOwner(slug);
   const db = supabaseAdmin();
+  const { data: planRow } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
+  if (!planRow) throw new Error("plan not found");
+  const planId = (planRow as Row).id as string;
   const { data: opt } = await db.from("plan_options").select("plan_id, payload").eq("id", optionId).maybeSingle();
-  if (!opt) throw new Error("date option not found");
+  // the date option must belong to THIS plan — stop cross-plan optionId tampering
+  if (!opt || (opt as Row).plan_id !== planId) throw new Error("date option not on this plan");
   const iso = ((opt as Row).payload as Row)?.iso as string;
   if (iso) await db.from("plans").update({ starts_at: iso } as never).eq("slug", slug);
-  // remove all date candidates now that it's set
-  await db.from("plan_options").delete().eq("plan_id", (opt as Row).plan_id as string).eq("title", "date");
+  // remove all date candidates on THIS plan now that it's set
+  await db.from("plan_options").delete().eq("plan_id", planId).eq("title", "date");
 }
 
 /** Append a new (empty) slot to the plan's scaffold. */
@@ -760,11 +800,15 @@ export async function addResolvedPlace(slug: string, query: string, slotKey: str
 export async function deleteOption(slug: string, optionId: string): Promise<void> {
   await assertOwner(slug);
   const db = supabaseAdmin();
+  const { data: planRow } = await db.from("plans").select("id").eq("slug", slug).maybeSingle();
+  if (!planRow) throw new Error("plan not found");
+  const planId = (planRow as Row).id as string;
   const { data: opt } = await db.from("plan_options").select("plan_id").eq("id", optionId).maybeSingle();
+  // option must belong to THIS plan — stop an owner deleting another plan's option by id
+  if (!opt || (opt as Row).plan_id !== planId) throw new Error("option not on this plan");
   await db.from("option_votes").delete().eq("option_id", optionId);
   await db.from("plan_options").delete().eq("id", optionId);
-  const planId = (opt as Row | null)?.plan_id as string | undefined;
-  if (planId) await deriveHeadline(planId, slug);
+  await deriveHeadline(planId, slug);
 }
 
 /** Pick one option for its slot: marks it chosen, clears siblings, re-derives the plan headline. */
@@ -867,6 +911,8 @@ export async function invitePeople(slug: string, profileIds: string[]): Promise<
   if (!plan) throw new Error("plan not found");
   const p = plan as Row;
   const pid = p.id as string;
+  // cap + dedupe the invite list so one call can't fan out unbounded rows
+  profileIds = Array.from(new Set((profileIds ?? []).filter((id) => typeof id === "string"))).slice(0, 50);
   // Invitees start as "maybe" (tentative) — they only count as going once they
   // explicitly accept via setRsvp. Auto-"in" inflated availability + lock counts.
   const rows = profileIds.map((id) => ({ plan_id: pid, profile_id: id, rsvp: "maybe", joined_via: "app" }));
@@ -886,9 +932,20 @@ export async function invitePeople(slug: string, profileIds: string[]): Promise<
 }
 
 /** Move a plan through its lifecycle: open → locked → completed. Owner only. */
+// legal lifecycle moves — stops jumping open→completed or other illegal skips
+const LEGAL_TRANSITIONS: Record<string, string[]> = {
+  open: ["open", "locked"],
+  locked: ["locked", "open", "completed"],
+  completed: ["completed", "locked"],
+};
+
 export async function updatePlanStatus(slug: string, status: "open" | "locked" | "completed"): Promise<void> {
   await assertOwner(slug);
   const db = supabaseAdmin();
+  const { data: cur } = await db.from("plans").select("status").eq("slug", slug).maybeSingle();
+  const from = ((cur as Row | null)?.status as string) ?? "open";
+  if (!(LEGAL_TRANSITIONS[from] ?? []).includes(status))
+    throw new Error(`can't move a ${from} plan to ${status}`);
   const patch: Record<string, unknown> = { status };
   patch.completed_at = status === "completed" ? new Date().toISOString() : null;
   const { error } = await db.from("plans").update(patch as never).eq("slug", slug);
@@ -1043,14 +1100,6 @@ async function isMember(planId: string, me: string): Promise<boolean> {
   if (!me) return false;
   const db = supabaseAdmin();
   const { data } = await db.from("plan_members").select("profile_id").eq("plan_id", planId).eq("profile_id", me).maybeSingle();
-  return !!data;
-}
-
-// True if `me` was invited to this plan (has an invite row).
-async function hasInvite(slug: string, me: string): Promise<boolean> {
-  if (!me) return false;
-  const db = supabaseAdmin();
-  const { data } = await db.from("invites").select("id").eq("plan_slug", slug).eq("to_id", me).maybeSingle();
   return !!data;
 }
 

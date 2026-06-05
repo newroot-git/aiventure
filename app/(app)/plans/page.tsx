@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { MapPin, CalendarDays, ChevronRight, Sparkles, Users, Lock } from "lucide-react";
-import { Card, Pill, AvatarStack } from "@/components/ui";
+import { MapPin, CalendarDays, ChevronRight, Sparkles, Users, Lock, Plus } from "lucide-react";
+import { Card, Pill, AvatarStack, Button } from "@/components/ui";
 import { Countdown } from "@/components/Countdown";
 import { LocalDateTime } from "@/components/LocalDateTime";
 import { getUserPlans, getCurrentProfile, getInvites, getNudges, getOpenEvents, type PlanCard } from "@/lib/db";
@@ -33,29 +33,48 @@ export default async function HomePage() {
         </div>
       )}
 
-      {/* for you — inbox */}
-      <h2 className="mt-7 mb-3 text-xs font-bold uppercase tracking-wider text-muted">For you</h2>
-      <div className="flex flex-col gap-2">
-        {invites.map((iv) => (
-          <Link key={iv.id} href="/invites" className="block">
-            <Card className="flex items-center gap-3 p-3 transition active:scale-[0.99]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/img/icons/invite.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink object-cover" />
-              <div className="min-w-0 flex-1 text-sm"><b>{iv.fromLabel}</b> invited you · <span className="text-muted">{iv.activity}</span></div>
-              <ChevronRight size={18} className="shrink-0 text-muted" />
-            </Card>
+      {/* first-run — no plans yet */}
+      {plans.length === 0 && (
+        <Card hard className="mt-6 p-6 text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/img/icons/invite.png" alt="" className="pixelated mx-auto h-14 w-14 rounded-md border-2 border-ink object-cover" />
+          <h2 className="mt-4 font-display text-2xl font-bold">No plans yet. Let&apos;s fix that.</h2>
+          <p className="mx-auto mt-2 max-w-xs text-[15px] text-muted">
+            Start something — a hike, a dinner, a whole adventure. We&apos;ll do the legwork.
+          </p>
+          <Link href="/new" className="mt-5 inline-block">
+            <Button variant="primary" size="lg"><Plus size={18} /> Start a plan</Button>
           </Link>
-        ))}
-        {nudges.length > 0 && (
-          <Card className="flex items-center gap-3 p-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/img/icons/nudge.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink object-cover" />
-            <div className="min-w-0 flex-1 text-sm">
-              <b>{nudges.length} nudge{nudges.length > 1 ? "s" : ""}</b> waiting · <span className="text-muted">tap the inbox to respond</span>
-            </div>
-          </Card>
-        )}
-      </div>
+        </Card>
+      )}
+
+      {/* for you — inbox (only when there's actually something here) */}
+      {(invites.length > 0 || nudges.length > 0) && (
+        <>
+          <h2 className="mt-7 mb-3 text-xs font-bold uppercase tracking-wider text-muted">For you</h2>
+          <div className="flex flex-col gap-2">
+            {invites.map((iv) => (
+              <Link key={iv.id} href="/invites" className="block">
+                <Card className="flex items-center gap-3 p-3 transition active:scale-[0.99]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/img/icons/invite.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink object-cover" />
+                  <div className="min-w-0 flex-1 text-sm"><b>{iv.fromLabel}</b> invited you · <span className="text-muted">{iv.activity}</span></div>
+                  <ChevronRight size={18} className="shrink-0 text-muted" />
+                </Card>
+              </Link>
+            ))}
+            {nudges.length > 0 && (
+              <Card className="flex items-center gap-3 p-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/img/icons/nudge.png" alt="" className="pixelated h-10 w-10 shrink-0 rounded-md border-2 border-ink object-cover" />
+                <div className="min-w-0 flex-1 text-sm">
+                  <b>{nudges.length} nudge{nudges.length > 1 ? "s" : ""}</b> waiting · <span className="text-muted">tap the inbox to respond</span>
+                </div>
+              </Card>
+            )}
+          </div>
+        </>
+      )}
 
       {rest.length > 0 && (
         <>

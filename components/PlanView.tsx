@@ -51,17 +51,20 @@ function fmtTime(iso?: string | null) {
   if (!iso) return null;
   return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
-function googleCalUrl(plan: Plan) {
-  if (!plan.starts_at) return "#";
+// add-to-calendar link; returns null when there's no date (control renders disabled).
+// details = chosen step→venue lines + the plan url; end = start + 2h.
+function googleCalUrl(plan: Plan, details: string, location: string, url: string): string | null {
+  if (!plan.starts_at) return null;
   const start = new Date(plan.starts_at);
-  const end = new Date(start.getTime() + 3 * 60 * 60 * 1000);
+  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+  // UTC basic format YYYYMMDDTHHMMSSZ
   const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
   const p = new URLSearchParams({
     action: "TEMPLATE",
     text: plan.activity ?? plan.title,
     dates: `${fmt(start)}/${fmt(end)}`,
-    details: plan.why ?? "",
-    location: plan.place_address ?? plan.place_name ?? "",
+    details: [details, url].filter(Boolean).join("\n\n"),
+    location,
   });
   return `https://calendar.google.com/calendar/render?${p.toString()}`;
 }
@@ -189,16 +192,21 @@ export function PlanView({
   // actually reflects it (write landed). A wholesale reset on plan-identity would
   // nuke still-in-flight overrides on an unrelated refresh; this clears exactly the
   // ones that have caught up, and failed writes are rolled back explicitly (below).
-  if (optStatus !== null && plan.status === optStatus) setOptStatus(null);
-  {
+  // setState lives in effects (post-render) — never during render (React 19 throws).
+  React.useEffect(() => {
+    if (optStatus !== null && plan.status === optStatus) setOptStatus(null);
+  }, [plan.status, optStatus]);
+  React.useEffect(() => {
     const keep = Object.entries(optPlan).filter(([k, v]) => (plan as unknown as Record<string, unknown>)[k] !== v);
     if (keep.length !== Object.keys(optPlan).length) setOptPlan(Object.fromEntries(keep));
-  }
-  {
+  }, [plan, optPlan]);
+  React.useEffect(() => {
     const keep = Object.entries(optChosen).filter(([sid, oid]) => serverChosen[sid] !== oid);
     if (keep.length !== Object.keys(optChosen).length) setOptChosen(Object.fromEntries(keep));
-  }
-  if (optRec.set && JSON.stringify(recurrence ?? null) === JSON.stringify(optRec.val ?? null)) setOptRec({ set: false, val: null });
+  }, [serverChosen, optChosen]);
+  React.useEffect(() => {
+    if (optRec.set && JSON.stringify(recurrence ?? null) === JSON.stringify(optRec.val ?? null)) setOptRec({ set: false, val: null });
+  }, [recurrence, optRec]);
 
   const effPlan = React.useMemo(() => ({ ...plan, ...optPlan }), [plan, optPlan]);
   const effRecurrence = optRec.set ? optRec.val : recurrence;
@@ -233,12 +241,35 @@ export function PlanView({
   );
 
   const [rsvp, setRsvpState] = React.useState<RSVP>(myRsvp ?? "in");
-  const [votes, setVotes] = React.useState<Record<string, number>>(
-    Object.fromEntries(options.map((o) => [o.id, o.votes])),
+  // Votes derive from server truth (per option: `votes` + `mine`) every render; we
+  // keep only an optimistic toggle override per option the user just tapped. Once the
+  // background refresh lands and the server `mine` matches the override, the override
+  // clears (effect below) so the delta never stacks on an already-updated base.
+  const [optVote, setOptVote] = React.useState<Record<string, boolean>>({});
+  // server truth keyed by option id — single source for count + mine (plan options + date options)
+  const serverVotes = React.useMemo(() => {
+    const m: Record<string, { votes: number; mine: boolean }> = {};
+    for (const o of options) m[o.id] = { votes: o.votes ?? 0, mine: !!o.mine };
+    for (const d of dateOptions) m[d.id] = { votes: d.votes ?? 0, mine: !!d.mine };
+    return m;
+  }, [options, dateOptions]);
+  const dateMine = React.useMemo(() => Object.fromEntries(dateOptions.map((d) => [d.id, !!d.mine])), [dateOptions]);
+  // drop each optimistic override once the server reflects it
+  React.useEffect(() => {
+    const keep = Object.entries(optVote).filter(([id, on]) => (serverVotes[id]?.mine ?? false) !== on);
+    if (keep.length !== Object.keys(optVote).length) setOptVote(Object.fromEntries(keep));
+  }, [serverVotes, optVote]);
+  // displayed active state (checkmark) = optimistic override if present, else server mine
+  const isVoted = React.useCallback(
+    (id: string) => (id in optVote ? optVote[id] : serverVotes[id]?.mine ?? false),
+    [optVote, serverVotes],
   );
-  const [voted, setVoted] = React.useState<Record<string, boolean>>(
-    Object.fromEntries(options.filter((o) => o.mine).map((o) => [o.id, true])),
-  );
+  // displayed count = server count adjusted by the option's optimistic delta only
+  const voteCount = React.useCallback((id: string) => {
+    const s = serverVotes[id] ?? { votes: 0, mine: false };
+    if (!(id in optVote) || optVote[id] === s.mine) return s.votes;
+    return Math.max(0, s.votes + (optVote[id] ? 1 : -1));
+  }, [optVote, serverVotes]);
   const [copied, setCopied] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   // per-slot "working" key (e.g. `${slot.id}:refine`) so only the active slot shows a spinner
@@ -263,6 +294,14 @@ export function PlanView({
   const planning = phase === "open";
   const people = members.map((m) => m.profile ?? { name: "Guest" });
   const generalArea = effPlan.place_address || effPlan.place_name || "TBC";
+
+  // add-to-calendar: chosen "step: venue" lines + the live plan url; null = no date set
+  const pageUrl = typeof window !== "undefined" ? window.location.href : `https://aiventure.app/p/${plan.slug}`;
+  const calDetails = slots
+    .filter((s) => s.chosen)
+    .map((s) => `${s.label}: ${s.chosen!.title}`)
+    .join("\n");
+  const calUrl = googleCalUrl(effPlan, calDetails, generalArea, pageUrl);
 
   // fire the write, reconcile in the background. On failure: run the caller's rollback
   // (undo the optimistic override) and surface an error — so a rejected write never
@@ -306,18 +345,18 @@ export function PlanView({
     } catch { setOptStatus(prev); setErr("Couldn't update — check your connection."); }
     finally { setBusy(false); bgRefresh(); }
   }
+  // optimistic toggle = flip from current displayed state (override if set, else server mine)
   const vote = React.useCallback((id: string) => {
-    const toggle = () => setVoted((v) => {
-      const now = !v[id];
-      setVotes((vs) => ({ ...vs, [id]: Math.max(0, (vs[id] ?? 0) + (now ? 1 : -1)) }));
-      return { ...v, [id]: now };
-    });
-    toggle();
+    setOptVote((v) => ({ ...v, [id]: !(id in v ? v[id] : serverVotes[id]?.mine ?? false) }));
     fetch("/api/plans/vote", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ optionId: id }),
-    }).then((res) => { if (!res.ok) toggle(); }).catch(() => toggle()); // re-toggle = undo
-  }, []);
+    })
+      // on failure: drop the override (falls back to server truth); else let refresh reconcile
+      .then((res) => { if (!res.ok) setOptVote((v) => { const n = { ...v }; delete n[id]; return n; }); })
+      .catch(() => setOptVote((v) => { const n = { ...v }; delete n[id]; return n; }))
+      .finally(() => bgRefresh());
+  }, [serverVotes, bgRefresh]);
   function changeRsvp(v: RSVP) {
     // declining drops the plan off your calendar/home — guard against a misclick
     if (v === "out" && !window.confirm("Can't make it? This plan will drop off your plans. You can still reopen it from the link.")) return;
@@ -328,13 +367,16 @@ export function PlanView({
   const deleteOpt = React.useCallback((optionId: string) => persist({ action: "deleteOption", optionId }), [persist]);
   const addDateOpt = (iso: string) => persist({ action: "addDate", iso });
   const lockDateOpt = (optionId: string) => persist({ action: "lockDate", optionId });
+  // date options share the votes/mine shape — same optimistic-override scheme as `vote`
   function voteDate(id: string) {
-    const toggle = () => setVoted((v) => ({ ...v, [id]: !v[id] }));
-    toggle();
+    setOptVote((v) => ({ ...v, [id]: !(id in v ? v[id] : dateMine[id] ?? false) }));
     fetch("/api/plans/vote", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ optionId: id }),
-    }).then((res) => { if (!res.ok) toggle(); bgRefresh(); }).catch(() => { toggle(); });
+    })
+      .then((res) => { if (!res.ok) setOptVote((v) => { const n = { ...v }; delete n[id]; return n; }); })
+      .catch(() => setOptVote((v) => { const n = { ...v }; delete n[id]; return n; }))
+      .finally(() => bgRefresh());
   }
   // Ask AI: append=true adds more ideas (keeps existing); append=false re-rolls the slot
   const onRefine = React.useCallback(async (slotKey: string, day: number, feedback: string, append = true) => {
@@ -582,20 +624,22 @@ export function PlanView({
             )}
             <div className="flex flex-col gap-2">
               {(() => {
-                const maxV = Math.max(0, ...dateOptions.map((d) => d.votes));
-                return [...dateOptions].sort((a, b) => b.votes - a.votes).map((d) => {
-                  const ideal = maxV > 0 && d.votes === maxV;
+                // display counts reflect the optimistic override, same as plan-option votes
+                const maxV = Math.max(0, ...dateOptions.map((d) => voteCount(d.id)));
+                return [...dateOptions].sort((a, b) => voteCount(b.id) - voteCount(a.id)).map((d) => {
+                  const c = voteCount(d.id);
+                  const ideal = maxV > 0 && c === maxV;
                   return (
                     <div key={d.id} className={`flex items-center gap-2 rounded-md border-2 p-2 ${ideal ? "border-success bg-success-soft/40" : "border-line bg-surface"}`}>
                       <button
                         onClick={() => voteDate(d.id)}
-                        className={`flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-bold transition ${voted[d.id] ? "text-success" : "text-ink"}`}
+                        className={`flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm font-bold transition ${isVoted(d.id) ? "text-success" : "text-ink"}`}
                       >
-                        <Check size={15} className={voted[d.id] ? "opacity-100" : "opacity-30"} />
+                        <Check size={15} className={isVoted(d.id) ? "opacity-100" : "opacity-30"} />
                         {fmtDate(d.iso)}{fmtTime(d.iso) ? ` · ${fmtTime(d.iso)}` : ""}
                       </button>
                       {ideal && <span className="rounded bg-success px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">Best</span>}
-                      <span className="text-xs font-bold text-muted">{d.votes} free</span>
+                      <span className="text-xs font-bold text-muted">{c} free</span>
                       {isOwner && (
                         <Button variant="soft" size="sm" onClick={() => lockDateOpt(d.id)}>
                           <Lock size={13} /> Set
@@ -685,7 +729,7 @@ export function PlanView({
                       <Reveal key={s.id} delay={Math.min(i, 5) * 0.05}>
                         <PlanSlot
                           slot={s} index={i} isOwner={isOwner} planning={planning} working={working}
-                          votes={votes} voted={voted} placeArea={plan.place_address}
+                          voteCount={voteCount} isVoted={isVoted} placeArea={plan.place_address}
                           onVote={vote} onChoose={choose} onDeleteOpt={deleteOpt}
                           onRefine={onRefine} onAddOwn={onAddOwn} onResolveAdd={onResolveAdd} onSetSlotTime={onSetSlotTime}
                         />
@@ -715,9 +759,15 @@ export function PlanView({
           <Button variant="soft" className="flex-1" onClick={copyLink}>
             <Link2 size={17} /> {copied ? "Link copied" : "Invite"}
           </Button>
-          <a href={googleCalUrl(plan)} target="_blank" rel="noopener noreferrer" className="flex-1">
-            <Button variant="soft" className="w-full"><CalendarDays size={17} /> Calendar</Button>
-          </a>
+          {calUrl ? (
+            <a href={calUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
+              <Button variant="soft" className="w-full"><CalendarDays size={17} /> Calendar</Button>
+            </a>
+          ) : (
+            <Button variant="soft" className="flex-1" disabled title="Set a date first" aria-label="Set a date first to add to calendar">
+              <CalendarDays size={17} /> Calendar
+            </Button>
+          )}
         </div>
 
         {/* poke non-voters (owner, planning, others present) */}
@@ -916,11 +966,11 @@ function AddStepBox({ onAdd }: { onAdd: (label: string) => void }) {
 /* one slot's card stack — memoized module-scope component with local expand +
    refine-text state. Lives outside PlanView so React can bail re-renders. */
 const PlanSlot = React.memo(function PlanSlot({
-  slot, index, isOwner, planning, working, votes, voted, placeArea,
+  slot, index, isOwner, planning, working, voteCount, isVoted, placeArea,
   onVote, onChoose, onDeleteOpt, onRefine, onAddOwn, onResolveAdd, onSetSlotTime,
 }: {
   slot: Slot; index: number; isOwner: boolean; planning: boolean; working: string | null;
-  votes: Record<string, number>; voted: Record<string, boolean>; placeArea: string | null;
+  voteCount: (id: string) => number; isVoted: (id: string) => boolean; placeArea: string | null;
   onVote: (id: string) => void; onChoose: (slotId: string, id: string) => void; onDeleteOpt: (id: string) => void;
   onRefine: (slotKey: string, day: number, feedback: string, append?: boolean) => void;
   onAddOwn: (slotKey: string, day: number, title: string, area?: string) => void;
@@ -977,7 +1027,7 @@ const PlanSlot = React.memo(function PlanSlot({
               key={o.id}
               title={o.title} subtitle={o.subtitle} why={o.why}
               sourceUrl={o.source_url} sourceLabel={o.source_label}
-              votes={votes[o.id]} voted={voted[o.id]} onVote={() => onVote(o.id)}
+              votes={voteCount(o.id)} voted={isVoted(o.id)} onVote={() => onVote(o.id)}
               selected={slot.chosen?.id === o.id}
               onSelect={isOwner && planning ? () => pick(o.id) : undefined}
               onDelete={isOwner && planning ? () => onDeleteOpt(o.id) : undefined}
