@@ -37,7 +37,7 @@ import {
 } from "./plan";
 import { PlanMap } from "./PlanMap";
 import { PlaceSearch } from "./PlaceSearch";
-import type { Plan, PlanOption, PlanMember, RSVP, Profile } from "@/lib/types";
+import type { Plan, PlanOption, PlanMember, RSVP, Profile, PlanStatus } from "@/lib/types";
 import type { PlanScaffoldSlot, PlanRecurrence, DateOption } from "@/lib/db";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -160,7 +160,40 @@ export function PlanView({
   myRsvp?: RSVP | null;
   isOwner?: boolean;
 }) {
-  const slots = React.useMemo(() => buildSlots(options, scaffold), [options, scaffold]);
+  // ---- optimistic overlay --------------------------------------------------
+  // Edits apply to local state INSTANTLY; the server write + a background
+  // router.refresh() reconcile quietly behind it. Each override clears when the
+  // matching server prop changes (i.e. once the refresh confirms the new truth),
+  // so the prop is always the eventual source of truth.
+  const router = useRouter();
+  const [, startBgRefresh] = React.useTransition();
+  const bgRefresh = React.useCallback(() => startBgRefresh(() => router.refresh()), [router]);
+
+  const [optStatus, setOptStatus] = React.useState<PlanStatus | null>(null);
+  const [optChosen, setOptChosen] = React.useState<Record<string, string>>({});
+  const [optPlan, setOptPlan] = React.useState<Partial<Pick<Plan, "activity" | "starts_at" | "place_address" | "place_name">>>({});
+  const [optRec, setOptRec] = React.useState<{ set: boolean; val: PlanRecurrence | null }>({ set: false, val: null });
+  // Reconcile: a background refresh re-serialises all server props with fresh
+  // identities, so when `plan` changes we drop every optimistic override and let
+  // the server truth take over. Render-phase reset (React's documented pattern for
+  // "adjust state when a prop changes") — no effect, no extra render pass.
+  const [prevPlan, setPrevPlan] = React.useState(plan);
+  if (plan !== prevPlan) {
+    setPrevPlan(plan);
+    setOptStatus(null); setOptChosen({}); setOptPlan({}); setOptRec({ set: false, val: null });
+  }
+
+  const effPlan = React.useMemo(() => ({ ...plan, ...optPlan }), [plan, optPlan]);
+  const effRecurrence = optRec.set ? optRec.val : recurrence;
+
+  const slots = React.useMemo(() => {
+    const base = buildSlots(options, scaffold);
+    for (const s of base) {
+      const oid = optChosen[s.id];
+      if (oid) { const o = s.options.find((x) => x.id === oid); if (o) s.chosen = o; }
+    }
+    return base;
+  }, [options, scaffold, optChosen]);
   const dayNums = React.useMemo(() => [...new Set(slots.map((s) => s.day))].sort((a, b) => a - b), [slots]);
   const multiDay = dayNums.length > 1;
   const multiStep = slots.length > 1;
@@ -201,36 +234,40 @@ export function PlanView({
   const [editLoc, setEditLoc] = React.useState(false);
   const [locVal, setLocVal] = React.useState(plan.place_address ?? "");
   const [poked, setPoked] = React.useState(false);
-  const router = useRouter();
 
-  const phase = plan.status;
+  const phase = optStatus ?? plan.status;
   const planning = phase === "open";
   const people = members.map((m) => m.profile ?? { name: "Guest" });
-  const generalArea = plan.place_address || plan.place_name || "TBC";
+  const generalArea = effPlan.place_address || effPlan.place_name || "TBC";
 
-  const persist = React.useCallback(async (body: Record<string, unknown>) => {
-    await fetch("/api/plans/edit", {
+  // fire the write, then reconcile in the background — never blocks the optimistic UI
+  const persist = React.useCallback((body: Record<string, unknown>) => {
+    return fetch("/api/plans/edit", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ slug: plan.slug, ...body }),
-    });
-    router.refresh();
-  }, [plan.slug, router]);
-  const choose = React.useCallback((id: string) => persist({ action: "choose", optionId: id }), [persist]);
-  const setWhenDate = (iso: string) => persist({ action: "when", startsAt: iso });
+    }).then(() => bgRefresh());
+  }, [plan.slug, bgRefresh]);
+  // slotId comes from the PlanSlot that owns the option, so the pick shows instantly
+  const choose = React.useCallback((slotId: string, id: string) => {
+    setOptChosen((prev) => ({ ...prev, [slotId]: id }));
+    persist({ action: "choose", optionId: id });
+  }, [persist]);
+  const setWhenDate = (iso: string) => { setOptPlan((p) => ({ ...p, starts_at: iso })); persist({ action: "when", startsAt: iso }); };
   async function doInvite() {
     if (!pickedFriends.length) return;
-    await persist({ action: "invite", profileIds: pickedFriends });
     setInviteOpen(false);
     setPickedFriends([]);
+    await persist({ action: "invite", profileIds: pickedFriends });
   }
   async function move(status: "open" | "locked" | "completed") {
+    setOptStatus(status); // hero + actions flip instantly
     setBusy(true);
     try {
       await fetch("/api/plans/status", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: plan.slug, status }),
       });
-      router.refresh();
+      bgRefresh();
     } finally { setBusy(false); }
   }
   const vote = React.useCallback((id: string) => {
@@ -258,7 +295,7 @@ export function PlanView({
     fetch("/api/plans/vote", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ optionId: id }),
-    }).then(() => router.refresh()).catch(() => {});
+    }).then(() => bgRefresh()).catch(() => {});
   }
   // Ask AI: append=true adds more ideas (keeps existing); append=false re-rolls the slot
   const onRefine = React.useCallback(async (slotKey: string, day: number, feedback: string, append = true) => {
@@ -268,9 +305,9 @@ export function PlanView({
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: plan.slug, slotKey, day, feedback, append }),
       });
-      router.refresh();
+      bgRefresh();
     } finally { setWorking(null); }
-  }, [plan.slug, router]);
+  }, [plan.slug, bgRefresh]);
   // "Ask AI to find <text>" — resolve a typed name to a real venue and add it
   const onResolveAdd = React.useCallback(async (slotKey: string, day: number, query: string) => {
     if (!query.trim()) return;
@@ -280,9 +317,9 @@ export function PlanView({
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: plan.slug, title: query, slotKey, day, ai: true }),
       });
-      router.refresh();
+      bgRefresh();
     } finally { setWorking(null); }
-  }, [plan.slug, router]);
+  }, [plan.slug, bgRefresh]);
   const refineAll = React.useCallback(async (day: number | undefined, feedback: string) => {
     setWorking(`all:${day ?? 0}`);
     try {
@@ -290,9 +327,9 @@ export function PlanView({
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: plan.slug, all: true, day, feedback }),
       });
-      router.refresh();
+      bgRefresh();
     } finally { setWorking(null); }
-  }, [plan.slug, router]);
+  }, [plan.slug, bgRefresh]);
   const onAddOwn = React.useCallback(async (slotKey: string, day: number, title: string, area?: string) => {
     if (!title.trim()) return;
     setWorking(`${day}:${slotKey}:add`);
@@ -301,9 +338,9 @@ export function PlanView({
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ slug: plan.slug, title, area, slotKey, day }),
       });
-      router.refresh();
+      bgRefresh();
     } finally { setWorking(null); }
-  }, [plan.slug, router]);
+  }, [plan.slug, bgRefresh]);
   const addStep = React.useCallback(async (day: number, label: string) => {
     const t = label.trim();
     if (!t) return;
@@ -315,9 +352,11 @@ export function PlanView({
     // turning OFF after it's locked (materialised) wipes future instances — confirm
     if (next === null && phase !== "open") {
       if (!window.confirm("This is a recurring series — turning it off will remove all the future repeats. Continue?")) return;
+      setOptRec({ set: true, val: null });
       await persist({ action: "stopSeries" });
       return;
     }
+    setOptRec({ set: true, val: next });
     await persist({ action: "recurrence", recurrence: next });
   }
   async function doDelete() {
@@ -337,11 +376,13 @@ export function PlanView({
   }
   async function saveTitle() {
     setEditTitle(false);
-    if (titleVal.trim() && titleVal.trim() !== (plan.activity ?? plan.title)) await persist({ action: "title", title: titleVal.trim() });
+    const t = titleVal.trim();
+    if (t && t !== (plan.activity ?? plan.title)) { setOptPlan((p) => ({ ...p, activity: t })); await persist({ action: "title", title: t }); }
   }
   async function saveLocation() {
     setEditLoc(false);
-    if (locVal.trim() && locVal.trim() !== plan.place_address) await persist({ action: "location", location: locVal.trim() });
+    const l = locVal.trim();
+    if (l && l !== plan.place_address) { setOptPlan((p) => ({ ...p, place_address: l, place_name: l })); await persist({ action: "location", location: l }); }
   }
   async function poke() {
     setPoked(true);
@@ -396,7 +437,7 @@ export function PlanView({
           {multiDay && (
             <Pill tone="primary" className="border-2 border-ink/10"><Route size={13} /> {dayNums.length}-day trip</Pill>
           )}
-          {recurrence && (
+          {effRecurrence && (
             <Pill tone="secondary" className="border-2 border-ink/10"><Repeat size={13} /> Weekly</Pill>
           )}
         </div>
@@ -415,9 +456,9 @@ export function PlanView({
           ) : (
             <h1
               className="flex items-center gap-2 font-heading text-2xl font-extrabold leading-tight text-white drop-shadow"
-              onClick={() => isOwner && planning && (setTitleVal(plan.activity ?? plan.title), setEditTitle(true))}
+              onClick={() => isOwner && planning && (setTitleVal(effPlan.activity ?? effPlan.title), setEditTitle(true))}
             >
-              {plan.activity ?? plan.title}
+              {effPlan.activity ?? effPlan.title}
               {isOwner && planning && <Pencil size={15} className="shrink-0 opacity-70" />}
             </h1>
           )}
@@ -426,19 +467,19 @@ export function PlanView({
 
       {/* when / where */}
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <Section icon={<Clock size={15} />} label={recurrence ? "Repeats" : "When"} tone="accent">
-          {recurrence ? (
+        <Section icon={<Clock size={15} />} label={effRecurrence ? "Repeats" : "When"} tone="accent">
+          {effRecurrence ? (
             <div className="font-bold leading-tight">
-              {recurrence.cadence === "monthly"
-                ? `Monthly · ${ordinal(recurrence.monthday ?? 1)}`
-                : `${recurrence.cadence === "biweekly" ? "Fortnightly" : "Weekly"} · ${WEEKDAYS[recurrence.weekday]}`}
-              {recurrence.time ? ` · ${recurrence.time}` : ""}
+              {effRecurrence.cadence === "monthly"
+                ? `Monthly · ${ordinal(effRecurrence.monthday ?? 1)}`
+                : `${effRecurrence.cadence === "biweekly" ? "Fortnightly" : "Weekly"} · ${WEEKDAYS[effRecurrence.weekday]}`}
+              {effRecurrence.time ? ` · ${effRecurrence.time}` : ""}
             </div>
           ) : (
             <>
-              <div className="font-bold leading-tight">{fmtDate(plan.starts_at) ?? (isOwner ? "Pick a time" : "TBC")}</div>
-              {fmtTime(plan.starts_at) && <div className="text-sm text-muted">{fmtTime(plan.starts_at)}</div>}
-              {isOwner && planning && <WhenPicker value={plan.starts_at} onChange={setWhenDate} />}
+              <div className="font-bold leading-tight">{fmtDate(effPlan.starts_at) ?? (isOwner ? "Pick a time" : "TBC")}</div>
+              {fmtTime(effPlan.starts_at) && <div className="text-sm text-muted">{fmtTime(effPlan.starts_at)}</div>}
+              {isOwner && planning && <WhenPicker value={effPlan.starts_at} onChange={setWhenDate} />}
             </>
           )}
         </Section>
@@ -457,12 +498,12 @@ export function PlanView({
             </div>
           ) : (
             <>
-              <div className="font-bold leading-tight">{multiStep ? generalArea : (plan.place_name ?? plan.place_address ?? "TBC")}</div>
+              <div className="font-bold leading-tight">{multiStep ? generalArea : (effPlan.place_name ?? effPlan.place_address ?? "TBC")}</div>
               {multiStep
                 ? <div className="text-sm text-muted">{pins.length} stop{pins.length === 1 ? "" : "s"}</div>
-                : (plan.place_name && plan.place_address) && <div className="text-sm text-muted">{plan.place_address}</div>}
+                : (effPlan.place_name && effPlan.place_address) && <div className="text-sm text-muted">{effPlan.place_address}</div>}
               {isOwner && planning && (
-                <button onClick={() => { setLocVal(plan.place_address ?? ""); setEditLoc(true); }} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-primary">
+                <button onClick={() => { setLocVal(effPlan.place_address ?? ""); setEditLoc(true); }} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-primary">
                   <Pencil size={11} /> Change area
                 </button>
               )}
@@ -474,13 +515,13 @@ export function PlanView({
       {/* recurring — part of choosing the when (right under the date pickers) */}
       {isOwner && planning && (
         <div className="mt-3">
-          <RecurringControl recurrence={recurrence} defaultStart={plan.starts_at} onChange={toggleRecurring} />
+          <RecurringControl recurrence={effRecurrence} defaultStart={effPlan.starts_at} onChange={toggleRecurring} />
         </div>
       )}
-      {!isOwner && recurrence && (
+      {!isOwner && effRecurrence && (
         <div className="mt-3">
           <Section icon={<Repeat size={15} />} label="Recurring" tone="secondary">
-            <p className="text-sm font-bold">{recurrence.cadence === "monthly" ? "Repeats monthly" : recurrence.cadence === "biweekly" ? "Repeats fortnightly" : "Repeats weekly"}</p>
+            <p className="text-sm font-bold">{effRecurrence.cadence === "monthly" ? "Repeats monthly" : effRecurrence.cadence === "biweekly" ? "Repeats fortnightly" : "Repeats weekly"}</p>
           </Section>
         </div>
       )}
@@ -489,7 +530,7 @@ export function PlanView({
       {pins.length >= 1 && <div className="mt-3"><PlanMap pins={pins} area={plan.place_address} /></div>}
 
       {/* availability — propose dates, mark which work, owner locks one */}
-      {!recurrence && (dateOptions.length > 0 || (planning && !plan.starts_at)) && (
+      {!effRecurrence && (dateOptions.length > 0 || (planning && !effPlan.starts_at)) && (
         <div className="mt-4">
           <Section icon={<CalendarDays size={15} />} label="When works?" tone="accent">
             {dateOptions.length === 0 && (
@@ -537,7 +578,7 @@ export function PlanView({
           <div className="mb-3 flex items-center justify-between">
             <AvatarStack people={people} />
             <span className="text-sm font-bold text-muted">
-              {members.filter((m) => m.rsvp === "in").length} {recurrence ? "in this week" : "going"}
+              {members.filter((m) => m.rsvp === "in").length} {effRecurrence ? "in this week" : "going"}
             </span>
           </div>
           <RSVPControl value={rsvp} onChange={changeRsvp} />
@@ -836,7 +877,7 @@ const PlanSlot = React.memo(function PlanSlot({
 }: {
   slot: Slot; index: number; isOwner: boolean; planning: boolean; working: string | null;
   votes: Record<string, number>; voted: Record<string, boolean>; placeArea: string | null;
-  onVote: (id: string) => void; onChoose: (id: string) => void; onDeleteOpt: (id: string) => void;
+  onVote: (id: string) => void; onChoose: (slotId: string, id: string) => void; onDeleteOpt: (id: string) => void;
   onRefine: (slotKey: string, day: number, feedback: string, append?: boolean) => void;
   onAddOwn: (slotKey: string, day: number, title: string, area?: string) => void;
   onResolveAdd: (slotKey: string, day: number, query: string) => void;
@@ -846,7 +887,7 @@ const PlanSlot = React.memo(function PlanSlot({
   const decided = !!slot.chosen;
   const empty = slot.options.length === 0;
   const refining = working === `${slot.id}:refine`;
-  const pick = (id: string) => { setExpanded(false); onChoose(id); };
+  const pick = (id: string) => { setExpanded(false); onChoose(slot.id, id); };
 
   if (slot.fixed && slot.options[0]) {
     const o = slot.options[0];

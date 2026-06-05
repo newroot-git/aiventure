@@ -31,6 +31,7 @@ function OnboardFlow() {
   const [interests, setInterests] = React.useState<string[]>([]);
   const [query, setQuery] = React.useState("");
   const [geo, setGeo] = React.useState<"idle" | "locating">("idle");
+  const [saving, setSaving] = React.useState(false);
 
   function useMyLocation() {
     if (!("geolocation" in navigator)) return;
@@ -70,6 +71,7 @@ function OnboardFlow() {
   }
   async function next() {
     if (step < STEPS.length - 1) return setStep((s) => s + 1);
+    setSaving(true); // show progress — the save must land before /plans reads the profile
     try {
       localStorage.setItem(
         "aiventure_profile",
@@ -316,10 +318,10 @@ function OnboardFlow() {
           variant="primary"
           size="lg"
           className="w-full"
-          disabled={!valid}
+          disabled={!valid || saving}
           onClick={next}
         >
-          {step === STEPS.length - 1 ? "That's me" : "Continue"}
+          {saving ? <Loader2 size={18} className="animate-spin" /> : (step === STEPS.length - 1 ? "That's me" : "Continue")}
         </Button>
       </div>
     </main>
