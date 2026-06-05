@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AIventure — cliff emblem</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{--muted:#8A7B66;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#161320;color:#EAE1CF;font-family:'Plus Jakarta Sans',sans-serif;padding:44px 30px 80px}
+  h1{font-family:'Pixelify Sans',monospace;font-size:32px;margin-bottom:4px;color:#fff}
+  .sub{color:var(--muted);margin-bottom:36px;font-size:15px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;max-width:1080px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:13px}
+  .frame{width:230px;height:230px;border:3px solid #000;box-shadow:7px 7px 0 #000}
+  .sq{border-radius:46px;overflow:hidden}
+  .ci{border-radius:50%;overflow:hidden}
+  .frame svg{width:100%;height:100%;display:block}
+  .name{font-family:'Pixelify Sans',monospace;font-weight:700;font-size:16px;color:#fff}
+  .note{font-size:12.5px;color:var(--muted);text-align:center;margin-top:-7px;max-width:210px;line-height:1.4}
+  .chips{display:flex;gap:10px;margin-top:4px}
+  .chips .frame{width:54px;height:54px;border-radius:13px;box-shadow:3px 3px 0 #000}
+  .lockup{grid-column:1 / -1;display:flex;align-items:center;gap:26px;background:#0f0d16;border:3px solid #000;border-radius:26px;padding:26px 34px;margin-top:8px;box-shadow:6px 6px 0 #000}
+  .lockup .frame{width:120px;height:120px;border-radius:28px;flex:0 0 auto}
+  .word{font-family:'Pixelify Sans',monospace;font-size:60px;color:#EAE1CF;letter-spacing:1px}
+  .word b{color:#E0573F}
+  .tag{font-size:15px;color:var(--muted);margin-top:2px}
+  .legend{margin-top:42px;font-size:13px;color:var(--muted);max-width:720px;line-height:1.6}
+</style>
+</head>
+<body>
+  <h1>AIventure — three on a cliff</h1>
+  <div class="sub">Three friends, legs over the edge, the whole world in front of them. The feeling, not the tech.</div>
+  <div class="grid" id="grid"></div>
+  <div class="legend">Same scene, different moods. All vector — crisp at any size. Pick a mood + frame (squircle or circle), then I'll refine that one and build the favicon / PWA / nav set + the wordmark lockup.</div>
+
+<script>
+let UID=0;
+
+// palettes
+const PAL={
+  sunset:{ sky:['#FAD27A','#F2A65A','#E07242'], sun:'#FCEAB0', sunEdge:'#F7C873',
+           hillA:'#C9714A', hillB:'#9A4F44', cliff:'#241B2B', fig:'#15101C', rim:'#F4B36A', star:'#FBE7B0' },
+  dusk:{ sky:['#F3B26A','#A56A8A','#5B4F80'], sun:'#F6D9A6', sunEdge:'#E9A86A',
+           hillA:'#7C5273','hillB:':'#4E416E', hillB:'#4E416E', cliff:'#1A1626', fig:'#0E0B16', rim:'#C98AA0', star:'#F4E3B0' },
+  night:{ sky:['#3B3B66','#33335B','#222041'], sun:'#E7E0CF', sunEdge:'#C9C2AE',
+           hillA:'#2E2C4C','hillB':'#222041', hillB:'#201E3A', cliff:'#100E1C', fig:'#08060E', rim:'#6E6AA0', star:'#F4E3B0' },
+};
+
+function scene(p){
+  const id='g'+(UID++);
+  const stars = p===PAL.sunset ? '' : `
+    ${star(20,18,p.star)} ${star(34,12,p.star)} ${star(78,16,p.star)} ${star(88,30,p.star)} ${star(62,10,p.star)} ${star(12,32,p.star)}
+  `;
+  return `
+  <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="${p.sky[0]}"/>
+        <stop offset="0.55" stop-color="${p.sky[1]}"/>
+        <stop offset="1" stop-color="${p.sky[2]}"/>
+      </linearGradient>
+    </defs>
+    <rect width="100" height="100" fill="url(#${id})"/>
+    ${stars}
+    <!-- sun / moon low on horizon -->
+    <circle cx="66" cy="60" r="17" fill="${p.sun}"/>
+    <circle cx="66" cy="60" r="17" fill="none" stroke="${p.sunEdge}" stroke-width="1.4" opacity=".7"/>
+    <!-- far hills -->
+    <path d="M0,66 Q22,56 44,63 T100,58 V100 H0 Z" fill="${p.hillA}" opacity=".9"/>
+    <path d="M0,74 Q30,66 56,72 T100,69 V100 H0 Z" fill="${p.hillB}"/>
+    <!-- foreground cliff (left promontory) -->
+    <path d="M0,100 V70 Q10,68 26,69 L52,74 L57,84 L62,100 Z" fill="${p.cliff}"/>
+    <!-- warm rim light along the cliff edge -->
+    <path d="M0,70 Q10,68 26,69 L52,74" fill="none" stroke="${p.rim}" stroke-width="1.1" opacity=".55" stroke-linecap="round"/>
+    <!-- three friends seated on the edge, facing the view -->
+    ${friend(20, 69.4, p.fig, 0)}
+    ${friend(30, 71.2, p.fig, 1)}
+    ${friend(40, 72.8, p.fig, 2)}
+  </svg>`;
+}
+
+function star(x,y,c){ return `<g fill="${c}"><rect x="${x}" y="${y-1.2}" width="0.9" height="2.6"/><rect x="${x-1.0}" y="${y-0.15}" width="2.9" height="0.9"/></g>`; }
+
+// seated friend facing right (toward the sun). yseat = top of the ledge under them.
+function friend(x, yseat, c, variant){
+  const headY = yseat-8.2;
+  const lean = variant===1 ? -0.6 : (variant===2 ? 0.4 : 0);
+  // torso blob, head, two dangling legs over the edge (to the right)
+  return `<g fill="${c}">
+    <ellipse cx="${x+0.4+lean}" cy="${headY}" rx="2.0" ry="2.1"/>
+    <path d="M ${x-2.3+lean},${yseat-6.4}
+             Q ${x-2.8+lean},${yseat-1.5} ${x-0.6},${yseat-0.2}
+             L ${x+2.6},${yseat-0.2}
+             Q ${x+3.2},${yseat-4.2} ${x+1.6+lean},${yseat-6.6}
+             Q ${x-0.3+lean},${yseat-8.2} ${x-2.3+lean},${yseat-6.4} Z"/>
+    <!-- thighs forward then calves dangling -->
+    <path d="M ${x+0.4},${yseat-0.6} L ${x+4.2},${yseat+0.2} L ${x+4.2},${yseat+1.7} L ${x+0.4},${yseat+1.4} Z"/>
+    <rect x="${x+2.7}" y="${yseat+1.2}" width="1.5" height="5.4" rx="0.7"/>
+    <rect x="${x+4.0}" y="${yseat+1.1}" width="1.5" height="5.0" rx="0.7"/>
+  </g>`;
+}
+
+const VARIANTS=[
+  {name:'Sunset', pal:PAL.sunset, frame:'sq', note:'Golden hour, the classic adventure feeling. Warm and inviting.'},
+  {name:'Dusk', pal:PAL.dusk, frame:'sq', note:'Sun dipping into purple. Earthy meets a little cosmic.'},
+  {name:'Night', pal:PAL.night, frame:'sq', note:'Under the stars, moon on the horizon. Quiet and big.'},
+];
+
+const grid=document.getElementById('grid');
+VARIANTS.forEach(v=>{
+  const cell=document.createElement('div');cell.className='cell';
+  const fr=document.createElement('div');fr.className='frame sq';fr.innerHTML=scene(v.pal);cell.appendChild(fr);
+  const nm=document.createElement('div');nm.className='name';nm.textContent=v.name;cell.appendChild(nm);
+  const nt=document.createElement('div');nt.className='note';nt.textContent=v.note;cell.appendChild(nt);
+  const chips=document.createElement('div');chips.className='chips';
+  const c1=document.createElement('div');c1.className='frame sq';c1.innerHTML=scene(v.pal);
+  const c2=document.createElement('div');c2.className='frame ci';c2.innerHTML=scene(v.pal);
+  chips.appendChild(c1);chips.appendChild(c2);cell.appendChild(chips);
+  grid.appendChild(cell);
+});
+
+// lockup
+const lock=document.createElement('div');lock.className='lockup';
+const lf=document.createElement('div');lf.className='frame ci';lf.style.border='3px solid #000';lf.innerHTML=scene(PAL.sunset);
+const txt=document.createElement('div');
+txt.innerHTML=`<div class="word">AIventure</div><div class="tag">Stop scrolling. Start adventuring.</div>`;
+lock.appendChild(lf);lock.appendChild(txt);
+grid.appendChild(lock);
+</script>
+</body>
+</html>

@@ -38,6 +38,7 @@ import {
 } from "./plan";
 import { PlanMap } from "./PlanMap";
 import { PlaceSearch } from "./PlaceSearch";
+import { WeatherChip } from "./WeatherChip";
 import type { Plan, PlanOption, PlanMember, RSVP, Profile, PlanStatus } from "@/lib/types";
 import type { PlanScaffoldSlot, PlanRecurrence, DateOption } from "@/lib/db";
 
@@ -656,6 +657,10 @@ export function PlanView({
           {/* date is always shown + editable, even when recurring — changing it re-anchors the cadence */}
           <div className="font-bold leading-tight">{fmtDate(effPlan.starts_at) ?? (isOwner ? "Pick a time" : "TBC")}</div>
           {fmtTime(effPlan.starts_at) && <div className="text-sm text-muted">{fmtTime(effPlan.starts_at)}</div>}
+          {/* forecast for the chosen day + area (Open-Meteo; silent if out of range) */}
+          {effPlan.starts_at && !effRecurrence && (
+            <WeatherChip place={effPlan.place_address || generalArea} date={effPlan.starts_at} />
+          )}
           {effRecurrence && (
             <div className="mt-1 inline-flex items-center gap-1 text-sm font-bold text-secondary">
               <Repeat size={13} />

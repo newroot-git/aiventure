@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AIventure — pixel sunset scene</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{--muted:#8A7B66;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#161320;color:#EAE1CF;font-family:'Plus Jakarta Sans',sans-serif;padding:44px 30px 80px}
+  h1{font-family:'Pixelify Sans',monospace;font-size:32px;margin-bottom:4px;color:#fff}
+  .sub{color:var(--muted);margin-bottom:36px;font-size:15px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;max-width:1080px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:13px}
+  .frame{width:230px;height:230px;border:3px solid #000;box-shadow:7px 7px 0 #000;border-radius:46px;overflow:hidden}
+  .frame canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+  .name{font-family:'Pixelify Sans',monospace;font-weight:700;font-size:16px;color:#fff}
+  .note{font-size:12.5px;color:var(--muted);text-align:center;margin-top:-7px;max-width:210px;line-height:1.4}
+  .chips{display:flex;gap:10px;margin-top:4px;align-items:center}
+  .chips .frame{width:54px;height:54px;border-radius:13px;box-shadow:3px 3px 0 #000}
+  .chips .ci{border-radius:50%}
+  .lockup{grid-column:1 / -1;display:flex;align-items:center;gap:26px;background:#0f0d16;border:3px solid #000;border-radius:26px;padding:26px 34px;margin-top:8px;box-shadow:6px 6px 0 #000}
+  .lockup .frame{width:120px;height:120px;border-radius:28px;flex:0 0 auto}
+  .word{font-family:'Pixelify Sans',monospace;font-size:60px;color:#EAE1CF;letter-spacing:1px}
+  .tag{font-size:15px;color:var(--muted);margin-top:2px}
+  .legend{margin-top:42px;font-size:13px;color:var(--muted);max-width:720px;line-height:1.6}
+</style>
+</head>
+<body>
+  <h1>AIventure — pixel sunset</h1>
+  <div class="sub">Three friends, legs over the edge, watching the sun go down. 16-bit, cozy game vibe.</div>
+  <div class="grid" id="grid"></div>
+  <div class="legend">Same scene, three skies. Pixel-true — scales to any icon size. Pick a mood + frame and I'll refine that one + build favicon / PWA / nav + the wordmark lockup.</div>
+
+<script>
+const G=44; // logical pixel grid
+
+// ---- palettes: sky ramp top->horizon (6 bands) + features ----
+const MOODS={
+  Sunset:{ sky:['#6E5A8C','#9A5F7E','#C77A5C','#E2965A','#F4C25E','#FBE08A'],
+    sun:'#FFF3C8', sunCore:'#FFFBE6', sunRim:'#FBD178',
+    hillFar:'#B5704C', hillNear:'#6E3F4E', ground:'#2A2030', groundEdge:'#5B3F4E',
+    fig:'#15101C', rim:'#F4B36A', stars:null },
+  Dusk:{ sky:['#3B3566','#5B4F80','#8A5C82','#C16E72','#E59A5C','#F6C97A'],
+    sun:'#F7DCA0', sunCore:'#FCEFC2', sunRim:'#E9A86A',
+    hillFar:'#7C5273', hillNear:'#3E3460', ground:'#1A1626', groundEdge:'#4E416E',
+    fig:'#0E0B16', rim:'#C98AA0', stars:'#F4E3B0' },
+  Night:{ sky:['#1E1D3A','#272650','#322F5E','#3E3A66','#4A4570','#5B557E'],
+    sun:'#E7E0CF', sunCore:'#F4EEDD', sunRim:'#C9C2AE',
+    hillFar:'#2E2C4C', hillNear:'#201E3A', ground:'#100E1C', groundEdge:'#3A3660',
+    fig:'#08060E', rim:'#6E6AA0', stars:'#F4E3B0' },
+};
+
+const HORIZON=27, GROUND=31;
+
+// seated friend, facing right. 5 wide x 8 tall map. K=body
+const FRIEND=[
+  ".KK..",
+  ".KK..",
+  "KKKK.",
+  "KKKK.",
+  "KKKKK",
+  "...KK",
+  "..K.K",
+  "..K.K",
+];
+
+function build(m){
+  const px=Array.from({length:G},()=>Array(G).fill(null));
+  const set=(x,y,c)=>{ if(x>=0&&x<G&&y>=0&&y<G) px[y][x]=c; };
+
+  // --- sky with dithered bands ---
+  const bands=m.sky.length;
+  for(let y=0;y<HORIZON;y++){
+    const f=y/(HORIZON-1);
+    const idx=Math.min(bands-1, Math.floor(f*bands));
+    const nidx=Math.min(bands-1, idx+1);
+    const local=(f*bands)-idx; // 0..1 within band
+    for(let x=0;x<G;x++){
+      // dither near the bottom of each band toward next color
+      let c=m.sky[idx];
+      if(local>0.6 && ((x+y)%2===0)) c=m.sky[nidx];
+      set(x,y,c);
+    }
+  }
+  // --- stars ---
+  if(m.stars){ [[6,5],[12,3],[19,6],[33,4],[38,9],[27,3],[9,9],[36,15]].forEach(([x,y])=>{ set(x,y,m.stars); set(x-1,y,m.stars);set(x+1,y,m.stars);set(x,y-1,m.stars);set(x,y+1,m.stars); }); }
+
+  // --- sun (disc near horizon, behind hills) ---
+  const scx=27, scy=24, sr=8;
+  for(let y=-sr;y<=sr;y++)for(let x=-sr;x<=sr;x++){
+    if(x*x+y*y<=sr*sr+sr*0.4){
+      let c=m.sun;
+      if(x*x+y*y<=(sr-3)*(sr-3)) c=m.sunCore;
+      // retro horizontal slat lines on lower half
+      if(y>1 && (y%2===0)) continue;
+      set(scx+x,scy+y,c);
+    }
+  }
+  // sun rim
+  for(let a=0;a<360;a+=12){ const rad=a*Math.PI/180; set(Math.round(scx+Math.cos(rad)*sr), Math.round(scy+Math.sin(rad)*sr), m.sunRim); }
+
+  // --- far hills ---
+  for(let x=0;x<G;x++){
+    const h=Math.round(24 + 2.2*Math.sin(x/6.5) + 1.4*Math.sin(x/3.1));
+    for(let y=h;y<HORIZON+2;y++) set(x,y,m.hillFar);
+    set(x,h,m.rim); // soft top edge
+  }
+  // --- near hills ---
+  for(let x=0;x<G;x++){
+    const h=Math.round(26 + 1.8*Math.sin(x/8+2) );
+    for(let y=h;y<GROUND;y++) set(x,y,m.hillNear);
+  }
+
+  // --- foreground ground / cliff ---
+  for(let x=0;x<G;x++){
+    let top=GROUND + (x>30? Math.round((x-30)/4):0); // slope down to the right (the drop)
+    if(x>34) top=GROUND+2+Math.round((x-34)/2);
+    for(let y=top;y<G;y++) set(x,y,m.ground);
+    set(x,top,m.groundEdge); // lit rim along the edge
+  }
+
+  // --- three friends seated on the edge, watching the sun ---
+  const seats=[[10,GROUND-7],[17,GROUND-7],[24,GROUND-7]];
+  seats.forEach(([fx,fy],i)=>{
+    for(let y=0;y<FRIEND.length;y++)for(let x=0;x<5;x++){
+      if(FRIEND[y][x]==='K') set(fx+x, fy+y, m.fig);
+    }
+    // tiny warm rim on the head/shoulder catching the light
+    set(fx+0, fy+2, m.rim); set(fx+3, fy+1, m.rim);
+  });
+
+  return px;
+}
+
+function render(m){
+  const cv=document.createElement('canvas');cv.width=G;cv.height=G;
+  const ctx=cv.getContext('2d');
+  const px=build(m);
+  for(let y=0;y<G;y++)for(let x=0;x<G;x++) if(px[y][x]){ ctx.fillStyle=px[y][x]; ctx.fillRect(x,y,1,1);}
+  return cv;
+}
+
+const grid=document.getElementById('grid');
+Object.entries(MOODS).forEach(([name,m])=>{
+  const cell=document.createElement('div');cell.className='cell';
+  const fr=document.createElement('div');fr.className='frame';fr.appendChild(render(m));cell.appendChild(fr);
+  const nm=document.createElement('div');nm.className='name';nm.textContent=name;cell.appendChild(nm);
+  const note=document.createElement('div');note.className='note';
+  note.textContent={Sunset:'Golden hour. Warm, classic, inviting.',Dusk:'Purple sky, first stars. Earthy + cosmic.',Night:'Moon + stars. Quiet and big.'}[name];
+  cell.appendChild(note);
+  const chips=document.createElement('div');chips.className='chips';
+  const c1=document.createElement('div');c1.className='frame';c1.appendChild(render(m));
+  const c2=document.createElement('div');c2.className='frame ci';c2.style.borderRadius='50%';c2.appendChild(render(m));
+  chips.appendChild(c1);chips.appendChild(c2);cell.appendChild(chips);
+  grid.appendChild(cell);
+});
+
+// lockup
+const lock=document.createElement('div');lock.className='lockup';
+const lf=document.createElement('div');lf.className='frame';lf.appendChild(render(MOODS.Sunset));
+const txt=document.createElement('div');txt.innerHTML=`<div class="word">AIventure</div><div class="tag">Stop scrolling. Start adventuring.</div>`;
+lock.appendChild(lf);lock.appendChild(txt);grid.appendChild(lock);
+</script>
+</body>
+</html>

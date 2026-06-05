@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight, NotebookText } from "lucide-react";
 import { Card } from "@/components/ui";
 import { Tile } from "@/components/Tile";
 import { getUserPlans, type PlanCard } from "@/lib/db";
@@ -36,7 +36,9 @@ export default async function LogPage() {
       </Link>
 
       <div className="mt-4 flex items-center gap-4">
-        <Tile name="log" className="h-16 w-16 border-2 border-ink" />
+        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-md border-2 border-ink bg-secondary-soft text-secondary shadow-hard-sm">
+          <NotebookText size={30} />
+        </span>
         <div>
           <h1 className="font-display text-3xl font-bold">Adventure log</h1>
           <p className="text-[15px] text-muted">

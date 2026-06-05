@@ -3,12 +3,24 @@ import { MapPin, CalendarDays, ChevronRight, Sparkles, Users, Lock, Plus, Mail, 
 import { Card, Pill, AvatarStack, Button } from "@/components/ui";
 import { Countdown } from "@/components/Countdown";
 import { LocalDateTime } from "@/components/LocalDateTime";
+import { WeatherChip } from "@/components/WeatherChip";
+import { ActivityOfDay } from "@/components/ActivityOfDay";
+import { CATEGORIES } from "@/lib/interests";
+import { freshIdeas } from "@/lib/ideas";
 import { getUserPlans, getCurrentProfile, getInvites, getNudges, getOpenEvents, type PlanCard } from "@/lib/db";
+
+const CAT_OF = new Map<string, string>();
+for (const c of CATEGORIES) for (const i of c.interests) CAT_OF.set(i.toLowerCase(), c.id);
 
 export default async function HomePage() {
   const [plans, me, invites, nudges, openEvents] = await Promise.all([
     getUserPlans(), getCurrentProfile(), getInvites(), getNudges(), getOpenEvents(),
   ]);
+  // activity of the day — interest-aligned, rotates daily (offset so it differs from Explore)
+  const cats = Array.from(new Set((me?.interests ?? []).map((i) => CAT_OF.get(i.toLowerCase())).filter(Boolean) as string[]));
+  const today = new Date();
+  const dayKey = today.toISOString().slice(0, 10);
+  const aotd = freshIdeas(cats, today.getDate() + 3, 1)[0];
   const upcoming = plans.filter((p) => p.status === "upcoming");
   const next = upcoming.find((p) => p.date);
   const rest = upcoming.filter((p) => p.slug !== next?.slug);
@@ -27,11 +39,17 @@ export default async function HomePage() {
       <h1 className="font-display text-3xl font-bold">Hey {me?.name ?? "there"}</h1>
       <p className="mt-1 text-[15px] text-muted">Here&apos;s what&apos;s happening.</p>
 
+      {me?.home_area && (
+        <div className="mt-4"><WeatherChip place={me.home_area} variant="card" /></div>
+      )}
+
       {next && (
         <div className="mt-5">
           <Countdown slug={next.slug} activity={next.activity} cover={next.cover} place={next.place} targetISO={next.startsAtISO || `${next.date}T16:00:00`} who={nextWho} />
         </div>
       )}
+
+      {aotd && <ActivityOfDay idea={aotd} dayKey={dayKey} />}
 
       {/* first-run — no plans yet */}
       {plans.length === 0 && (
@@ -53,7 +71,7 @@ export default async function HomePage() {
           <h2 className="mt-7 mb-3 text-xs font-bold uppercase tracking-wider text-muted">For you</h2>
           <div className="flex flex-col gap-2">
             {invites.map((iv) => (
-              <Link key={iv.id} href="/invites" className="block">
+              <Link key={iv.id} href={`/p/${iv.slug}`} className="block">
                 <Card className="flex items-center gap-3 p-3 transition active:scale-[0.99]">
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-md border-2 border-ink bg-secondary-soft text-secondary"><Mail size={20} /></span>
                   <div className="min-w-0 flex-1 text-sm"><b>{iv.fromLabel}</b> invited you · <span className="text-muted">{iv.activity}</span></div>

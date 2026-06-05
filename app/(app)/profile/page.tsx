@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
-  Sparkles, Pencil, ChevronRight, Compass, Users, Heart, Zap, NotebookText, Trophy,
+  Sparkles, Pencil, ChevronRight, Heart, Zap, NotebookText, Trophy,
 } from "lucide-react";
 import { Card, Pill, Avatar, Burst } from "@/components/ui";
 import { AuroraField } from "@/components/atmosphere";
@@ -87,13 +87,6 @@ export default async function ProfilePage() {
           <p className="mt-1.5 text-xs text-white/75">Finish adventures to level up your explorer.</p>
         </div>
       </AuroraField>
-
-      {/* stats */}
-      <div className="mt-5 grid grid-cols-3 gap-3">
-        <Stat icon={<Compass size={18} />} value={adventures} label="Journeys" />
-        <Stat icon={<Users size={18} />} value={crews} label="Allies" />
-        <Stat icon={<Heart size={18} />} value={interests.length} label="Affinities" />
-      </div>
 
       {/* badges — earned in one row, full set on its own page */}
       <SectionHead icon={<Trophy size={17} className="text-accent" />} title="Badges">
@@ -195,12 +188,3 @@ function SectionHead({ icon, title, children }: { icon: ReactNode; title: string
   );
 }
 
-function Stat({ icon, value, label }: { icon: ReactNode; value: number; label: string }) {
-  return (
-    <Card hard className="p-4 text-center">
-      <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center text-primary">{icon}</div>
-      <div className="font-heading text-2xl font-extrabold text-ink">{value}</div>
-      <div className="mt-0.5 text-xs font-semibold text-muted">{label}</div>
-    </Card>
-  );
-}

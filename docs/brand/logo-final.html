@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AIventure — logo options</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{--muted:#8A7B66;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#161320;color:#EAE1CF;font-family:'Plus Jakarta Sans',sans-serif;padding:44px 30px 80px}
+  h1{font-family:'Pixelify Sans',monospace;font-size:32px;margin-bottom:4px;color:#fff}
+  .sub{color:var(--muted);margin-bottom:36px;font-size:15px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:28px;max-width:1160px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:13px}
+  .frame{width:240px;height:240px;border:3px solid #000;box-shadow:7px 7px 0 #000;border-radius:50px;overflow:hidden}
+  .frame img{width:100%;height:100%;object-fit:cover;display:block;image-rendering:auto}
+  .name{font-family:'Pixelify Sans',monospace;font-weight:700;font-size:16px;color:#fff}
+  .chips{display:flex;gap:10px;margin-top:3px;align-items:center}
+  .chips .frame{width:56px;height:56px;border-radius:14px;box-shadow:3px 3px 0 #000}
+  .chips .ci{border-radius:50%}
+  .chips .mini{width:24px;height:24px;border-radius:6px;box-shadow:2px 2px 0 #000}
+  .lockups{grid-column:1/-1;display:flex;gap:24px;flex-wrap:wrap;margin-top:10px}
+  .lockup{display:flex;align-items:center;gap:22px;background:#0f0d16;border:3px solid #000;border-radius:24px;padding:22px 30px;box-shadow:6px 6px 0 #000}
+  .lockup.light{background:#EAE1CF}
+  .lockup .frame{width:104px;height:104px;border-radius:24px;flex:0 0 auto}
+  .word{font-family:'Pixelify Sans',monospace;font-size:50px;letter-spacing:1px;color:#EAE1CF}
+  .lockup.light .word{color:#1E1B16}
+  .tag{font-size:14px;color:var(--muted)}
+  .legend{margin-top:40px;font-size:13px;color:var(--muted);max-width:720px;line-height:1.6}
+</style>
+</head>
+<body>
+  <h1>AIventure — logo, locked style</h1>
+  <div class="sub">Three friends, sunset, our detailed pixel-art. Each as a big app icon + favicon-size chips (squircle, circle, 24px).</div>
+  <div class="grid" id="grid"></div>
+  <div class="legend">Pick a number. Then I lock it as the app icon, favicon, PWA set + nav mark, and finalise a wordmark lockup (dark + light shown below for your fave).</div>
+
+<script>
+const OPTS=[
+  ['cliff-sunset','1. Cliff Sunset'],
+  ['hill-sunset','2. Hill Sunset'],
+  ['beach-sunset','3. Beach Sunset'],
+  ['cliff-dusk','4. Cliff Dusk'],
+];
+const grid=document.getElementById('grid');
+OPTS.forEach(([file,name])=>{
+  const cell=document.createElement('div');cell.className='cell';
+  const fr=document.createElement('div');fr.className='frame';fr.innerHTML=`<img src="logo-gen/${file}.png">`;cell.appendChild(fr);
+  const nm=document.createElement('div');nm.className='name';nm.textContent=name;cell.appendChild(nm);
+  const chips=document.createElement('div');chips.className='chips';
+  chips.innerHTML=`
+    <div class="frame"><img src="logo-gen/${file}.png"></div>
+    <div class="frame ci"><img src="logo-gen/${file}.png"></div>
+    <div class="frame mini"><img src="logo-gen/${file}.png"></div>`;
+  cell.appendChild(chips);
+  grid.appendChild(cell);
+});
+
+// lockups (using cliff-sunset as the placeholder fave; swap on pick)
+const lks=document.createElement('div');lks.className='lockups';
+['','light'].forEach(mode=>{
+  const l=document.createElement('div');l.className='lockup '+mode;
+  l.innerHTML=`<div class="frame"><img src="logo-gen/cliff-sunset.png"></div>
+    <div><div class="word">AIventure</div><div class="tag">Stop scrolling. Start adventuring.</div></div>`;
+  lks.appendChild(l);
+});
+grid.appendChild(lks);
+</script>
+</body>
+</html>
