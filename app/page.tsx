@@ -272,7 +272,7 @@ export default function Home() {
               <h1>Less scrolling.<br />More <b>living</b>.</h1>
               <p className="sub">AIventure turns “we should hang out” into a real plan — and your crew out the door. Then it remembers it for you.</p>
               <div className="cta">
-                <Link className="btn btn-gold" href="/signin" onPointerDown={blip}>Start an adventure</Link>
+                <Link className="btn btn-gold" href="/tour" onPointerDown={blip}>Start an adventure</Link>
               </div>
               <div className="pressstart">▶ Press start</div>
               <p className="trust">Free to join any plan · No download · No feed</p>
@@ -476,7 +476,7 @@ export default function Home() {
           <div className="ctacard reveal">
             <h2>“We should hang out more.”</h2>
             <p>Stop saying it. Just go.</p>
-            <Link className="btn btn-gold" href="/signin" onPointerDown={blip}>Start an adventure</Link>
+            <Link className="btn btn-gold" href="/tour" onPointerDown={blip}>Start an adventure</Link>
             <p className="fine">Free to join any plan. Plus unlocks AI planning for your whole crew.</p>
           </div>
         </div>

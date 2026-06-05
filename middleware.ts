@@ -3,7 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 
 // Pages that don't require a session. Everything else redirects to /signin
 // unless the visitor has a guest (av_uid) cookie. APIs handle their own identity.
-const PUBLIC = new Set(["/", "/signin", "/onboard"]);
+const PUBLIC = new Set(["/", "/signin", "/onboard", "/tour"]);
 function isPublic(path: string): boolean {
   if (PUBLIC.has(path)) return true;
   return (
