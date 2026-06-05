@@ -28,7 +28,7 @@ const scene =
   "A small group of 3 to 4 friends sitting close together on a low sturdy fallen log that rests flat on a solid granite ledge at a cliff-top viewpoint — the log is safely on the ground, NOT overhanging or near the edge — positioned in the right third of the frame, seen from behind, gazing out over a vast Yosemite-style valley filling the centre and left: deep green pine forest, sweeping granite cliffs, a distant waterfall and far blue mountains, soft warm golden-hour sunlight and gentle haze, calm open sky.";
 
 const prompt = `GENERATE A NEW IMAGE (do not describe it). ${scene} ${STYLE} ${CHAR} ${SIMPLE} ${FRAME}`;
-const out = join(root, "public/img/hero-cliff-2.png");
+const out = join(root, "public/img/hero-cliff-3.png");
 
 let img;
 for (let attempt = 1; attempt <= 5 && !img; attempt++) {
