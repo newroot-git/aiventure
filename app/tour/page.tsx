@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, useCallback } from "react";
 
 type Panel = {
-  kind: "cover" | "shot" | "outro";
+  kind: "cover" | "shot" | "outro" | "note";
   step?: string;
   kicker?: string;
   title: string;
@@ -20,6 +20,12 @@ const PANELS: Panel[] = [
     kicker: "A 60-second tour",
     title: "Here's how it works.",
     body: "Get out of the group chat. Swipe through, then jump in.",
+  },
+  {
+    kind: "note",
+    kicker: "Heads up",
+    title: "Best on your phone.",
+    body: "AIventure is built mobile-first — a proper app is on the way. For the full experience, open it on your phone (or flip your browser to mobile view).",
   },
   {
     kind: "shot",
@@ -79,9 +85,17 @@ const PANELS: Panel[] = [
     step: "Step 6",
     kicker: "Counting down",
     title: "Your next one, up top.",
-    body: "The next adventure sits front and centre with a live countdown — not buried under a feed.",
+    body: "Your next adventure front and centre with a live countdown, today's weather, and a fresh activity to try — not buried under a feed.",
     img: "/tour/09-home.png",
-    alt: "Home screen with a countdown to the next adventure",
+    alt: "Home screen with a countdown, weather and activity of the day",
+  },
+  {
+    kind: "shot",
+    kicker: "Your crews",
+    title: "Crews that remember.",
+    body: "Group your people into crews — each with its own purpose, the adventures you've done together, and what's coming up next.",
+    img: "/tour/12-group.png",
+    alt: "A group page with its description, history and upcoming plans",
   },
   {
     kind: "shot",
@@ -137,8 +151,8 @@ const CSS = `
   scroll-snap-align:center; scroll-snap-stop:always;
   display:flex; flex-direction:column; align-items:center;
   text-align:center;
-  padding:64px 22px 104px;
-  gap:16px;
+  padding:44px 18px 84px;
+  gap:14px;
 }
 @media (min-width:900px){
   .tour .panel{flex-direction:row; text-align:left; gap:64px; padding:40px 72px 96px; justify-content:center;}
@@ -162,14 +176,14 @@ const CSS = `
 /* device frame */
 .tour .phone{
   flex:0 0 auto; position:relative;
-  background:var(--ink); border:2px solid var(--ink); border-radius:34px; padding:8px;
-  box-shadow:8px 8px 0 rgba(30,27,22,.18);
-  height:min(52dvh, 480px); aspect-ratio:402 / 874;
+  background:var(--ink); border:2px solid var(--ink); border-radius:30px; padding:4px;
+  box-shadow:6px 6px 0 rgba(30,27,22,.18);
+  height:min(58dvh, 520px); aspect-ratio:402 / 874;
 }
-@media (min-width:900px){ .tour .phone{height:min(76dvh, 720px);} }
-.tour .phone::before{content:""; position:absolute; top:12px; left:50%; transform:translateX(-50%);
-  width:32%; height:6px; background:#000; border-radius:999px; opacity:.5; z-index:2;}
-.tour .phone img{width:100%; height:100%; object-fit:cover; object-position:top center; border-radius:27px; display:block; background:var(--surface);}
+@media (min-width:900px){ .tour .phone{height:min(78dvh, 740px);} }
+.tour .phone::before{content:""; position:absolute; top:9px; left:50%; transform:translateX(-50%);
+  width:28%; height:5px; background:#000; border-radius:999px; opacity:.45; z-index:2;}
+.tour .phone img{width:100%; height:100%; object-fit:cover; object-position:top center; border-radius:26px; display:block; background:var(--surface);}
 
 /* cover/outro */
 .tour .wm{font-size:clamp(40px,11vw,84px); color:var(--ink)}
@@ -261,12 +275,12 @@ export default function Tour() {
                 <p className="sub">{p.body}</p>
                 <div className="swipehint">swipe / scroll &rarr;</div>
               </div>
-            ) : p.kind === "outro" ? (
+            ) : p.kind === "outro" || p.kind === "note" ? (
               <div className="cap" style={{ alignItems: "center", textAlign: "center", margin: "auto" }}>
                 <div className="lede">{p.kicker}</div>
-                <h2 className="wm">{p.title}</h2>
+                <h2 className="wm" style={p.kind === "note" ? { fontSize: "clamp(32px,9vw,64px)" } : undefined}>{p.title}</h2>
                 <p className="sub">{p.body}</p>
-                <Link className="cta" href="/signin">Get started</Link>
+                {p.kind === "outro" && <Link className="cta" href="/signin">Get started</Link>}
               </div>
             ) : (
               <>

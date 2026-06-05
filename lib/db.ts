@@ -492,7 +492,7 @@ export async function seedDemoAccount(name: string): Promise<{ userId: string }>
     const { data: gp } = await db.from("plans").insert({
       slug: pastSlug, title: "Sunset hike + pizza", intent: "hike then pizza", activity: "Sunset hike + pizza",
       status: "completed", visibility: "group", creator_id: userId, group_id: groupId, ai_empowered: true,
-      cover_hue: "hike", place_address: "Box Hill", place_name: "Box Hill", adventure_no: 1,
+      cover_hue: "hike", place_address: "Box Hill", place_name: "Box Hill", adventure_no: 2,
       completed_at: new Date(Date.now() - 14 * 86400_000).toISOString(),
     } as never).select("id").single();
     const gpId = (gp as unknown as Row | null)?.id as string | undefined;
@@ -554,6 +554,29 @@ export async function seedDemoAccount(name: string): Promise<{ userId: string }>
     await db.from("plan_members").insert(
       [userId, ...crew.slice(0, 2)].map((pid) => ({ plan_id: advId, profile_id: pid, rsvp: "in", joined_via: "app" })) as never,
     );
+  }
+
+  // a SECOND crew (so "groups" reads plural) with its own description + a past adventure
+  const { data: grp2 } = await db.from("groups").insert({
+    name: "Climbing Crew", owner_id: userId,
+    emoji: "Midweek bouldering and the occasional proper day out on real rock.",
+  } as never).select("id").single();
+  const group2Id = (grp2 as unknown as Row | null)?.id as string | undefined;
+  if (group2Id && crew[2]) {
+    const g2members = [userId, crew[0], crew[2]];
+    await db.from("group_members").insert(g2members.map((pid) => ({ group_id: group2Id, profile_id: pid })) as never);
+    const c2Slug = planSlug(`${Date.now()}-demo-grp2-past`);
+    const { data: c2 } = await db.from("plans").insert({
+      slug: c2Slug, title: "Bouldering + burgers", intent: "bouldering then burgers", activity: "Bouldering + burgers",
+      status: "completed", visibility: "group", creator_id: userId, group_id: group2Id, ai_empowered: true,
+      cover_hue: "climb", place_address: "The Arch", place_name: "The Arch", adventure_no: 3,
+      completed_at: new Date(Date.now() - 30 * 86400_000).toISOString(),
+    } as never).select("id").single();
+    const c2Id = (c2 as unknown as Row | null)?.id as string | undefined;
+    if (c2Id) {
+      await writeMeta(c2Id, { scaffold: [{ key: "plan", label: "The plan", day: 1, order: 0 }] });
+      await db.from("plan_members").insert(g2members.map((pid) => ({ plan_id: c2Id, profile_id: pid, rsvp: "in", joined_via: "app" })) as never);
+    }
   }
 
   return { userId };

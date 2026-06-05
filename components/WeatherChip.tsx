@@ -29,11 +29,16 @@ export function WeatherChip({ place, date, variant = "chip" }: {
 
   if (variant === "card") {
     return (
-      <div className="flex items-center gap-3 rounded-xl border-2 border-ink bg-secondary-soft px-4 py-3 shadow-hard-sm">
-        <Icon size={26} className="shrink-0 text-secondary" />
-        <div className="min-w-0">
-          <div className="font-display text-lg font-bold leading-none">{temp} <span className="text-sm font-bold text-muted">{w.label}</span></div>
-          <div className="mt-0.5 truncate text-xs font-bold text-muted">{date ? "on the day" : "today"} · {place?.split(",")[0]}</div>
+      <div className="flex items-center gap-3 rounded-xl border-2 border-ink bg-surface px-4 py-3 shadow-hard-sm">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border-2 border-ink bg-secondary-soft text-secondary">
+          <Icon size={24} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-2">
+            <span className="font-display text-2xl font-bold leading-none">{temp}</span>
+            <span className="text-sm font-bold text-ink/70">{w.label}</span>
+          </div>
+          <div className="mt-0.5 truncate text-xs font-bold text-muted">{date ? "On the day" : "Today"} in {place?.split(",")[0]}</div>
         </div>
       </div>
     );
