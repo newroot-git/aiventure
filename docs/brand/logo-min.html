@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AIventure — minimal marks</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --cream:#EAE1CF; --surface:#F5EFE1; --ink:#1E1B16; --muted:#7B6E5C;
+    --red:#CE3B2A; --gold:#EBA92C; --green:#2E7B4E; --night:#241F33; --dusk:#5B5080;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#E2D7BF;font-family:'Plus Jakarta Sans',sans-serif;color:var(--ink);padding:40px 28px 64px}
+  h1{font-family:'Pixelify Sans',monospace;font-size:34px;margin-bottom:4px}
+  .sub{color:var(--muted);margin-bottom:34px;font-size:15px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;max-width:1080px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:13px}
+  .tile{
+    width:200px;height:200px;border:3px solid var(--ink);border-radius:38px;
+    box-shadow:7px 7px 0 var(--ink);display:flex;align-items:center;justify-content:center;
+  }
+  .tile svg{width:120px;height:120px;display:block}
+  .name{font-family:'Pixelify Sans',monospace;font-weight:700;font-size:16px}
+  .note{font-size:12.5px;color:var(--muted);text-align:center;margin-top:-7px;max-width:190px;line-height:1.4}
+  .chips{display:flex;gap:9px;margin-top:3px}
+  .chip{width:34px;height:34px;border:2px solid var(--ink);border-radius:9px;display:flex;align-items:center;justify-content:center}
+  .chip svg{width:22px;height:22px}
+  .legend{margin-top:42px;font-size:13px;color:var(--muted);max-width:760px;line-height:1.5}
+</style>
+</head>
+<body>
+  <h1>AIventure — minimal marks</h1>
+  <div class="sub">One bold glyph each. No scene, no name. Built to live at favicon size and on a billboard.</div>
+  <div class="grid" id="grid"></div>
+  <div class="legend">All vector — infinitely crisp. Chips show each on its tile colour, on ink, and on cream (favicon reality check). Pick number(s) + a colourway and I'll wire it as the app icon / PWA / nav mark.</div>
+
+<script>
+const C={red:'#CE3B2A',gold:'#EBA92C',green:'#2E7B4E',ink:'#1E1B16',cream:'#EAE1CF',surface:'#F5EFE1',night:'#241F33',dusk:'#5B5080'};
+
+// Each mark = function(stroke, accent) -> inner SVG markup on a 0..100 viewBox.
+const MARKS=[
+  { name:'Ascent', tile:C.cream, fg:C.ink, ac:C.red,
+    note:'A peak that is also an up-arrow. Onward + up in one shape.',
+    svg:(fg,ac)=>`
+      <polygon points="50,16 84,80 16,80" fill="none" stroke="${fg}" stroke-width="9" stroke-linejoin="round"/>
+      <polygon points="50,40 66,70 34,70" fill="${ac}"/>`},
+
+  { name:'Waypoint', tile:C.surface, fg:C.ink, ac:C.red,
+    note:'A single route rising to its destination. The journey, abstracted.',
+    svg:(fg,ac)=>`
+      <path d="M18 82 L40 54 L58 66 L82 26" fill="none" stroke="${fg}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="82" cy="26" r="11" fill="${ac}"/>`},
+
+  { name:'North', tile:C.ink, fg:C.cream, ac:C.gold,
+    note:'A compass needle. Pure direction — the agent points the way.',
+    svg:(fg,ac)=>`
+      <polygon points="50,12 64,50 50,88 36,50" fill="${fg}"/>
+      <polygon points="50,12 64,50 50,50" fill="${ac}"/>
+      <circle cx="50" cy="50" r="6" fill="${C.ink}"/>`},
+
+  { name:'Daybreak', tile:C.cream, fg:C.ink, ac:C.gold,
+    note:'Sun cresting a horizon. New day, get out there.',
+    svg:(fg,ac)=>`
+      <path d="M22 64 A28 28 0 0 1 78 64" fill="${ac}" stroke="${fg}" stroke-width="0"/>
+      <path d="M22 64 A28 28 0 0 1 78 64" fill="none" stroke="${fg}" stroke-width="8" stroke-linecap="round"/>
+      <line x1="14" y1="76" x2="86" y2="76" stroke="${fg}" stroke-width="9" stroke-linecap="round"/>`},
+
+  { name:'Constellation', tile:C.night, fg:C.dusk, ac:C.gold,
+    note:'Three stars drawing a peak. Earth meets cosmos, stripped bare.',
+    svg:(fg,ac)=>`
+      <line x1="50" y1="20" x2="22" y2="80" stroke="${fg}" stroke-width="6" stroke-linecap="round"/>
+      <line x1="50" y1="20" x2="78" y2="80" stroke="${fg}" stroke-width="6" stroke-linecap="round"/>
+      <line x1="22" y1="80" x2="78" y2="80" stroke="${fg}" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="50" cy="20" r="11" fill="${ac}"/>
+      <circle cx="22" cy="80" r="8" fill="${C.cream}"/>
+      <circle cx="78" cy="80" r="8" fill="${C.cream}"/>`},
+
+  { name:'Onward', tile:C.red, fg:C.cream, ac:C.gold,
+    note:'Stacked chevrons climbing. Momentum, "press start".',
+    svg:(fg,ac)=>`
+      <polyline points="24,52 50,26 76,52" fill="none" stroke="${fg}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+      <polyline points="24,74 50,48 76,74" fill="none" stroke="${ac}" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>`},
+
+  { name:'Trailhead', tile:C.surface, fg:C.ink, ac:C.red,
+    note:'Pin and peak fused — one triangle that means "a real place to go".',
+    svg:(fg,ac)=>`
+      <path d="M50 86 L26 40 A26 26 0 1 1 74 40 Z" fill="${ac}" stroke="${fg}" stroke-width="7" stroke-linejoin="round"/>
+      <polygon points="50,38 60,58 40,58" fill="${C.surface}"/>`},
+
+  { name:'Wayfold', tile:C.ink, fg:C.cream, ac:C.red,
+    note:'A folded paper dart / arrow. Go, lightweight, no admin.',
+    svg:(fg,ac)=>`
+      <polygon points="22,28 82,50 22,72" fill="${fg}"/>
+      <polygon points="22,28 82,50 48,50" fill="${ac}"/>
+      <polyline points="22,28 48,50 22,72" fill="none" stroke="${C.ink}" stroke-width="3"/>`},
+
+  { name:'Open Door', tile:C.cream, fg:C.ink, ac:C.gold,
+    note:'An arch / portal with a star through it. Step out, the world opens.',
+    svg:(fg,ac)=>`
+      <path d="M26 84 L26 50 A24 24 0 0 1 74 50 L74 84" fill="none" stroke="${fg}" stroke-width="9" stroke-linecap="round"/>
+      <polygon points="50,30 56,46 72,46 59,56 64,72 50,62 36,72 41,56 28,46 44,46" fill="${ac}"/>`},
+];
+
+const grid=document.getElementById('grid');
+MARKS.forEach((mk,i)=>{
+  const cell=document.createElement('div');cell.className='cell';
+  const tile=document.createElement('div');tile.className='tile';tile.style.background=mk.tile;
+  tile.innerHTML=`<svg viewBox="0 0 100 100">${mk.svg(mk.fg,mk.ac)}</svg>`;
+  cell.appendChild(tile);
+  const name=document.createElement('div');name.className='name';name.textContent=(i+1)+'. '+mk.name;cell.appendChild(name);
+  const note=document.createElement('div');note.className='note';note.textContent=mk.note;cell.appendChild(note);
+  const chips=document.createElement('div');chips.className='chips';
+  [[mk.tile,mk.fg,mk.ac],[C.ink,C.cream,mk.ac],[C.cream,C.ink,mk.ac]].forEach(([bg,fg,ac])=>{
+    const ch=document.createElement('div');ch.className='chip';ch.style.background=bg;
+    ch.innerHTML=`<svg viewBox="0 0 100 100">${mk.svg(fg,ac)}</svg>`;chips.appendChild(ch);
+  });
+  cell.appendChild(chips);
+  grid.appendChild(cell);
+});
+</script>
+</body>
+</html>

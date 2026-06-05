@@ -50,16 +50,14 @@ export const currentUserId = cache(async (): Promise<string> => {
       // only honour av_uid for genuine guest profiles (no linked auth account) —
       // stops a forged/stale cookie from impersonating a real or seeded user.
       const db = supabaseAdmin();
-      const { data } = await db.from("profiles").select("id, auth_id, name").eq("id", uid).maybeSingle();
+      const { data } = await db.from("profiles").select("id, auth_id").eq("id", uid).maybeSingle();
       const row = data as Row | null;
-      if (row && !row.auth_id) {
-        // in prod, av_uid must be an actual minted guest ("Guest NNNN") — this stops a
-        // leftover dev-switch cookie (e.g. =Josh) from masking a fresh account. The dev
-        // profile-switcher (DEV_SWITCH=1) may still resolve any seed profile.
-        const devMode = process.env.NEXT_PUBLIC_DEV_SWITCH === "1";
-        const isGuest = typeof row.name === "string" && (row.name as string).startsWith("Guest ");
-        if (devMode || isGuest) return row.id as string;
-      }
+      // av_uid is HMAC-signed (verifyGuest gated the signature above), so a valid cookie
+      // pointing at a guest/demo profile (no linked auth account) is trustworthy — honour
+      // it regardless of the display name. Demo accounts use the person's real name, not
+      // "Guest NNNN", so the old name check wrongly logged them out. In prod an unsigned
+      // (stale dev-switch) cookie never gets here because verifyGuest returns null for it.
+      if (row && !row.auth_id) return row.id as string;
     }
   } catch {}
   return "";

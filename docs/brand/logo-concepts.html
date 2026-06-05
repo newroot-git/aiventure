@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>AIventure — pixel logo concepts</title>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --cream:#EAE1CF; --surface:#F5EFE1; --ink:#1E1B16; --muted:#7B6E5C;
+    --red:#CE3B2A; --gold:#EBA92C; --green:#2E7B4E; --blue:#2A56A8;
+    --night:#241F33; --dusk:#5B5080; --line:#D8C9AE;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#E2D7BF;font-family:'Plus Jakarta Sans',sans-serif;color:var(--ink);padding:40px 28px 64px}
+  h1{font-family:'Pixelify Sans',monospace;font-size:34px;margin-bottom:4px}
+  .sub{color:var(--muted);margin-bottom:32px;font-size:15px}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;max-width:1180px}
+  .cell{display:flex;flex-direction:column;align-items:center;gap:12px}
+  .tile{
+    width:180px;height:180px;border:3px solid var(--ink);border-radius:34px;
+    box-shadow:6px 6px 0 var(--ink);display:flex;align-items:center;justify-content:center;
+    overflow:hidden;position:relative;
+  }
+  .tile canvas{image-rendering:pixelated;width:150px;height:150px}
+  .name{font-family:'Pixelify Sans',monospace;font-weight:700;font-size:15px}
+  .note{font-size:12px;color:var(--muted);text-align:center;margin-top:-6px;max-width:170px;line-height:1.35}
+  .row2{display:flex;gap:10px;align-items:center;margin-top:2px}
+  .chip{width:30px;height:30px;border:2px solid var(--ink);border-radius:8px;image-rendering:pixelated}
+  .legend{margin-top:40px;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <h1>AIventure — pixel logo marks</h1>
+  <div class="sub">Icon only, no wordmark. Adventure × earth-meets-cosmos. Each shown big + as a tiny favicon-size chip.</div>
+  <div class="grid" id="grid"></div>
+  <div class="legend">Pixel-true. Any one renders crisp from 16px favicon to a 1024px app icon. Pick numbers + a tile colour and I'll wire it as the app/PWA icon.</div>
+
+<script>
+const C = {
+  red:'#CE3B2A', redDk:'#A2331F', gold:'#EBA92C', goldDk:'#C98A1E',
+  green:'#2E7B4E', greenDk:'#1F5A38', blue:'#2A56A8',
+  cream:'#EAE1CF', surface:'#F5EFE1', ink:'#1E1B16', muted:'#7B6E5C',
+  night:'#241F33', dusk:'#5B5080', duskLt:'#7A6E9C', white:'#F7F1E3', line:'#D8C9AE',
+  snow:'#EDE6D6'
+};
+const G = 32; // logical pixel grid
+
+function maker(){
+  const px = {};
+  const set = (x,y,c)=>{ if(x>=0&&x<G&&y>=0&&y<G) px[x+','+y]=c; };
+  const rect=(x0,y0,w,h,c)=>{ for(let y=y0;y<y0+h;y++) for(let x=x0;x<x0+w;x++) set(x,y,c); };
+  // filled disc
+  const disc=(cx,cy,r,c)=>{ for(let y=-r;y<=r;y++) for(let x=-r;x<=r;x++){ if(x*x+y*y<=r*r+r*0.4) set(cx+x,cy+y,c); } };
+  const ring=(cx,cy,r,c,t=1)=>{ for(let y=-r;y<=r;y++) for(let x=-r;x<=r;x++){ const d=Math.sqrt(x*x+y*y); if(d<=r+0.3&&d>=r-t) set(cx+x,cy+y,c); } };
+  // triangle mountain: peak at (px,py), half-base hb, base row by
+  const mtn=(pX,pY,hb,by,c)=>{ for(let row=pY;row<=by;row++){ const w=Math.round((row-pY)/(by-pY)*hb); for(let x=pX-w;x<=pX+w;x++) set(x,row,c); } };
+  // 4-point sparkle star centered cx,cy, arm length a
+  const spark=(cx,cy,a,c)=>{ for(let i=-a;i<=a;i++){ const t=a-Math.abs(i); set(cx+i,cy,c); set(cx,cy+i,c); for(let k=0;k<t-0?1:0;k++){} }
+    // taper diagonals lightly
+    for(let i=1;i<a;i++){ const t=a-i; if(t>0){ set(cx+i,cy, c);} } };
+  const plus=(cx,cy,a,c)=>{ for(let i=-a;i<=a;i++){ set(cx+i,cy,c); set(cx,cy+i,c);} };
+  // diamond star (4-point) with body
+  const dstar=(cx,cy,r,c)=>{ for(let y=-r;y<=r;y++) for(let x=-r;x<=r;x++){ if(Math.abs(x)+Math.abs(y)<=r) set(cx+x,cy+y,c);} };
+  const tinyStar=(x,y,c)=>{ set(x,y,c); set(x-1,y,c); set(x+1,y,c); set(x,y-1,c); set(x,y+1,c); };
+  return {px,set,rect,disc,ring,mtn,plus,dstar,tinyStar};
+}
+
+// ---- CONCEPTS ----
+const CONCEPTS = [
+  { name:'Summit Sun', tile:C.cream, note:'Twin peaks, rising sun. Classic adventure badge.',
+    draw(m){
+      // sun
+      m.disc(20,11,5,C.gold); m.ring(20,11,6,C.goldDk,1);
+      // rays
+      [[20,2],[27,4],[12,4]].forEach(([x,y])=>m.plus(x,y,1,C.goldDk));
+      // back peak
+      m.mtn(12,12,11,27,C.redDk);
+      // front peak
+      m.mtn(21,15,9,28,C.red);
+      // snow caps
+      m.mtn(12,12,3,16,C.snow);
+      m.mtn(21,15,3,19,C.snow);
+      // ground line
+      m.rect(2,28,28,2,C.ink);
+    }},
+
+  { name:'Night Peak', tile:C.night, note:'Mountain under the stars. The earth↔cosmos signature.',
+    draw(m){
+      // stars
+      m.tinyStar(7,7,C.gold); m.tinyStar(25,9,C.white); m.tinyStar(15,5,C.white); m.set(28,4,C.gold); m.set(5,13,C.white);
+      // crescent moon
+      m.disc(24,7,4,C.gold); m.disc(26,6,4,C.night);
+      // mountains
+      m.mtn(11,13,11,29,C.dusk);
+      m.mtn(22,17,8,29,C.duskLt);
+      m.mtn(11,13,3,17,C.white);
+      // base
+      m.rect(2,29,28,1,C.duskLt);
+    }},
+
+  { name:'Compass Star', tile:C.surface, note:'Four-point compass rose. Direction, the agent that points the way.',
+    draw(m){
+      m.ring(16,16,12,C.ink,2);
+      m.ring(16,16,12,C.gold,1);
+      // star arms (N red, others ink)
+      // vertical
+      for(let y=5;y<=27;y++){ const w = (y<16)?(y-5):(27-y); for(let x=16-Math.floor(w/2);x<=16+Math.floor(w/2);x++) m.set(x,y, y<16?C.red:C.redDk);}
+      // horizontal
+      for(let x=5;x<=27;x++){ const w=(x<16)?(x-5):(27-x); for(let y=16-Math.floor(w/2);y<=16+Math.floor(w/2);y++) m.set(x,y,C.ink);}
+      m.disc(16,16,2,C.gold);
+    }},
+
+  { name:'Flag Peak', tile:C.cream, note:'Pennant planted on the summit. You made it.',
+    draw(m){
+      m.mtn(15,9,13,28,C.red);
+      m.mtn(15,9,4,14,C.snow);
+      // flag pole
+      m.rect(15,4,1,8,C.ink);
+      // pennant
+      m.set(16,4,C.gold);m.set(17,4,C.gold);m.set(18,4,C.gold);m.set(19,4,C.gold);
+      m.set(16,5,C.gold);m.set(17,5,C.gold);m.set(18,5,C.gold);
+      m.set(16,6,C.gold);m.set(17,6,C.gold);
+      m.set(16,3,C.goldDk);m.set(17,3,C.goldDk);m.set(18,3,C.goldDk);
+      m.rect(2,28,28,2,C.ink);
+    }},
+
+  { name:'Tent & Stars', tile:C.night, note:'Camp under the cosmos. Cosy, social, outdoors.',
+    draw(m){
+      m.tinyStar(8,7,C.gold); m.tinyStar(24,6,C.white); m.set(16,4,C.gold); m.set(28,11,C.white);
+      // tent triangle
+      m.mtn(16,12,11,26,C.green);
+      // door
+      for(let row=18;row<=26;row++){ const w=Math.max(0,(row-18)/8*2); m.set(16,row,C.greenDk); if(w>=1){m.set(15,row,C.greenDk);m.set(17,row,C.greenDk);} }
+      // ridge
+      m.rect(16,12,1,14,C.greenDk);
+      // pole tips
+      m.set(16,11,C.gold);
+      m.rect(3,26,26,2,C.ink);
+    }},
+
+  { name:'Sunburst', tile:C.red, note:'The Burst star motif, radiating. Energy, “press start”.',
+    draw(m){
+      // rays
+      const cx=16,cy=16;
+      for(let a=0;a<8;a++){ const ang=a*Math.PI/4; for(let r=7;r<=13;r++){ m.set(Math.round(cx+Math.cos(ang)*r),Math.round(cy+Math.sin(ang)*r),C.gold);} }
+      m.disc(cx,cy,6,C.gold); m.ring(cx,cy,6,C.ink,1); m.disc(cx,cy,3,C.cream);
+    }},
+
+  { name:'Comet', tile:C.night, note:'Shooting star across the dark. Momentum, “just go”.',
+    draw(m){
+      // trail
+      for(let i=0;i<14;i++){ const x=6+i, y=24-i; m.set(x,y, i<7?C.dusk:C.duskLt); if(i<10) m.set(x,y+1,C.dusk); }
+      // head star
+      m.dstar(22,8,4,C.gold); m.set(22,8,C.white);
+      m.tinyStar(7,9,C.white); m.set(27,20,C.gold);
+    }},
+
+  { name:'Trail Pin', tile:C.surface, note:'Location pin as a peak, star inside. Real places, grounded.',
+    draw(m){
+      // teardrop pin
+      m.disc(16,13,8,C.red);
+      m.mtn(16,28,7,21,C.red); // point down (inverted via mtn? mtn widens downward) -> use triangle pointing down
+      // fix point: draw downward triangle
+      for(let row=20;row<=29;row++){ const w=Math.round((29-row)/9*7); for(let x=16-w;x<=16+w;x++) m.set(x,row,C.red);}
+      m.ring(16,13,8,C.redDk,1);
+      // star hole
+      m.dstar(16,13,4,C.cream);
+    }},
+];
+
+const grid = document.getElementById('grid');
+CONCEPTS.forEach((cn,idx)=>{
+  const cell=document.createElement('div'); cell.className='cell';
+  const tile=document.createElement('div'); tile.className='tile'; tile.style.background=cn.tile;
+  const big=document.createElement('canvas'); big.width=G; big.height=G;
+  // draw
+  const m=maker(); cn.draw(m);
+  const ctx=big.getContext('2d');
+  for(const k in m.px){ const [x,y]=k.split(',').map(Number); ctx.fillStyle=m.px[k]; ctx.fillRect(x,y,1,1);}
+  tile.appendChild(big);
+  cell.appendChild(tile);
+  const name=document.createElement('div'); name.className='name'; name.textContent=(idx+1)+'. '+cn.name; cell.appendChild(name);
+  const note=document.createElement('div'); note.className='note'; note.textContent=cn.note; cell.appendChild(note);
+  // favicon chips
+  const row=document.createElement('div'); row.className='row2';
+  [cn.tile, C.ink, C.cream].forEach(bg=>{
+    const chip=big.cloneNode(); chip.className='chip'; chip.style.background=bg;
+    const cx=chip.getContext('2d'); for(const k in m.px){ const [x,y]=k.split(',').map(Number); cx.fillStyle=m.px[k]; cx.fillRect(x,y,1,1);}
+    row.appendChild(chip);
+  });
+  cell.appendChild(row);
+  grid.appendChild(cell);
+});
+</script>
+</body>
+</html>
