@@ -26,9 +26,8 @@ Ran a 4-agent moody code audit, then fixed everything. `next build` green, `tsc`
 - NOTE: `lib/slug.ts` was flagged dead by a reviewer but is NOT — `db.ts` uses `planSlug` everywhere. Kept.
 
 ## ⚠️ ACTION NEEDED FROM JOSH
-- **Enable Supabase RLS** — biggest remaining hardening. Service-role bypasses it, so the hand-rolled guards above are the *only* authz. RLS = defense-in-depth behind all of them. (`lib/supabase/admin.ts` flags this too.)
-- **Run `supabase/migrations/0005_home_area.sql`** (`alter table profiles add column if not exists home_area text;`). Until run, home-location default silently falls back to London (migration-safe, won't crash). Already run: 0002 (RLS policies authored), 0003 (indexes), 0004 (constraints).
-- **One manual click-through** — the live interactive smoke test (vote / refine / create) didn't run this session (port 3210 was held by an existing dev server). Build + typecheck are green and the PlanView refactor was logic-preserving, but eyeball one plan's vote + AI-refine once.
+- ✅ **DONE 2026-06-05: RLS enabled on all 15 tables + `profiles.home_area` column added** (Josh ran combined SQL). Auth model now fully closed: RLS deny-by-default behind the hand-rolled db.ts guards. Home-location default no longer falls back to London.
+- ✅ **DONE 2026-06-05: live click-through passed on prod** (Playwright, as judge guest): judge login → AI plan create → vote (optimistic + count) → AI refine (regenerated central/cheaper options) → delete. Zero console errors. The memoized PlanSlot refactor holds. **Found + fixed a real bug en route:** `go()` in signin cleared `av_uid` unconditionally, so "I'm a judge" wiped its own guest cookie and bounced to /signin — now `go(false)` keeps it (`2259a39`).
 - **Optional:** Supabase → Auth → Providers → Email → turn OFF "Confirm email" for instant password signup (free-tier email is rate-limited).
 
 ## Deferred (judged too risky for an unattended deploy — cosmetic, wide blast radius)
