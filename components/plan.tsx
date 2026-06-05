@@ -252,7 +252,7 @@ export function WhenPicker({
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40 bg-night/30" onClick={done} />
+          <div className="fixed inset-0 z-40 bg-ink/20 backdrop-blur-[1px]" onClick={done} />
           <div className="fixed left-1/2 top-1/2 z-50 w-[min(92vw,380px)] -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-ink bg-surface p-4 shadow-hard">
             <div className="mb-3 flex items-center justify-between">
               <button type="button" onClick={() => shift(-1)} className="grid h-9 w-9 place-items-center rounded-md border-2 border-line text-ink hover:border-primary">‹</button>

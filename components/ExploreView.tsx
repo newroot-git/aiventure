@@ -1,9 +1,10 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { Compass, Users, CalendarDays, Check, Sparkles, Search } from "lucide-react";
+import { Compass, Users, CalendarDays, Check, Sparkles, ArrowRight } from "lucide-react";
 import { Card, Pill, Button } from "./ui";
 import type { CommunityCard, OpenEventCard } from "@/lib/db";
+import type { Idea } from "@/lib/ideas";
 
 function Heading({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -11,21 +12,47 @@ function Heading({ icon, children }: { icon: React.ReactNode; children: React.Re
   );
 }
 
-export function ExploreView({ communities, events }: { communities: CommunityCard[]; events: OpenEventCard[] }) {
+// fresh things-to-do — each pre-fills the create flow on tap
+function IdeaCards({ ideas }: { ideas: Idea[] }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {ideas.map((idea) => (
+        <Link key={idea.id} href={`/new?scope=single&intent=${encodeURIComponent(idea.q)}`} className="block">
+          <Card hard className="overflow-hidden p-0 transition active:translate-x-1 active:translate-y-1 active:shadow-none">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`/img/cover-${idea.tile}.png`} alt="" className="h-28 w-full border-b-2 border-ink/10 object-cover" />
+            <div className="p-4">
+              <h3 className="font-heading text-lg font-bold leading-snug">{idea.title}</h3>
+              <p className="mt-1 text-sm text-muted">{idea.blurb}</p>
+              <p className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-primary">Plan this <ArrowRight size={14} /></p>
+            </div>
+          </Card>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+export function ExploreView({ communities, events, ideas = [] }: { communities: CommunityCard[]; events: OpenEventCard[]; ideas?: Idea[] }) {
   const [joined, setJoined] = React.useState<string[]>([]);
   const toggle = (id: string) => setJoined((j) => (j.includes(id) ? j.filter((x) => x !== id) : [...j, id]));
 
-  const empty = events.length === 0 && communities.length === 0;
-  if (empty) {
+  const noCommunity = events.length === 0 && communities.length === 0;
+  if (noCommunity) {
     return (
       <div>
         <h1 className="font-display text-3xl font-bold">Explore</h1>
-        <p className="mt-1 text-[15px] text-muted">Find communities, open plans, and things to get in on near you.</p>
-        <Card className="mt-6 flex flex-col items-center gap-2 p-8 text-center">
-          <span className="grid h-12 w-12 place-items-center rounded-md border-2 border-ink bg-secondary-soft text-secondary"><Compass size={24} /></span>
-          <h2 className="mt-1 font-display text-lg font-bold">Communities are coming</h2>
-          <p className="max-w-xs text-sm text-muted">Open plans and communities near you will show up here. For now, start your own plan or nudge a mate.</p>
-          <Link href="/new" className="mt-2"><Button variant="primary" size="sm">Create a plan</Button></Link>
+        <p className="mt-1 text-[15px] text-muted">Fresh things to do near you — tap one to turn it into a plan.</p>
+
+        <Heading icon={<Sparkles size={20} className="text-primary" />}>Fresh ideas for you</Heading>
+        <IdeaCards ideas={ideas} />
+
+        <Card className="mt-8 flex items-center gap-3 p-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-md border-2 border-ink bg-secondary-soft text-secondary"><Compass size={22} /></span>
+          <div className="min-w-0 text-sm">
+            <p className="font-bold">Communities are coming</p>
+            <p className="text-muted">Open plans + communities near you will show up here.</p>
+          </div>
         </Card>
       </div>
     );
@@ -34,14 +61,12 @@ export function ExploreView({ communities, events }: { communities: CommunityCar
   return (
     <div>
       <h1 className="font-display text-3xl font-bold">Explore</h1>
-      <p className="mt-1 text-[15px] text-muted">Find communities, open plans, and things to get in on near you.</p>
+      <p className="mt-1 text-[15px] text-muted">Fresh things to do, open plans, and communities near you.</p>
 
-      <div className="mt-5 flex items-center gap-2 rounded-md border-2 border-line bg-surface px-3 focus-within:border-primary">
-        <Search size={18} className="text-muted" />
-        <input placeholder="Search communities, activities, places…" aria-label="Search communities, activities, places" className="w-full bg-transparent py-3 text-[15px] outline-none placeholder:text-muted" />
-      </div>
+      <Heading icon={<Sparkles size={20} className="text-primary" />}>Fresh ideas for you</Heading>
+      <IdeaCards ideas={ideas} />
 
-      <Heading icon={<Sparkles size={20} className="text-primary" />}>For your interests</Heading>
+      <Heading icon={<CalendarDays size={20} className="text-accent" />}>Happening near you</Heading>
       <div className="grid gap-3 sm:grid-cols-2">
         {events.map((op) => (
           <Link key={op.id} href={`/p/${op.slug}`} className="block">

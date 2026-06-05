@@ -41,13 +41,15 @@ export default function NewPlan() {
 
 function NewPlanFlow() {
   const router = useRouter();
-  const scopeParam = useSearchParams().get("scope") as PlanScope | null;
+  const params = useSearchParams();
+  const scopeParam = params.get("scope") as PlanScope | null;
+  const intentParam = params.get("intent");
   const [scope, setScope] = React.useState<PlanScope | null>(scopeParam);
   const [phase, setPhase] = React.useState<"config" | "loading">("config");
   const [error, setError] = React.useState<string | null>(null);
 
-  // shared config
-  const [intent, setIntent] = React.useState("");
+  // shared config (intent can be pre-filled from an Explore "fresh idea")
+  const [intent, setIntent] = React.useState(intentParam ?? "");
   const [areas, setAreas] = React.useState<string[]>([]);
   const [areaInput, setAreaInput] = React.useState("");
   const [results, setResults] = React.useState<string[]>([]);

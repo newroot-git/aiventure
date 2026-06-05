@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AIventure — a 60-second tour</title>
+<meta name="description" content="A guided walkthrough of AIventure — turn 'we should hang out' into a real, grounded plan and get your crew out the door." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --bg:#EAE1CF; --surface:#F5EFE1; --ink:#1E1B16; --muted:#7B6E5C;
+    --red:#CE3B2A; --blue:#2A56A8; --yellow:#EBA92C; --green:#2E7B4E; --night:#241F33;
+    --line:#D8C9AE;
+    --display:'Pixelify Sans', monospace;
+    --body:'Plus Jakarta Sans', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    font-family:var(--body); color:var(--ink); background:var(--bg);
+    -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(120% 120% at 50% 0%, rgba(235,169,44,.10), transparent 55%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E");
+    overflow:hidden;
+  }
+
+  /* ── Deck ─────────────────────────────────────────── */
+  .deck{
+    display:flex; height:100dvh; width:100%;
+    overflow-x:auto; overflow-y:hidden;
+    scroll-snap-type:x mandatory;
+    scroll-behavior:smooth;
+    scrollbar-width:none;
+  }
+  .deck::-webkit-scrollbar{display:none;}
+
+  .panel{
+    flex:0 0 100%; width:100%; height:100dvh;
+    scroll-snap-align:center; scroll-snap-stop:always;
+    display:flex; align-items:center; justify-content:center;
+    padding:clamp(20px,5vw,64px);
+    gap:clamp(24px,5vw,72px);
+  }
+  @media (min-width:880px){ .panel{flex-direction:row; text-align:left;} }
+  @media (max-width:879px){ .panel{flex-direction:column; text-align:center; gap:18px; padding:24px 20px 96px;} }
+
+  /* ── Caption ─────────────────────────────────────── */
+  .cap{ max-width:380px; display:flex; flex-direction:column; gap:16px; }
+  @media (max-width:879px){ .cap{max-width:460px; gap:10px; order:1;} }
+
+  .kicker{
+    display:inline-flex; align-items:center; gap:8px; align-self:flex-start;
+    font-family:var(--display); font-weight:600; font-size:13px; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--ink);
+    background:var(--yellow); border:2px solid var(--ink); border-radius:999px;
+    padding:5px 12px; box-shadow:3px 3px 0 0 var(--ink);
+  }
+  @media (max-width:879px){ .kicker{align-self:center;} }
+  .step{ color:var(--red); }
+
+  h2{
+    font-family:var(--display); font-weight:700;
+    font-size:clamp(30px,5.2vw,52px); line-height:1.04; letter-spacing:-.01em;
+  }
+  .cap p{ font-size:clamp(15px,1.6vw,18px); line-height:1.55; color:var(--muted); max-width:38ch; }
+  @media (max-width:879px){ .cap p{margin:0 auto;} }
+  .cap .accent{ color:var(--ink); font-weight:600; }
+
+  /* ── Phone ───────────────────────────────────────── */
+  .phone{
+    flex:0 0 auto; position:relative;
+    width:min(300px, 78vw);
+    aspect-ratio:402 / 874;
+    max-height:78dvh;
+    background:var(--ink);
+    border:2px solid var(--ink); border-radius:38px;
+    padding:9px;
+    box-shadow:10px 10px 0 0 rgba(30,27,22,.22);
+  }
+  @media (max-width:879px){ .phone{ width:auto; height:min(58dvh, 520px); } }
+  .phone::before{ /* notch */
+    content:""; position:absolute; top:13px; left:50%; transform:translateX(-50%);
+    width:34%; height:6px; background:#000; border-radius:999px; z-index:2; opacity:.55;
+  }
+  .phone img{
+    width:100%; height:100%; object-fit:cover; object-position:top center;
+    border-radius:30px; display:block; background:var(--surface);
+  }
+
+  /* ── Cover / outro panels ────────────────────────── */
+  .cover{ flex-direction:column !important; text-align:center; gap:22px; }
+  .cover .wordmark{ font-family:var(--display); font-weight:700; font-size:clamp(44px,9vw,92px); line-height:1; }
+  .cover .wordmark b{ color:var(--red); font-weight:700; }
+  .cover .sub{ font-size:clamp(17px,2.2vw,22px); color:var(--muted); max-width:34ch; margin:0 auto; line-height:1.5; }
+  .cover .lede{ font-family:var(--display); font-weight:600; font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink); }
+  .cta{
+    display:inline-flex; align-items:center; gap:10px; align-self:center;
+    font-family:var(--display); font-weight:600; font-size:17px; text-decoration:none;
+    color:#fff; background:var(--red); border:2px solid var(--ink); border-radius:14px;
+    padding:13px 22px; box-shadow:4px 4px 0 0 var(--ink); transition:transform .06s, box-shadow .06s;
+  }
+  .cta:active{ transform:translate(4px,4px); box-shadow:0 0 0 0 var(--ink); }
+  .cta.ghost{ color:var(--ink); background:var(--surface); }
+  .swipehint{ font-family:var(--display); font-size:14px; color:var(--muted); letter-spacing:.06em; animation:nudge 1.6s ease-in-out infinite; }
+  @keyframes nudge{ 0%,100%{transform:translateX(0)} 50%{transform:translateX(8px)} }
+  .ctarow{ display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+
+  /* ── Chrome: progress dots + arrows + counter ────── */
+  .dots{
+    position:fixed; left:50%; bottom:18px; transform:translateX(-50%);
+    display:flex; gap:8px; z-index:20; background:rgba(245,239,225,.8);
+    border:2px solid var(--ink); border-radius:999px; padding:8px 12px;
+    box-shadow:3px 3px 0 0 var(--ink); backdrop-filter:blur(4px);
+  }
+  .dot{ width:9px; height:9px; border-radius:999px; background:var(--line); border:1.5px solid var(--ink); cursor:pointer; padding:0; transition:background .15s,width .15s; }
+  .dot.on{ background:var(--red); width:22px; }
+
+  .nav{
+    position:fixed; top:50%; transform:translateY(-50%); z-index:20;
+    width:46px; height:46px; border-radius:999px; cursor:pointer;
+    background:var(--surface); border:2px solid var(--ink); color:var(--ink);
+    font-size:20px; font-family:var(--display); display:flex; align-items:center; justify-content:center;
+    box-shadow:3px 3px 0 0 var(--ink); transition:transform .06s, box-shadow .06s, opacity .2s;
+  }
+  .nav:active{ transform:translateY(-50%) translate(3px,3px); box-shadow:0 0 0 0 var(--ink); }
+  .nav.prev{ left:16px; } .nav.next{ right:16px; }
+  .nav[disabled]{ opacity:.32; pointer-events:none; }
+  @media (max-width:879px){ .nav{display:none;} }
+
+  .counter{
+    position:fixed; top:16px; right:18px; z-index:20;
+    font-family:var(--display); font-size:14px; color:var(--ink);
+    background:var(--surface); border:2px solid var(--ink); border-radius:999px;
+    padding:5px 12px; box-shadow:3px 3px 0 0 var(--ink);
+  }
+  .brandtag{
+    position:fixed; top:16px; left:18px; z-index:20;
+    font-family:var(--display); font-weight:700; font-size:18px; color:var(--ink);
+  }
+  .brandtag b{ color:var(--red); }
+</style>
+</head>
+<body>
+
+<div class="brandtag">AI<b>venture</b></div>
+<div class="counter" id="counter">01 / 12</div>
+
+<div class="deck" id="deck">
+
+  <!-- 0 — cover -->
+  <section class="panel cover">
+    <div class="lede">A 60-second tour</div>
+    <div class="wordmark">AI<b>venture</b></div>
+    <p class="sub">Get out of the group chat. Here's exactly how it works — swipe through.</p>
+    <div class="swipehint">swipe / scroll &rarr;</div>
+  </section>
+
+  <!-- 1 — landing -->
+  <section class="panel">
+    <div class="cap">
+      <span class="kicker">The idea</span>
+      <h2>Less scrolling.<br>More living.</h2>
+      <p>The <span class="accent">anti-social-media app</span>: no feed, no followers. It gets you and your crew out the door — then remembers it for you.</p>
+    </div>
+    <div class="phone"><img src="tutorial-assets/01-landing.png" alt="AIventure landing screen" /></div>
+  </section>
+
+  <!-- 2 — sign in -->
+  <section class="panel">
+    <div class="cap">
+      <span class="kicker">Getting in</span>
+      <h2>One tap in.</h2>
+      <p>No download to join a plan. <span class="accent">Judges:</span> hit &ldquo;I'm a judge&rdquo; for an instant guest pass — no email, straight into the demo.</p>
+    </div>
+    <div class="phone"><img src="tutorial-assets/02-signin.png" alt="Sign in with judge guest mode" /></div>
+  </section>
+
+  <!-- 3 — scope -->
+  <section class="panel">
+    <div class="cap">
+      <span class="kicker"><span class="step">Step 1</span> &middot; Pick the scale</span>
+      <h2>From a coffee to a trip.</h2>
+      <p>A surprise, one activity, a full day back-to-back, or a multi-day trip away. <span class="accent">One engine, any size.</span></p>
+    </div>
+    <div class="phone"><img src="tutorial-assets/03-new-scope.png" alt="Choose the scale of your plan" /></div>
+  </section>
+
+  <!-- 4 — describe -->
+  <section class="panel">
+    <div class="cap">
+      <span class="kicker"><span class="step">Step 2</span> &middot; Describe it</span>
+      <h2>Just say it plainly.</h2>
+      <p>Type it like you'd text a mate &mdash; <span class="accent">&ldquo;a hike then a pint Saturday.&rdquo;</span> Drop a place with real autocomplete, anywhere on earth.</p>
+    </div>
+    <div class="phone"><img src="tutorial-assets/04-new-form.png" alt="Describe your plan in plain words" /></div>
+  </section>
+
+  <!-- 5 — AI builds -->
+  <section class="panel">
+    <div class="cap">
+      <span class="kicker"><span class="step">Step 3</span> &middot; AI does the legwork</span>
+      <h2>It grounds every idea.</h2>
+      <p>The agent comes back with <span class="accent">real, bookable places</span> — never made-up venues. The time, the spot and the logistics, sorted.</p>
+    </div>
+    <div class="phone"><img src="tutorial-assets/05-ai-building.png" alt="AI building your grounded plan" /></div>
+  </section>
+
+  <!-- 6 — plan -->
+  <section class="panel">
+    <div class="cap">
+      <span class="kicker"><span class="step">Step 4</span> &middot; A real plan appears</span>
+      <h2>Real spots. Crew votes.</h2>
+      <p>Each step gets real options with <span class="accent">Maps links</span> to prove they exist. The crew votes; the top pick wins. Tweak it in plain English anytime.</p>
+    </div>
+    <div class="phone"><img src="tutorial-assets/06-plan-top.png" alt="A grounded plan with real venue options" /></div>
+  </section>
+
+  <!-- 7 — lock in -->
+  <section class="panel">
+    <div class="cap">
+      <span class="kicker"><span class="step">Step 5</span> &middot; Lock it in</span>
+      <h2>Pick a day. Done.</h2>
+      <p>Set the date, see the route <span class="accent">mapped</span>, and add it to everyone's calendar in one tap. No 200-message thread, no chasing.</p>
+    </div>
+    <div class="phone"><img src="tutorial-assets/07-plan-locked-top.png" alt="Locked-in plan with date and map" /></div>
+  </section>
+
+  <!-- 8 — home countdown -->
+  <section class="panel">
+    <div class="cap">
+      <span class="kicker"><span class="step">Step 6</span> &middot; Counting down</span>
+      <h2>Your next one, up top.</h2>
+      <p>The next adventure sits front and centre with a <span class="accent">live countdown</span> — not buried under a feed of other people's lives.</p>
+    </div>
+    <div class="phone"><img src="tutorial-assets/09-home.png" alt="Home screen with countdown to next adventure" /></div>
+  </section>
+
+  <!-- 9 — calendar -->
+  <section class="panel">
+    <div class="cap">
+      <span class="kicker">It just shows up</span>
+      <h2>Every plan, on its day.</h2>
+      <p>Locked plans land straight on the <span class="accent">calendar</span> and in your real calendar app. The admin handles itself.</p>
+    </div>
+    <div class="phone"><img src="tutorial-assets/11-calendar.png" alt="Calendar showing the plan on its day" /></div>
+  </section>
+
+  <!-- 10 — adventure card -->
+  <section class="panel">
+    <div class="cap">
+      <span class="kicker"><span class="step">Step 7</span> &middot; The payoff</span>
+      <h2>A life, logged.</h2>
+      <p>Finish it and it becomes an <span class="accent">Adventure card</span> you keep. A growing record of things you actually did &mdash; not a feed of things you watched.</p>
+    </div>
+    <div class="phone"><img src="tutorial-assets/08-adventure-card.png" alt="Completed Adventure card" /></div>
+  </section>
+
+  <!-- 11 — outro -->
+  <section class="panel cover">
+    <div class="lede">That's the tour</div>
+    <div class="wordmark">Just go.</div>
+    <p class="sub">Stop saying &ldquo;we should hang out more.&rdquo; Try it yourself &mdash; the judge pass takes one tap.</p>
+    <div class="ctarow">
+      <a class="cta" href="https://aiventure-swart.vercel.app" target="_blank" rel="noopener">Open AIventure</a>
+      <a class="cta ghost" href="https://github.com/newroot-git/aiventure" target="_blank" rel="noopener">View the code</a>
+    </div>
+  </section>
+
+</div>
+
+<button class="nav prev" id="prev" aria-label="Previous">&#8249;</button>
+<button class="nav next" id="next" aria-label="Next">&#8250;</button>
+<div class="dots" id="dots"></div>
+
+<script>
+  const deck = document.getElementById('deck');
+  const panels = [...deck.querySelectorAll('.panel')];
+  const dotsWrap = document.getElementById('dots');
+  const counter = document.getElementById('counter');
+  const prev = document.getElementById('prev');
+  const next = document.getElementById('next');
+  const n = panels.length;
+  let i = 0;
+
+  panels.forEach((_, idx) => {
+    const b = document.createElement('button');
+    b.className = 'dot' + (idx === 0 ? ' on' : '');
+    b.setAttribute('aria-label', 'Go to slide ' + (idx + 1));
+    b.onclick = () => go(idx);
+    dotsWrap.appendChild(b);
+  });
+  const dots = [...dotsWrap.children];
+
+  function go(idx){
+    i = Math.max(0, Math.min(n - 1, idx));
+    deck.scrollTo({ left: i * deck.clientWidth, behavior: 'smooth' });
+  }
+  function sync(){
+    const idx = Math.round(deck.scrollLeft / deck.clientWidth);
+    if (idx === i) return;
+    i = idx;
+    dots.forEach((d, k) => d.classList.toggle('on', k === i));
+    counter.textContent = String(i + 1).padStart(2,'0') + ' / ' + String(n).padStart(2,'0');
+    prev.disabled = i === 0;
+    next.disabled = i === n - 1;
+  }
+
+  let raf;
+  deck.addEventListener('scroll', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(sync); });
+  prev.onclick = () => go(i - 1);
+  next.onclick = () => go(i + 1);
+  window.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(i + 1); }
+    if (e.key === 'ArrowLeft'  || e.key === 'PageUp')  { e.preventDefault(); go(i - 1); }
+    if (e.key === 'Home') go(0);
+    if (e.key === 'End')  go(n - 1);
+  });
+  window.addEventListener('resize', () => deck.scrollTo({ left: i * deck.clientWidth }));
+  prev.disabled = true;
+
+  // Let vertical wheel / trackpad drive horizontal movement.
+  deck.addEventListener('wheel', e => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { deck.scrollLeft += e.deltaY; e.preventDefault(); }
+  }, { passive: false });
+</script>
+</body>
+</html>

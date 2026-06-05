@@ -933,7 +933,7 @@ function TimeChip({ value, onChange }: { value: string | null; onChange: (t: str
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-40 bg-ink/20 backdrop-blur-[1px]" onClick={() => setOpen(false)} />
           <div className="absolute left-0 z-50 mt-1 w-56 rounded-xl border-2 border-ink bg-surface p-2 shadow-hard">
             <div className="flex flex-wrap gap-1.5">
               {TIMES.map((t) => (
