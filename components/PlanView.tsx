@@ -129,9 +129,9 @@ function Section({
     success: "bg-success-soft text-success",
   }[tone];
   return (
-    <section className={`rounded-xl border-2 border-ink bg-surface p-5 shadow-hard ${className ?? ""}`}>
+    <section className={`rounded-xl border-2 border-ink bg-surface p-5 shadow-hard-sm ${className ?? ""}`}>
       <div className="mb-3 flex items-center gap-2">
-        <span className={`grid h-7 w-7 place-items-center rounded-md border-2 border-ink shadow-hard-sm ${toneCls}`}>{icon}</span>
+        <span className={`grid h-7 w-7 place-items-center rounded-md border-2 border-ink ${toneCls}`}>{icon}</span>
         <span className="text-xs font-bold uppercase tracking-wider text-muted">{label}</span>
       </div>
       {children}

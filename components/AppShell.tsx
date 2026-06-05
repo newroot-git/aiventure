@@ -86,7 +86,7 @@ export function AppShell({
 
         {/* the ONLY scrolling region (min-h-0 lets the flex child shrink + scroll) */}
         <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="mx-auto w-full max-w-2xl px-4 pb-10 pt-4 md:max-w-4xl md:px-8 md:pb-12 md:pt-10">
+          <div className="mx-auto w-full max-w-2xl px-5 pb-10 pt-4 md:max-w-4xl md:px-8 md:pb-12 md:pt-10">
             {children}
           </div>
         </main>
