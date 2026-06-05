@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 // Web app manifest — makes AIventure installable to the home screen / standalone.
-// Icons are PLACEHOLDERS (scripts/gen-pwa-icons.mjs) until the real brand mark exists.
+// Icons are the real brand mark (pixel tree) on the cream brand bg.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "AIventure — get out and do things",

@@ -38,8 +38,9 @@ export function AppShell({
     <div className="flex h-dvh overflow-hidden">
       {/* ---- desktop sidebar (in-flow flex column, full height) ---- */}
       <aside className="hidden w-60 shrink-0 flex-col border-r-2 border-line bg-surface/50 px-4 py-6 md:flex">
-        <Link href="/plans" className="px-2 font-display text-2xl font-bold tracking-tight">
-          AI<span className="text-primary">venture</span>
+        <Link href="/plans" className="px-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/img/logo/wordmark.png" alt="AIventure" className="h-8 w-auto" />
         </Link>
         <nav className="mt-8 flex flex-col gap-1">
           {TABS.map((t) => (
@@ -76,8 +77,9 @@ export function AppShell({
           style={{ paddingTop: "env(safe-area-inset-top)" }}
         >
           <div className="flex items-center justify-between px-4 py-3">
-            <Link href="/plans" className="font-display text-xl font-bold tracking-tight">
-              AI<span className="text-primary">venture</span>
+            <Link href="/plans" className="flex items-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/img/logo/wordmark.png" alt="AIventure" className="h-7 w-auto" />
             </Link>
             <div className="flex items-center gap-3">
               {process.env.NEXT_PUBLIC_DEV_SWITCH === "1" && profiles.length > 1 && <ProfileSwitcher me={user} profiles={profiles} compact />}

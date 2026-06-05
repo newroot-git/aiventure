@@ -60,12 +60,19 @@ function render(fg, bg) { // fg/bg = [r,g,b,a]
   return png(DIM, DIM, raw);
 }
 
+const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16), 255];
+const clear = (h) => [...hex(h).slice(0, 3), 0];
 const BLACK = [0, 0, 0, 255], WHITE = [255, 255, 255, 255], CLEAR = [0, 0, 0, 0], CLEARW = [255, 255, 255, 0];
+const TERRA = hex("#CE3B2A"), GOLD = hex("#EBA92C"), CREAM = hex("#EAE1CF"), NIGHT = hex("#241F33");
 const jobs = [
   ["aiventure-logo-black-on-white.png", BLACK, WHITE],
   ["aiventure-logo-white-on-black.png", WHITE, BLACK],
   ["aiventure-logo-black-transparent.png", BLACK, CLEAR],
   ["aiventure-logo-white-transparent.png", WHITE, CLEARW],
+  ["aiventure-logo-terracotta-on-cream.png", TERRA, CREAM],
+  ["aiventure-logo-gold-on-night.png", GOLD, NIGHT],
+  ["aiventure-logo-terracotta-transparent.png", TERRA, clear("#CE3B2A")],
+  ["aiventure-logo-gold-transparent.png", GOLD, clear("#EBA92C")],
 ];
 for (const [name, fg, bg] of jobs) {
   writeFileSync(join(outDir, name), render(fg, bg));

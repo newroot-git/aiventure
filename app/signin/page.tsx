@@ -3,7 +3,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Mail, ArrowLeft, Loader2, Sparkles, Lock } from "lucide-react";
-import { Button, Input, Wordmark } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
 type Mode = "password" | "code";
@@ -111,9 +111,10 @@ export default function SignIn() {
           <div className="relative overflow-hidden rounded-md">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/img/hero-cliff-3.png" alt="" className="block aspect-[16/10] w-full object-cover" />
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-night/75 to-transparent p-3 text-center text-white">
-              <Wordmark className="text-2xl" onAccent />
-              <p className="text-[13px] font-semibold text-white/85">Get out of the group chat.</p>
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-night/85 to-transparent p-3 text-center text-white">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/img/logo/wordmark-gold.png" alt="AIventure" className="mx-auto h-7 w-auto" />
+              <p className="mt-1 text-[13px] font-semibold text-white/85">Get out of the group chat.</p>
             </div>
           </div>
         </div>
