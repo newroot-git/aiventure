@@ -5,6 +5,14 @@ Last session: 2026-06-05 (tester-feedback batch — 8 fixes). UCWS Singapore hac
 ## LIVE
 - **Prod: https://aiventure-swart.vercel.app** — repo `newroot-git/aiventure` @ **`43eb0b1`** → push main auto-deploys.
 
+## Mobile sizing + identity batch (2026-06-05, `deea0f7`) — SHIPPED, verified 390px
+- **#6 Conor's new account defaulted to Josh** — two causes: (a) the SW v1 cross-user RSC cache (fixed in v2 earlier); (b) a stale `av_uid` cookie resolving to seeded "Josh" (auth_id null). Now in prod `av_uid` is honoured ONLY for actual minted guest profiles (name `Guest NNNN`); dev-switcher still works under `DEV_SWITCH=1`. Real sessions already win first.
+- **#1 squish/width** — PlanView had `px-5` INSIDE AppShell's `px-5` wrapper = 80px gutters on 390px. Dropped PlanView `px-5`, shell gutter → `px-4`. Content now 358/390 (16px gutters), was ~310. **Lesson: page roots inside AppShell must NOT re-add horizontal padding/max-w.**
+- **#5** lock-in / done / poke buttons now full-width `size-lg` (were content-width = compressed).
+- **#4** friend picker: fixed-width grid cells + `min-w-0` + `w-full truncate` so long names don't break alignment (new/page + PlanView invite sheet; NudgeSheet still has the old pattern if it recurs).
+- **#3** onboarding interest search results now render under the input (were below the picks list).
+- **#2** onboarding home-area step gained a "Use my location" reverse-geocode button.
+
 ## App-shell + PWA (2026-06-05) — SHIPPED + verified on prod
 - **Native-feel app-shell:** `html,body` locked (overflow hidden, overscroll none); single `#app-scroll` host (h-100dvh flex-col) wraps every route; `AppShell` is a flex column locked to `h-dvh` — header `flex-none` + scrolling `<main>` (`min-h-0 flex-1`) + bottom nav `flex-none`, NO fixed/sticky (kills iOS drift). safe-area insets, viewport-fit=cover, 44px nav taps. Verified 390×844 local+prod: body never scrolls, header/nav pinned, only `<main>` scrolls; standalone pages scroll in `#app-scroll`.
 - **SW STALE-RSC BUG (found+fixed 2026-06-05, `41e6676`):** the first SW (v1) was cache-first for non-navigate/non-API GETs — but `router.refresh()`/soft-nav are RSC GETs, so it served stale server-component payloads. Symptom: "Lock this in" (and any router.refresh action) appeared to do nothing until a hard reload, though the server write succeeded. Fix (sw v2): cache-first ONLY for fingerprinted immutable assets (`/_next/static`, `/icons`, image/font/css); everything dynamic (nav, RSC, `/api`) is network-first. Verified on prod (lock-in + RSVP update live, v2 took over, v1 cache cleared). **Lesson: never cache-first RSC.** A controlling old SW updates on the next page load (skipWaiting+clientsClaim) — one reload.
