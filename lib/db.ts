@@ -435,11 +435,9 @@ export async function updateMyProfile(patch: { name?: string; interests?: string
     upd.interests = patch.interests.filter((x) => typeof x === "string").slice(0, 40).map((x) => x.slice(0, 60));
   }
   if (typeof patch.interest_notes === "string") upd.interest_notes = patch.interest_notes.slice(0, 500);
+  // home_area lives in the same row (migration 0005 applied) — one write, not two
+  if (typeof patch.home_area === "string") upd.home_area = patch.home_area.trim().slice(0, 120);
   if (Object.keys(upd).length) await db.from("profiles").update(upd as never).eq("id", me);
-  // home_area in its own call so a missing column (pre-migration) can't fail the rest
-  if (typeof patch.home_area === "string") {
-    await db.from("profiles").update({ home_area: patch.home_area.trim().slice(0, 120) } as never).eq("id", me);
-  }
 }
 
 /** All seeded profiles — used by the dev profile switcher. */

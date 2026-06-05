@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { Home, Users, CalendarDays, Compass, ChevronsUpDown, Loader2 } from "lucide-react";
 import { Avatar } from "./ui";
 import { QuickMenu } from "./QuickMenu";
-import { NotificationsMenu, type NotifData } from "./NotificationsMenu";
 import type { Profile } from "@/lib/types";
 
 // neutral fallback — never masquerade as a seeded user when identity is unresolved
@@ -19,9 +18,12 @@ const TABS = [
 ];
 
 export function AppShell({
-  children, notifs, me, profiles = [],
+  children, notifications, me, profiles = [],
 }: {
-  children: React.ReactNode; notifs: NotifData; me?: Profile | null; profiles?: Profile[];
+  children: React.ReactNode;
+  notifications: { side: React.ReactNode; icon: React.ReactNode };
+  me?: Profile | null;
+  profiles?: Profile[];
 }) {
   const path = usePathname();
   const isActive = (href: string) => path.startsWith(href);
@@ -46,7 +48,7 @@ export function AppShell({
         </div>
 
         <div className="mt-auto flex flex-col gap-1 border-t-2 border-line pt-4">
-          <NotificationsMenu variant="side" data={notifs} />
+          {notifications.side}
           <Link
             href="/profile"
             className={`flex items-center gap-3 rounded-md px-3 py-2 transition ${
@@ -76,7 +78,7 @@ export function AppShell({
             </Link>
             <div className="flex items-center gap-3">
               {process.env.NEXT_PUBLIC_DEV_SWITCH === "1" && profiles.length > 1 && <ProfileSwitcher me={user} profiles={profiles} compact />}
-              <NotificationsMenu variant="icon" data={notifs} />
+              {notifications.icon}
               <Link href="/profile" aria-label="Profile" className="grid h-11 w-11 place-items-center">
                 <Avatar name={user.name} src={user.avatar} size={32} />
               </Link>
