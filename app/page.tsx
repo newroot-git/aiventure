@@ -189,6 +189,32 @@ const CSS = `
 .lp.js-motion .reveal{opacity:0; transform:translateY(22px); transition:opacity .6s ease, transform .6s ease}
 .lp.js-motion .reveal.in{opacity:1; transform:none}
 
+/* ---- game chrome: HUD bar ---- */
+.lp .hud{position:fixed; top:0; left:0; right:0; height:42px; z-index:8; display:flex; align-items:center; gap:14px;
+  padding:0 14px; background:rgba(36,31,51,.84); backdrop-filter:blur(6px); border-bottom:2px solid var(--ink)}
+.lp .hud-wm{font-family:var(--font-display); font-size:18px; color:#fff; line-height:1}
+.lp .hud-wm b{color:var(--gold)}
+.lp .hud-score{font-family:var(--font-display); font-size:11px; letter-spacing:1px; color:rgba(255,255,255,.55)}
+.lp .hud-start{margin-left:auto; font-family:var(--font-display); font-size:13px; color:var(--ink); background:var(--gold);
+  border:2px solid var(--ink); padding:5px 13px; border-radius:6px; box-shadow:2px 2px 0 var(--ink); cursor:pointer}
+.lp .hud-start:active{transform:translate(2px,2px); box-shadow:0 0 0 var(--ink)}
+@media(max-width:560px){ .lp .hud-score{display:none} }
+
+/* ---- retro device screens around app demos ---- */
+.lp .screen{background:var(--night); border:3px solid var(--ink); border-radius:14px; padding:9px; box-shadow:var(--shadow); position:relative; overflow:hidden}
+.lp .screen-bar{display:flex; align-items:center; gap:6px; padding:2px 5px 8px}
+.lp .screen-bar .led{width:8px; height:8px; border-radius:50%; background:#5b5e6b; flex:0 0 auto}
+.lp .screen-bar .led:nth-child(1){background:var(--terra)}
+.lp .screen-bar .led:nth-child(2){background:var(--gold)}
+.lp .screen-bar .led:nth-child(3){background:var(--success); animation:lpled 1.4s steps(2) infinite}
+.lp .screen-bar em{margin-left:auto; font-family:var(--font-display); font-style:normal; font-size:10px; letter-spacing:1px; color:rgba(255,255,255,.5); text-transform:uppercase}
+.lp .screen-body{position:relative; border-radius:9px; overflow:hidden}
+.lp .screen .vizframe,.lp .screen .plan{box-shadow:none}
+.lp .screen::after{content:""; position:absolute; left:0; right:0; top:0; height:42%; pointer-events:none; z-index:6;
+  background:linear-gradient(rgba(255,255,255,.07), transparent); animation:lpsweep 4.6s linear infinite}
+@keyframes lpsweep{0%{transform:translateY(-110%)} 100%{transform:translateY(300%)}}
+@keyframes lpled{50%{opacity:.2}}
+
 @media(max-width:860px){
   .lp .cards{grid-template-columns:1fr 1fr}
   .lp section.band{padding:72px 0}
@@ -196,13 +222,34 @@ const CSS = `
 @media(max-width:780px){ .lp .probs{grid-template-columns:1fr} }
 @media(prefers-reduced-motion:reduce){
   .lp.js-motion .reveal{opacity:1; transform:none; transition:none}
-  .lp .vague .cursor{animation:none}
+  .lp .vague .cursor, .lp .star, .lp .pressstart, .lp .screen::after, .lp .screen-bar .led:nth-child(3){animation:none}
 }
 `;
 
 export default function Home() {
   const rootRef = useRef<HTMLElement>(null);
   const heroRef = useRef<HTMLImageElement>(null);
+  const scoreRef = useRef<HTMLSpanElement>(null);
+
+  const blip = () => {
+    try {
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const a = new AC();
+      const o = a.createOscillator();
+      const g = a.createGain();
+      o.type = "square";
+      o.frequency.setValueAtTime(620, a.currentTime);
+      o.frequency.setValueAtTime(880, a.currentTime + 0.05);
+      g.gain.setValueAtTime(0.05, a.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.13);
+      o.connect(g);
+      g.connect(a.destination);
+      o.start();
+      o.stop(a.currentTime + 0.14);
+    } catch {
+      /* audio unavailable — no-op */
+    }
+  };
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion:reduce)").matches) return;
@@ -225,6 +272,11 @@ export default function Home() {
       requestAnimationFrame(() => {
         const y = scroller instanceof Window ? window.scrollY : scroller.scrollTop;
         if (heroRef.current) heroRef.current.style.transform = `translateY(${y * 0.18}px)`;
+        const max = scroller instanceof Window
+          ? document.documentElement.scrollHeight - window.innerHeight
+          : scroller.scrollHeight - scroller.clientHeight;
+        const p = max > 0 ? Math.min(1, y / max) : 0;
+        if (scoreRef.current) scoreRef.current.textContent = "SCORE " + String(Math.floor(p * 99999)).padStart(5, "0");
         ticking = false;
       });
     };
@@ -235,6 +287,13 @@ export default function Home() {
   return (
     <main className="lp" ref={rootRef}>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
+
+      {/* HUD */}
+      <div className="hud">
+        <span className="hud-wm">AI<b>venture</b></span>
+        <span className="hud-score" ref={scoreRef}>SCORE 00000</span>
+        <Link className="hud-start" href="/signin" onPointerDown={blip}>▶ Start</Link>
+      </div>
 
       {/* HERO */}
       <header className="hero">
@@ -250,7 +309,7 @@ export default function Home() {
           <h1>Less scrolling.<br />More <b>living</b>.</h1>
           <p className="sub">AIventure turns “we should hang out” into a real plan — and your crew out the door. Then it remembers it for you.</p>
           <div className="cta">
-            <Link className="btn btn-gold" href="/signin">Start an adventure</Link>
+            <Link className="btn btn-gold" href="/signin" onPointerDown={blip}>Start an adventure</Link>
           </div>
           <div className="pressstart">▶ Press start</div>
           <p className="trust">Free to join any plan · No download · No feed</p>
@@ -442,7 +501,7 @@ export default function Home() {
           <div className="ctacard reveal">
             <h2>“We should hang out more.”</h2>
             <p>Stop saying it. Just go.</p>
-            <Link className="btn btn-gold" href="/signin">Start an adventure</Link>
+            <Link className="btn btn-gold" href="/signin" onPointerDown={blip}>Start an adventure</Link>
             <p className="fine">Free to join any plan. Plus unlocks AI planning for your whole crew.</p>
           </div>
         </div>
