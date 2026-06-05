@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import {
-  Sparkles,
+  Wand2,
   Heart,
   Check,
   HelpCircle,
@@ -64,7 +64,7 @@ export function OptionCard({
         <div className="flex shrink-0 items-center gap-2">
           {sourceLabel && (
             <Pill tone="secondary">
-              <Sparkles size={14} /> {sourceLabel}
+              <Wand2 size={14} /> {sourceLabel}
             </Pill>
           )}
           {onDelete && (

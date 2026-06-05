@@ -2,7 +2,7 @@
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Loader2, Sparkles, MapPin, Route, Tent, ArrowLeft, Plus, X, Navigation,
+  Loader2, Wand2, MapPin, ArrowLeft, Plus, X, Navigation, Dices, Footprints, Mountain, Luggage,
   User, Users, Globe, CalendarDays, HelpCircle, ListChecks, Check, Link2,
 } from "lucide-react";
 import { Button, Textarea, SelectTag, Label, Input, Avatar } from "@/components/ui";
@@ -10,11 +10,11 @@ import { WhenPicker } from "@/components/plan";
 import { AuroraField } from "@/components/atmosphere";
 import type { PlanScope } from "@/lib/types";
 
-const SCOPES: { id: PlanScope; label: string; desc: string; Icon: typeof Sparkles }[] = [
-  { id: "surprise", label: "Surprise me", desc: "Solo — I'm in the mood for something today.", Icon: Sparkles },
-  { id: "single", label: "One thing", desc: "A single activity — a hike, dinner, a date.", Icon: MapPin },
-  { id: "adventure", label: "An adventure", desc: "A day of activities, back to back.", Icon: Route },
-  { id: "trip", label: "A trip", desc: "Multiple days away with the crew.", Icon: Tent },
+const SCOPES: { id: PlanScope; label: string; desc: string; Icon: typeof MapPin; tone: string }[] = [
+  { id: "surprise", label: "Surprise me", desc: "Solo — I'm in the mood for something today.", Icon: Dices, tone: "bg-accent-soft text-[#8a6512]" },
+  { id: "single", label: "One thing", desc: "A single activity — a hike, dinner, a date.", Icon: Footprints, tone: "bg-primary-soft text-primary-deep" },
+  { id: "adventure", label: "An adventure", desc: "A day of activities, back to back.", Icon: Mountain, tone: "bg-secondary-soft text-secondary" },
+  { id: "trip", label: "A trip", desc: "Multiple days away with the crew.", Icon: Luggage, tone: "bg-success-soft text-success" },
 ];
 
 const THINKING = [
@@ -232,7 +232,7 @@ function NewPlanFlow() {
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-5 py-8">
         <AuroraField stars className="flex flex-col items-center rounded-2xl border-2 border-ink px-6 py-10 text-center text-white shadow-hard">
           <span className="relative grid h-20 w-20 place-items-center rounded-xl border-2 border-ink bg-accent text-ink shadow-hard-sm">
-            <Sparkles size={36} className="animate-pulse" />
+            <Wand2 size={36} className="animate-pulse" />
           </span>
           <h1 className="mt-6 font-display text-2xl font-bold drop-shadow">
             {scope === "adventure" || scope === "trip" ? "Building your adventure…" : "Building your plan…"}
@@ -269,7 +269,7 @@ function NewPlanFlow() {
           {SCOPES.map((s) => (
             <button key={s.id} onClick={() => { if (s.id === "surprise") { doSurprise(); } else { setScope(s.id); setPhase("config"); } }}
               className="flex items-center gap-4 rounded-xl border-2 border-ink bg-surface p-5 text-left shadow-hard transition active:translate-x-1 active:translate-y-1 active:shadow-none">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md border-2 border-ink bg-primary-soft text-primary-deep"><s.Icon size={24} /></span>
+              <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-md border-2 border-ink shadow-hard-sm ${s.tone}`}><s.Icon size={24} /></span>
               <div>
                 <div className="font-display text-xl font-bold">{s.label}</div>
                 <div className="text-sm text-muted">{s.desc}</div>
@@ -456,7 +456,7 @@ function NewPlanFlow() {
       {/* CTA (surprise never reaches config — it fires instantly) */}
       <DualCTA
         aiLabel={scope === "trip" ? "Plan the trip with AI" : scope === "adventure" ? "Build the day with AI" : "Build it with AI"}
-        aiIcon={scope === "trip" ? <Tent size={18} /> : scope === "adventure" ? <Route size={18} /> : <Sparkles size={18} />}
+        aiIcon={<Wand2 size={18} />}
         disabled={!intent.trim()}
         onAi={() => createPlan(true)}
         onManual={() => createPlan(false)}

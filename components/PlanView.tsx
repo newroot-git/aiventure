@@ -592,7 +592,7 @@ export function PlanView({
         <section className="mt-5">
           <div className="mb-1 flex items-center justify-between">
             <h2 className="flex items-center gap-1.5 font-display text-xl font-bold">
-              <Sparkles size={18} className="text-secondary" /> {multiDay ? "The itinerary" : multiStep ? "The plan" : "Your options"}
+              <Wand2 size={18} className="text-secondary" /> {multiDay ? "The itinerary" : multiStep ? "The plan" : "Your options"}
             </h2>
             {multiStep && <span className="text-sm font-bold text-muted">{decidedCount}/{slots.length} set</span>}
           </div>
