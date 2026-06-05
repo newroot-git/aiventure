@@ -17,17 +17,29 @@ export default async function GroupDetail({
   const upcoming = plans.filter((p) => p.status === "upcoming");
   const past = plans.filter((p) => p.status === "past");
 
+  // banner = the crew's latest adventure cover, else a deterministic scenic one
+  const SCENIC = ["trip", "beach", "camp", "park", "hike", "train", "city", "festival"];
+  let h = 0; for (const c of group.id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const banner = plans[0]?.cover || `/img/cover-${SCENIC[h % SCENIC.length]}.png`;
+
   return (
     <div className="mx-auto w-full max-w-lg">
       <Link href="/groups" className="inline-flex items-center gap-1 text-sm font-bold text-muted">
         <ArrowLeft size={15} /> Crew
       </Link>
 
-      <div className="mt-4">
-        <h1 className="font-display text-3xl font-bold">{group.name}</h1>
-        <p className="mt-1 text-[15px] text-muted">{group.members.length} members · {past.length} adventure{past.length === 1 ? "" : "s"} together</p>
-        <GroupDescription groupId={group.id} initial={group.description} isOwner={isOwner} />
+      <div className="mt-4 overflow-hidden rounded-2xl border-2 border-ink shadow-hard">
+        <div className="relative h-32">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={banner} alt="" className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/30 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 p-4">
+            <h1 className="font-display text-2xl font-bold leading-tight text-white drop-shadow">{group.name}</h1>
+            <p className="text-sm font-bold text-white/85">{group.members.length} members · {past.length} adventure{past.length === 1 ? "" : "s"} together</p>
+          </div>
+        </div>
       </div>
+      <GroupDescription groupId={group.id} initial={group.description} isOwner={isOwner} />
 
       <Card className="mt-5 p-5">
         <div className="mb-3 text-xs font-bold uppercase tracking-wider text-muted">The crew</div>
