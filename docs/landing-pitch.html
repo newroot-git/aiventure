@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AIventure — the anti-social-media app</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    /* app-true: retro 90s primaries on cream (globals.css source of truth) */
+    --cream:#EAE1CF; --surface:#F5EFE1; --surface2:#E3D9C2; --ink:#1E1B16; --muted:#847B6A;
+    --gold:#EBA92C; --terra:#CE3B2A; --forest:#2E7B4E; --dusk:#5B5080;
+    --night:#241F33; --line:#D4C9B0; --success:#2E7B4E; --sky:#2A56A8;
+    --primary-soft:#F4D6CD; --secondary-soft:#D6E0F2; --accent-soft:#F8E9C4; --success-soft:#D6E7D6;
+    --shadow:4px 4px 0 var(--ink);
+    --shadow-sm:3px 3px 0 var(--ink);
+  }
+  /* IMG_BASE: standalone preview uses ../public/img ; in-app this becomes /img */
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; color:var(--ink);
+    /* elevated canvas — soft retro color-mesh on warm cream */
+    background:
+      radial-gradient(38% 30% at 8% 6%, rgba(235,169,44,.28), transparent 60%),
+      radial-gradient(40% 32% at 96% 14%, rgba(42,86,168,.16), transparent 62%),
+      radial-gradient(44% 34% at 84% 52%, rgba(206,59,42,.14), transparent 64%),
+      radial-gradient(42% 34% at 6% 60%, rgba(46,123,78,.16), transparent 64%),
+      radial-gradient(46% 36% at 92% 92%, rgba(235,169,44,.20), transparent 64%),
+      linear-gradient(180deg,#ece2cd,#e7ddc7);
+    background-attachment:fixed;
+    font-family:"Plus Jakarta Sans",system-ui,sans-serif;
+    font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased; overflow-x:hidden;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.45;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .wrap{max-width:1100px; margin:0 auto; padding:0 22px; position:relative; z-index:2}
+  .narrow{max-width:720px}
+  h1,h2,h3,.disp{font-family:"Pixelify Sans",sans-serif; line-height:1.02; letter-spacing:.5px; margin:0}
+  a{color:inherit}
+  .eyebrow{display:inline-flex; align-items:center; gap:8px; font-weight:700; font-size:12px;
+    letter-spacing:1.5px; text-transform:uppercase}
+
+  .btn{display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    height:54px; padding:0 30px; border:2px solid var(--ink); border-radius:8px;
+    font-weight:800; font-size:16px; text-decoration:none; cursor:pointer;
+    box-shadow:var(--shadow); transition:transform .08s ease, box-shadow .08s ease}
+  .btn:active{transform:translate(4px,4px); box-shadow:0 0 0 var(--ink)}
+  .btn-gold{background:var(--gold); color:var(--ink)}
+  .btn-ghost{background:rgba(255,255,255,.12); color:#fff; border-color:rgba(255,255,255,.55)}
+
+  /* ===== HERO — real pixel-art forest ===== */
+  .hero{position:relative; min-height:92vh; display:flex; align-items:center; justify-content:center;
+    border-bottom-left-radius:26px; border-bottom-right-radius:26px; overflow:hidden; background:#241F33}
+  .hero-img{position:absolute; inset:-8% 0 0 0; width:100%; height:116%; object-fit:cover;
+    object-position:center 42%; image-rendering:auto; z-index:0}
+  .hero-scrim{position:absolute; inset:0; z-index:1;
+    background:
+      radial-gradient(120% 80% at 50% 8%, rgba(36,31,51,.55), transparent 55%),
+      linear-gradient(rgba(36,31,51,.28) 0%, rgba(36,31,51,.12) 32%, rgba(36,31,51,.45) 72%, rgba(36,31,51,.82) 100%)}
+  .hero-inner{position:relative; z-index:3; text-align:center; color:#fff; padding:40px 22px 96px}
+  .hero .eyebrow{color:#fff; border:2px solid rgba(255,255,255,.32); background:rgba(0,0,0,.28);
+    padding:7px 14px; border-radius:7px; backdrop-filter:blur(3px)}
+  .hero h1{font-size:clamp(54px,11vw,104px); margin-top:26px; color:#fff; text-shadow:4px 4px 0 rgba(0,0,0,.5)}
+  .hero h1 b{color:var(--gold); font-weight:700}
+  .hero p.sub{max-width:540px; margin:22px auto 0; font-size:clamp(17px,2.3vw,21px);
+    font-weight:600; color:#fff; line-height:1.5; text-shadow:1px 2px 8px rgba(0,0,0,.5)}
+  .hero .cta{display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top:34px}
+  .demo-link{display:inline-block; margin-top:20px; color:#fff; font-weight:700; font-size:15px;
+    text-decoration:underline; text-underline-offset:4px; text-shadow:0 1px 6px rgba(0,0,0,.6)}
+  .trust{margin-top:14px; font-size:13px; color:rgba(255,255,255,.86); font-weight:600;
+    letter-spacing:.3px; text-shadow:0 1px 6px rgba(0,0,0,.6)}
+
+  section.band{padding:96px 0; position:relative; z-index:2}
+  .kicker{font-weight:800; font-size:13px; letter-spacing:2px; text-transform:uppercase; color:var(--terra)}
+  h2.big{font-size:clamp(34px,5vw,56px); margin-top:14px}
+  .lede{font-size:clamp(18px,2.2vw,22px); color:var(--muted); font-weight:500; margin-top:18px; line-height:1.55}
+
+  /* three core problems */
+  .probs{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:44px; text-align:left}
+  .prob{background:var(--surface); border:2px solid var(--ink); border-radius:16px; padding:24px;
+    box-shadow:var(--shadow); height:100%}
+  .prob .ic{display:grid; place-items:center; width:44px; height:44px; border:2px solid var(--ink);
+    border-radius:11px; background:var(--cream); color:var(--terra); margin-bottom:15px}
+  .prob .ic svg{width:22px; height:22px}
+  .prob h3{font-size:21px}
+  .prob p{margin:9px 0 0; color:var(--muted); font-size:15px; font-weight:500; line-height:1.5}
+  @media(max-width:780px){ .probs{grid-template-columns:1fr} }
+
+  /* reframe */
+  .reframe{background:var(--night); color:var(--cream); border-radius:26px; margin:0 22px;
+    text-align:center; overflow:hidden; position:relative}
+  .reframe .wrap{padding:88px 22px}
+  .reframe h2{color:#fff; font-size:clamp(32px,4.6vw,52px)}
+  .reframe p{color:rgba(255,255,255,.84); font-size:clamp(18px,2.2vw,22px); font-weight:500;
+    max-width:640px; margin:22px auto 0}
+  .reframe .glow{position:absolute; width:420px; height:420px; border-radius:50%; filter:blur(80px);
+    background:radial-gradient(var(--dusk),transparent 70%); top:-120px; right:-80px; opacity:.6}
+
+  /* magic moment */
+  .magic-grid{display:grid; grid-template-columns:1fr auto 1.05fr; gap:26px; align-items:center; margin-top:48px}
+  .scrap{background:#fff; border:2px solid var(--ink); border-radius:12px; padding:24px; box-shadow:var(--shadow);
+    font-size:19px; font-weight:600; position:relative; text-align:left}
+  .scrap .tag{font-family:"Pixelify Sans"; font-size:13px; color:var(--muted); display:block; margin-bottom:10px;
+    text-transform:uppercase; letter-spacing:1px}
+  .scrap .cursor{display:inline-block; width:2px; height:1.05em; background:var(--terra); vertical-align:-3px;
+    margin-left:2px; animation:blink 1s steps(2) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .arrow{display:flex; flex-direction:column; align-items:center; gap:8px; color:var(--terra)}
+  .arrow .think{font-family:"Pixelify Sans"; font-size:13px; white-space:nowrap}
+  .arrow svg{width:40px; height:40px}
+
+  /* plan card — mirrors the real PlanView */
+  .plan{border:2px solid var(--ink); border-radius:14px; overflow:hidden; box-shadow:var(--shadow);
+    background:var(--surface); text-align:left}
+  .plan .cover{height:138px; position:relative; overflow:hidden}
+  .plan .cover img{width:100%; height:100%; object-fit:cover; image-rendering:auto; display:block}
+  .plan .cover::after{content:""; position:absolute; inset:0; background:linear-gradient(transparent 52%,rgba(30,27,22,.46))}
+  .plan .cover b{position:absolute; left:14px; right:14px; bottom:10px; font-family:"Pixelify Sans"; color:#fff;
+    font-size:20px; line-height:1.05; text-shadow:2px 2px 0 rgba(0,0,0,.45); z-index:1}
+  .plan .body{padding:15px}
+  .plan .meta{display:flex; gap:8px; flex-wrap:wrap; font-size:12.5px; font-weight:700}
+  .plan .meta span{display:inline-flex; align-items:center; gap:5px; border:2px solid var(--line);
+    border-radius:7px; padding:4px 9px; background:#fff; color:var(--ink)}
+  .plan .opts{margin-top:12px; display:flex; flex-direction:column; gap:8px}
+  .opt{border:2px solid var(--line); border-radius:10px; padding:11px 12px; background:#fff}
+  .opt .top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px}
+  .opt h4{font-family:"Plus Jakarta Sans"; font-weight:800; font-size:15px; margin:0; line-height:1.2}
+  .opt small{display:block; color:var(--muted); font-weight:600; font-size:12.5px; margin-top:2px}
+  .keen{display:inline-flex; align-items:center; gap:5px; border:2px solid var(--line); border-radius:7px;
+    padding:5px 9px; font-weight:800; font-size:12.5px; background:var(--surface); white-space:nowrap}
+  .keen.on{background:var(--sky); color:#fff; border-color:var(--ink)}
+  .keen svg{width:13px; height:13px}
+  .plan .who{margin-top:13px; display:flex; align-items:center; gap:9px; font-size:13px; font-weight:700; color:var(--muted)}
+  .stack{display:flex}
+  .stack img{width:30px; height:30px; border-radius:50%; border:2px solid var(--ink); margin-left:-9px;
+    object-fit:cover; background:#fff}
+  .stack img:first-child{margin-left:0}
+  .rsvp{margin-top:11px; display:flex; gap:7px}
+  .rsvp span{flex:1; display:inline-flex; align-items:center; justify-content:center; gap:5px; border:2px solid var(--line);
+    border-radius:9px; padding:8px; font-weight:800; font-size:13px; background:var(--surface)}
+  .rsvp span.in{background:var(--success); color:#fff; border-color:var(--ink)}
+  .rsvp span svg{width:14px; height:14px}
+  .magic-cap{text-align:center; margin-top:30px; color:var(--muted); font-weight:600; font-size:16px}
+
+  /* feature rows — alternating, each with an app visual */
+  .feats{margin-top:46px}
+  .feat{display:grid; gap:26px; align-items:center; max-width:1000px; margin:0 auto; padding:36px 0;
+    border-top:2px solid rgba(43,36,54,.10)}
+  .feat:first-child{border-top:none}
+  .feat-tx{text-align:left}
+  .feat-tx .no{font-family:"Pixelify Sans"; font-size:clamp(30px,5vw,44px); color:var(--terra); line-height:.82}
+  .feat-tx h3{font-size:clamp(22px,3.4vw,30px); margin-top:10px; line-height:1.1}
+  .feat-tx p{margin-top:11px; color:var(--muted); font-size:clamp(15px,2vw,17px); font-weight:500; line-height:1.55; max-width:440px}
+  .feat-viz{display:flex; justify-content:center}
+  .feat-viz > *{width:100%; max-width:382px}
+  @media(min-width:861px){
+    .feat{grid-template-columns:1fr 1fr; gap:60px; padding:48px 0}
+    .feat.flip .feat-viz{order:-1}
+  }
+
+  /* viz: vague input chip */
+  .vague{display:inline-block; background:#fff; border:2px solid var(--ink); border-radius:11px; padding:11px 14px;
+    font-weight:600; font-size:14px; box-shadow:var(--shadow-sm); margin-bottom:-4px; position:relative; z-index:2; max-width:86%}
+  .vague .tag{font-family:"Pixelify Sans"; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; display:block; margin-bottom:3px}
+  .vague .cursor{display:inline-block; width:2px; height:1em; background:var(--terra); vertical-align:-2px; margin-left:1px; animation:blink 1s steps(2) infinite}
+
+  /* viz: generic framed surface */
+  .vizframe{border:2px solid var(--ink); border-radius:16px; background:var(--surface); box-shadow:var(--shadow); padding:18px; text-align:left}
+  .vizframe.vf-blue{background:var(--secondary-soft)}
+  .vizframe.vf-green{background:var(--success-soft)}
+  .vizframe.vf-yellow{background:var(--accent-soft)}
+  .vizframe.vf-red{background:var(--primary-soft)}
+  .vizframe .vh{font-family:"Pixelify Sans"; font-size:12.5px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:7px}
+  .vizframe .vh svg{width:15px; height:15px; color:var(--terra)}
+
+  /* viz: availability date vote */
+  .datevote{display:flex; flex-direction:column; gap:8px; margin-top:13px}
+  .dv{display:flex; justify-content:space-between; align-items:center; border:2px solid var(--line); border-radius:10px; padding:10px 12px; font-weight:700; font-size:14px; background:#fff}
+  .dv.best{background:#e7efe1; border-color:var(--ink)}
+  .dv .bt-tag{display:inline-flex; align-items:center; gap:5px; font-weight:800; font-size:12px; color:var(--forest)}
+  .dv .bt-tag svg{width:13px; height:13px}
+  .dv .free{color:var(--muted); font-weight:700; font-size:13px}
+
+  /* viz: itinerary */
+  .itin{display:flex; flex-direction:column; gap:11px; margin-top:13px}
+  .itin .row{display:flex; align-items:center; gap:12px}
+  .itin .num{font-family:"Pixelify Sans"; font-size:15px; color:var(--terra); width:16px; flex:0 0 auto}
+  .itin img{width:46px; height:46px; border:2px solid var(--ink); border-radius:10px; object-fit:cover; flex:0 0 auto}
+  .itin .t b{display:block; font-weight:800; font-size:14.5px; line-height:1.1}
+  .itin .t small{color:var(--muted); font-weight:600; font-size:12.5px}
+
+  /* viz: discovery */
+  .disc{display:flex; flex-direction:column; gap:10px; margin-top:13px}
+  .disc .d{display:flex; align-items:center; gap:12px; border:2px solid var(--ink); border-radius:12px; padding:9px; background:#fff; box-shadow:var(--shadow-sm)}
+  .disc .d img{width:46px; height:46px; border:2px solid var(--ink); border-radius:9px; object-fit:cover; flex:0 0 auto}
+  .disc .d b{display:block; font-weight:800; font-size:14.5px; line-height:1.15}
+  .disc .d small{color:var(--muted); font-weight:700; font-size:12.5px}
+
+  /* viz: log grid */
+  .loggrid{display:grid; grid-template-columns:1fr 1fr; gap:11px; margin-top:13px}
+  .minicard{aspect-ratio:4/3; border:2px solid var(--ink); border-radius:11px; overflow:hidden; position:relative}
+  .minicard img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
+  .minicard::after{content:""; position:absolute; inset:0; background:linear-gradient(transparent 48%,rgba(30,27,22,.5))}
+  .minicard b{position:absolute; left:9px; bottom:7px; right:9px; z-index:1; font-family:"Pixelify Sans"; color:#fff; font-size:12px; line-height:1.05; text-shadow:1px 1px 0 rgba(0,0,0,.5)}
+
+  /* loop */
+  .steps{display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-top:48px}
+  .step{background:var(--surface); border:2px solid var(--ink); border-radius:14px; padding:22px;
+    box-shadow:var(--shadow); height:100%; text-align:left}
+  .step .n{font-family:"Pixelify Sans"; font-size:28px; color:var(--terra)}
+  .step h3{font-size:21px; margin-top:8px}
+  .step p{margin:8px 0 0; color:var(--muted); font-size:15px; font-weight:500}
+
+  /* range */
+  .pills{display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-top:38px}
+  .pill{border:2px solid var(--ink); border-radius:999px; padding:11px 20px; font-weight:800;
+    background:var(--surface); box-shadow:var(--shadow-sm); font-size:15px}
+  .pill:nth-child(3n){background:var(--gold)}
+  .pill:nth-child(4n){background:#fff}
+  .range-line{text-align:center; margin-top:30px; font-family:"Pixelify Sans"; font-size:clamp(20px,3vw,30px)}
+
+  /* payoff — real covers */
+  .cards{display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-top:46px}
+  .acard{border:2px solid var(--ink); border-radius:12px; overflow:hidden; box-shadow:var(--shadow);
+    aspect-ratio:3/4; position:relative}
+  .acard img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; image-rendering:auto}
+  .acard::after{content:""; position:absolute; inset:0; background:linear-gradient(transparent 44%,rgba(30,27,22,.55))}
+  .acard b{position:absolute; left:12px; right:12px; bottom:30px; z-index:1; font-family:"Pixelify Sans"; color:#fff;
+    font-size:17px; text-shadow:2px 2px 0 rgba(0,0,0,.5); line-height:1.06}
+  .acard small{position:absolute; left:12px; bottom:12px; z-index:1; color:rgba(255,255,255,.88);
+    font-weight:700; font-size:11px; text-shadow:1px 1px 0 rgba(0,0,0,.5)}
+
+  /* what it isn't */
+  .nots{background:var(--ink); color:var(--cream); border-radius:26px; margin:0 22px; text-align:center}
+  .nots .wrap{padding:84px 22px}
+  .nots h2{color:#fff; font-size:clamp(30px,4.4vw,48px)}
+  .nogrid{display:flex; flex-wrap:wrap; gap:12px; justify-content:center; margin-top:34px}
+  .no{border:2px solid rgba(255,255,255,.28); border-radius:8px; padding:10px 16px; font-weight:800; font-size:15px; color:#fff}
+  .no b{color:var(--terra); font-family:"Pixelify Sans"; margin-right:6px}
+  .nots p.kept{margin-top:30px; color:rgba(255,255,255,.8); font-weight:600; font-size:18px}
+
+  /* final */
+  .final{text-align:center}
+  .final .card{background:linear-gradient(135deg,var(--dusk),var(--terra)); border:2px solid var(--ink);
+    border-radius:20px; box-shadow:var(--shadow); padding:64px 30px; color:#fff; position:relative; overflow:hidden}
+  .final h2{color:#fff; font-size:clamp(30px,5vw,52px); text-shadow:3px 3px 0 rgba(0,0,0,.32)}
+  .final p{font-weight:600; margin-top:14px; font-size:18px; color:rgba(255,255,255,.92)}
+  .final .btn{margin-top:30px}
+  .final .fine{margin-top:16px; font-size:13px; color:rgba(255,255,255,.8)}
+
+  footer{text-align:center; padding:50px 22px 70px; color:var(--muted); font-weight:600; font-size:14px}
+  footer .wm{font-family:"Pixelify Sans"; font-size:22px; color:var(--ink)}
+  footer .wm b{color:var(--terra)}
+
+  .reveal{opacity:1; transform:none}
+  .js-motion .reveal{opacity:0; transform:translateY(22px); transition:opacity .6s ease, transform .6s ease}
+  .js-motion .reveal.in{opacity:1; transform:none}
+
+  @media(max-width:860px){
+    .magic-grid{grid-template-columns:1fr; gap:18px}
+    .arrow{flex-direction:row; transform:rotate(90deg); margin:4px 0}
+    .steps{grid-template-columns:1fr 1fr}
+    .cards{grid-template-columns:1fr 1fr}
+    section.band{padding:72px 0}
+  }
+  @media(max-width:520px){ .steps{grid-template-columns:1fr} }
+  @media(prefers-reduced-motion:reduce){
+    .js-motion .reveal{opacity:1; transform:none; transition:none}
+    .scrap .cursor{animation:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== HERO ===== -->
+<header class="hero" id="hero">
+  <img class="hero-img" id="heroImg" src="../public/img/hero-forest.png" alt="" />
+  <div class="hero-scrim"></div>
+  <div class="hero-inner">
+    <span class="eyebrow">◇ The anti-social-media app</span>
+    <h1>Less scrolling.<br/>More <b>living</b>.</h1>
+    <p class="sub">AIventure turns “we should hang out” into a real plan — and your crew out the door. Then it remembers it for you.</p>
+    <div class="cta">
+      <a class="btn btn-gold" href="#">Start an adventure</a>
+      <a class="btn btn-ghost" href="#">Sign in</a>
+    </div>
+    <a class="demo-link" href="#">Just looking? Explore the demo →</a>
+    <p class="trust">Free to join any plan · No download · No feed</p>
+  </div>
+</header>
+
+<!-- ===== THREE PROBLEMS ===== -->
+<section class="band">
+  <div class="wrap" style="text-align:center">
+    <div class="kicker reveal">The problem</div>
+    <h2 class="big reveal">Three reasons nothing ever happens.</h2>
+    <div class="probs reveal">
+      <div class="prob">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+        <h3>It dies in the chat</h3>
+        <p>“We should hang out” rots in the group chat. And if it survives, it’s 40 messages of “who’s in?” and “what time again?” — nobody actually running it.</p>
+      </div>
+      <div class="prob">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <h3>The scroll ate the plan</h3>
+        <p>“Social” media quietly swapped living for watching — hours a day on everyone else’s life instead of going and having your own.</p>
+      </div>
+      <div class="prob">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg></div>
+        <h3>You’re out of ideas</h3>
+        <p>The same three spots on repeat — or no clue what to do at all. With the crew, or just you on a quiet Sunday.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== SOLUTION ===== -->
+<section class="reframe reveal">
+  <div class="glow"></div>
+  <div class="wrap">
+    <h2>So we built AIventure.</h2>
+    <p>Tell it roughly what you’re after. It comes back with real, grounded things to do — often somewhere you’d never have found on your own. Share one link and your crew’s in. Works for six people or just you; a Tuesday coffee or a two-week trip. Then it keeps the memory. <strong>No feed. No performing. No admin.</strong></p>
+  </div>
+</section>
+
+<!-- ===== FIVE WINS, EACH WITH AN APP VISUAL ===== -->
+<section class="band">
+  <div class="wrap" style="text-align:center">
+    <div class="kicker reveal">What you get</div>
+    <h2 class="big reveal">The whole adventure, handled.</h2>
+    <div class="feats">
+
+      <!-- 01 — vague idea → real plan -->
+      <div class="feat reveal">
+        <div class="feat-tx">
+          <div class="no">01</div>
+          <h3>A real plan from a vague idea</h3>
+          <p>Describe the vibe. AIventure comes back with grounded, bookable things to do — the time, the place and the logistics already sorted.</p>
+        </div>
+        <div class="feat-viz">
+          <div>
+            <div class="vague"><span class="tag">you type</span>something with the boys Saturday, hike then a pint<span class="cursor"></span></div>
+            <div class="plan">
+              <div class="cover"><img src="../public/img/cover-hike.png" alt="" /><b>Something with the boys, Saturday</b></div>
+              <div class="body">
+                <div class="meta"><span>◷ Sat 6 Jun · 4pm</span><span>◎ Hampstead Heath</span></div>
+                <div class="opts">
+                  <div class="opt"><div class="top"><div><h4>Sunset hike on the Heath</h4><small>Parliament Hill · easy 4km</small></div><span class="keen on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21s-7-4.35-9.5-8.5C.5 9 2 5.5 5.5 5.5c2 0 3.2 1.2 3.7 2 .6-.8 1.7-2 3.8-2C16.5 5.5 18 9 16 12.5 13.5 16.65 12 21 12 21z"/></svg>Keen 3</span></div></div>
+                  <div class="opt"><div class="top"><div><h4>The Southampton Arms</h4><small>Cask ale pub · ~£6/pint</small></div><span class="keen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 21s-7-4.35-9.5-8.5C.5 9 2 5.5 5.5 5.5c2 0 3.2 1.2 3.7 2 .6-.8 1.7-2 3.8-2C16.5 5.5 18 9 16 12.5 13.5 16.65 12 21 12 21z"/></svg>Keen 2</span></div></div>
+                </div>
+                <div class="who"><div class="stack"><img src="../public/img/avatars/a1.png" alt="" /><img src="../public/img/avatars/a2.png" alt="" /><img src="../public/img/avatars/a3.png" alt="" /></div>Josh, Conor + 3 in</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 02 — crew + availability -->
+      <div class="feat flip reveal">
+        <div class="feat-tx">
+          <div class="no">02</div>
+          <h3>The whole crew, zero admin</h3>
+          <p>One link to invite, votes to decide, and availability that finds the day everyone’s actually free. No 200-message thread, no chasing.</p>
+        </div>
+        <div class="feat-viz">
+          <div class="vizframe vf-blue">
+            <div class="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Who’s coming</div>
+            <div style="margin-top:12px; display:flex; align-items:center; gap:10px">
+              <div class="stack"><img src="../public/img/avatars/a1.png" alt="" /><img src="../public/img/avatars/a2.png" alt="" /><img src="../public/img/avatars/a3.png" alt="" /><img src="../public/img/avatars/a4.png" alt="" /><img src="../public/img/avatars/a5.png" alt="" /></div>
+              <span style="font-weight:700; font-size:13px; color:var(--muted)">5 in · 1 maybe</span>
+            </div>
+            <div class="vh" style="margin-top:18px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/></svg>Best day to go</div>
+            <div class="datevote">
+              <div class="dv best"><span>Sat 6 Jun</span><span class="bt-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="square"><path d="M5 12l5 5 9-11"/></svg>Best · 5 free</span></div>
+              <div class="dv"><span>Sun 7 Jun</span><span class="free">3 free</span></div>
+              <div class="dv"><span>Fri 12 Jun</span><span class="free">2 free</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 03 — scale / itinerary -->
+      <div class="feat reveal">
+        <div class="feat-tx">
+          <div class="no">03</div>
+          <h3>Any size, any distance</h3>
+          <p>A solo coffee, a six-person day out, a two-week trip abroad. One engine builds the itinerary — from the tiny to the epic.</p>
+        </div>
+        <div class="feat-viz">
+          <div class="vizframe vf-green">
+            <div class="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h6a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6"/></svg>A day out · 3 stops</div>
+            <div class="itin">
+              <div class="row"><span class="num">1</span><img src="../public/img/cover-coffee.png" alt="" /><div class="t"><b>Coffee &amp; pastries</b><small>10am · Climpson &amp; Sons</small></div></div>
+              <div class="row"><span class="num">2</span><img src="../public/img/cover-hike.png" alt="" /><div class="t"><b>Canal walk to the marsh</b><small>11:30am · 5km</small></div></div>
+              <div class="row"><span class="num">3</span><img src="../public/img/cover-pub.png" alt="" /><div class="t"><b>Late lunch &amp; a pint</b><small>1pm · The Anchor</small></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 04 — discovery -->
+      <div class="feat flip reveal">
+        <div class="feat-tx">
+          <div class="no">04</div>
+          <h3>Ideas beyond your bubble</h3>
+          <p>Real spots near you — or anywhere on earth — you’d never have found yourself. So you stop doing the same three things.</p>
+        </div>
+        <div class="feat-viz">
+          <div class="vizframe vf-yellow">
+            <div class="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20"/></svg>Near you · for your interests</div>
+            <div class="disc">
+              <div class="d"><img src="../public/img/cover-climb.png" alt="" /><div><b>Bouldering meetup</b><small>2.3km · Thu 7pm · 4 going</small></div></div>
+              <div class="d"><img src="../public/img/cover-market.png" alt="" /><div><b>Sunday market wander</b><small>1.1km · this weekend</small></div></div>
+              <div class="d"><img src="../public/img/cover-gig.png" alt="" /><div><b>Open-air gig in the park</b><small>4km · Sat · 12 going</small></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 05 — the log -->
+      <div class="feat reveal">
+        <div class="feat-tx">
+          <div class="no">05</div>
+          <h3>A life you can look back on</h3>
+          <p>Every plan you finish becomes a private record — a log of the things you actually did, not a feed of things you watched.</p>
+        </div>
+        <div class="feat-viz">
+          <div class="vizframe vf-red">
+            <div class="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/></svg>Your adventure log</div>
+            <div class="loggrid">
+              <div class="minicard"><img src="../public/img/cover-hike.png" alt="" /><b>Heath hike</b></div>
+              <div class="minicard"><img src="../public/img/cover-climb.png" alt="" /><b>Bouldering</b></div>
+              <div class="minicard"><img src="../public/img/cover-roast.png" alt="" /><b>Sunday roast</b></div>
+              <div class="minicard"><img src="../public/img/cover-beach.png" alt="" /><b>Coast day</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ===== PAYOFF — real covers ===== -->
+<section class="band" style="padding-top:0">
+  <div class="wrap" style="text-align:center">
+    <div class="kicker reveal">The payoff</div>
+    <h2 class="big reveal">A year of this beats a year of scrolling.</h2>
+    <p class="lede reveal narrow" style="margin-left:auto;margin-right:auto">Every plan you finish becomes an Adventure card. Stack them up and you’ve a real record of a life lived outside — not a history of things you watched other people do.</p>
+    <div class="cards">
+      <div class="acard reveal"><img src="../public/img/cover-hike.png" alt=""><b>Sunset hike, Hampstead Heath</b><small>Jun · 5 of you</small></div>
+      <div class="acard reveal"><img src="../public/img/cover-climb.png" alt=""><b>Bouldering at The Castle</b><small>May · 2 of you</small></div>
+      <div class="acard reveal"><img src="../public/img/cover-roast.png" alt=""><b>Sunday roast, Richmond</b><small>May · 6 of you</small></div>
+      <div class="acard reveal"><img src="../public/img/cover-camp.png" alt=""><b>Camping weekend away</b><small>Apr · 4 of you</small></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== WHAT IT ISN'T ===== -->
+<section class="nots reveal">
+  <div class="wrap">
+    <h2>What it isn’t.</h2>
+    <div class="nogrid">
+      <span class="no"><b>No</b>infinite feed</span>
+      <span class="no"><b>No</b>followers or likes</span>
+      <span class="no"><b>No</b>200-message threads</span>
+      <span class="no"><b>No</b>ads</span>
+      <span class="no"><b>No</b>stranger-stalking</span>
+      <span class="no"><b>No</b>download to join</span>
+      <span class="no"><b>No</b>pressure to perform</span>
+    </div>
+    <p class="kept">Just plans, your crew, and the things you actually did.</p>
+  </div>
+</section>
+
+<!-- ===== FINAL CTA ===== -->
+<section class="band final">
+  <div class="wrap narrow">
+    <div class="card reveal">
+      <h2>“We should hang out more.”</h2>
+      <p>Stop saying it. Just go.</p>
+      <a class="btn btn-gold" href="#">Start an adventure</a>
+      <p class="fine">Free to join any plan. Plus unlocks AI planning for your whole crew.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wm">AI<b>venture</b></div>
+  <p>The anti-social-media app · Stop scrolling, start adventuring.</p>
+</footer>
+
+<script>
+  const reduce = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
+  if(!reduce){
+    document.body.classList.add('js-motion');
+    const io = new IntersectionObserver((es)=>{
+      es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);} });
+    },{threshold:.12, rootMargin:'0px 0px -8% 0px'});
+    document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+    // gentle hero parallax (image drifts slower than scroll)
+    const img=document.getElementById('heroImg'); let ticking=false;
+    window.addEventListener('scroll',()=>{
+      if(ticking) return; ticking=true;
+      requestAnimationFrame(()=>{ if(img) img.style.transform=`translateY(${window.scrollY*0.18}px)`; ticking=false; });
+    },{passive:true});
+  }
+</script>
+</body>
+</html>
