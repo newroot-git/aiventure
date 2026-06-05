@@ -22,8 +22,10 @@ export default function SignIn() {
 
   // a real session must win — drop any leftover guest cookie so it can't mask it,
   // then route new accounts (no interests yet) into onboarding.
-  const go = async () => {
-    document.cookie = "av_uid=; Path=/; Max-Age=0; SameSite=Lax";
+  const go = async (clearGuest = true) => {
+    // real sign-in must drop any leftover guest cookie so it can't mask the session;
+    // the "I'm a judge" flow KEEPS its fresh guest cookie (that cookie IS its identity).
+    if (clearGuest) document.cookie = "av_uid=; Path=/; Max-Age=0; SameSite=Lax";
     let dest = "/plans";
     try {
       const me = await fetch("/api/me").then((r) => r.json());
@@ -87,7 +89,7 @@ export default function SignIn() {
     try {
       const res = await fetch("/api/guest", { method: "POST" });
       if (!res.ok) throw new Error("Couldn't start a guest session");
-      go();
+      go(false); // keep the guest cookie we just set
     } catch (e) { setError((e as Error).message); setBusy(false); }
   }
 
