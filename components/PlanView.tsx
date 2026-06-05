@@ -291,7 +291,6 @@ export function PlanView({
   const [editTitle, setEditTitle] = React.useState(false);
   const [titleVal, setTitleVal] = React.useState(plan.activity ?? plan.title);
   const [editLoc, setEditLoc] = React.useState(false);
-  const [locVal, setLocVal] = React.useState(plan.place_address ?? "");
   const [poked, setPoked] = React.useState(false);
 
   // auto-dismiss the error toast (setState lives in a timer, not the effect body)
@@ -307,7 +306,10 @@ export function PlanView({
   const generalArea = effPlan.place_address || effPlan.place_name || "TBC";
 
   // add-to-calendar: chosen "step: venue" lines + the live plan url; null = no date set
-  const pageUrl = typeof window !== "undefined" ? window.location.href : `https://aiventure.app/p/${plan.slug}`;
+  // start with a stable canonical URL (same on server + first client render to avoid a
+  // hydration mismatch on the calendar link), then swap to the real URL after mount.
+  const [pageUrl, setPageUrl] = React.useState(`https://aiventure.app/p/${plan.slug}`);
+  React.useEffect(() => { setPageUrl(window.location.href); }, []);
   const calDetails = slots
     .filter((s) => s.chosen)
     .map((s) => `${s.label}: ${s.chosen!.title}`)
@@ -486,10 +488,11 @@ export function PlanView({
     const t = titleVal.trim();
     if (t && t !== (plan.activity ?? plan.title)) { setOptPlan((p) => ({ ...p, activity: t })); await persist({ action: "title", title: t }); }
   }
-  async function saveLocation() {
+  // change the plan's core area — this is the location the AI + refines search from
+  function applyLocation(loc: string) {
     setEditLoc(false);
-    const l = locVal.trim();
-    if (l && l !== plan.place_address) { setOptPlan((p) => ({ ...p, place_address: l, place_name: l })); await persist({ action: "location", location: l }); }
+    const l = loc.trim();
+    if (l && l !== plan.place_address) { setOptPlan((p) => ({ ...p, place_address: l, place_name: l })); void persist({ action: "location", location: l }); }
   }
   async function poke() {
     setPoked(true);
@@ -598,16 +601,12 @@ export function PlanView({
         </Section>
         <Section icon={<MapPin size={15} />} label={multiStep ? "Area" : "Where"} tone="primary">
           {editLoc ? (
-            <div className="flex gap-1.5">
-              <input
-                autoFocus
-                value={locVal}
-                onChange={(e) => setLocVal(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && saveLocation()}
-                placeholder="Area or town"
-                className="w-full rounded-md border-2 border-line bg-surface px-2 py-1 text-sm font-bold outline-none focus:border-primary"
+            <div>
+              <PlaceSearch
+                placeholder="Search a town, area or postcode…"
+                onPick={(title, area) => applyLocation(area || title)}
               />
-              <button onClick={saveLocation} className="shrink-0 text-primary"><Check size={16} /></button>
+              <button onClick={() => setEditLoc(false)} className="mt-2 text-xs font-bold text-muted underline">Cancel</button>
             </div>
           ) : (
             <>
@@ -616,7 +615,7 @@ export function PlanView({
                 ? <div className="text-sm text-muted">{pins.length} stop{pins.length === 1 ? "" : "s"}</div>
                 : (effPlan.place_name && effPlan.place_address) && <div className="text-sm text-muted">{effPlan.place_address}</div>}
               {isOwner && planning && (
-                <button onClick={() => { setLocVal(effPlan.place_address ?? ""); setEditLoc(true); }} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-primary">
+                <button onClick={() => setEditLoc(true)} className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-primary">
                   <Pencil size={11} /> Change area
                 </button>
               )}
@@ -848,7 +847,7 @@ export function PlanView({
       {/* invite sheet */}
       {inviteOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setInviteOpen(false)} />
+          <div className="fixed inset-0 z-40 bg-ink/20 backdrop-blur-[1px]" onClick={() => setInviteOpen(false)} />
           <div className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md p-4">
             <div className="rounded-xl border-2 border-ink bg-surface p-4 shadow-hard">
               <div className="mb-3 flex items-center justify-between">

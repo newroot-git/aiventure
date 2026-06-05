@@ -1,50 +1,39 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
-  Sparkles, Pencil, ChevronRight, Compass, Users, Heart, Footprints,
-  Flame, Star, Trophy, Lock, Zap,
+  Sparkles, Pencil, ChevronRight, Compass, Users, Heart, Zap, NotebookText, Trophy,
 } from "lucide-react";
-import { Card, Pill, Button, Avatar, Burst } from "@/components/ui";
+import { Card, Pill, Avatar, Burst } from "@/components/ui";
 import { AuroraField } from "@/components/atmosphere";
+import { BadgeMedal } from "@/components/BadgeMedal";
 import { ResetButton } from "@/components/ResetButton";
 import { SignOutButton } from "@/components/SignOutButton";
 import { CATEGORIES } from "@/lib/interests";
+import { splitBadges } from "@/lib/badges";
 import { getCurrentProfile, getUserPlans, getUserGroups } from "@/lib/db";
 
-// interest -> category id, so we can read a "class" off someone's top interests
 const CAT_OF = new Map<string, string>();
 for (const c of CATEGORIES) for (const i of c.interests) CAT_OF.set(i.toLowerCase(), c.id);
 
-// each interest category maps to a playful adventurer "class"
 const CLASS_BY_CAT: Record<string, string> = {
-  active: "Trailblazer",
-  food: "Tastemaker",
-  games: "Game Master",
-  culture: "Culture Seeker",
-  nightlife: "Night Owl",
-  trips: "Wayfarer",
-  chill: "Free Spirit",
+  active: "Trailblazer", food: "Tastemaker", games: "Game Master", culture: "Culture Seeker",
+  nightlife: "Night Owl", trips: "Wayfarer", chill: "Free Spirit",
 };
 
 function archetype(interests: string[]): string {
   const tally = new Map<string, number>();
-  for (const i of interests) {
-    const cat = CAT_OF.get(i.toLowerCase());
-    if (cat) tally.set(cat, (tally.get(cat) ?? 0) + 1);
-  }
-  let best: string | null = null;
-  let max = 0;
+  for (const i of interests) { const c = CAT_OF.get(i.toLowerCase()); if (c) tally.set(c, (tally.get(c) ?? 0) + 1); }
+  let best: string | null = null, max = 0;
   for (const [cat, n] of tally) if (n > max) { max = n; best = cat; }
   return (best && CLASS_BY_CAT[best]) || "Wanderer";
 }
 
-// XP is derived from real activity now and grows as you do more. Interests give a
-// little base XP so a fresh profile already shows progress. (Stats-over-time later.)
 const XP_PER_LEVEL = 250;
 function levelFrom(adventures: number, crews: number, interests: number) {
   const xp = adventures * 100 + crews * 40 + interests * 10;
   const level = Math.floor(xp / XP_PER_LEVEL) + 1;
   const intoLevel = xp - (level - 1) * XP_PER_LEVEL;
-  return { xp, level, intoLevel, pct: Math.round((intoLevel / XP_PER_LEVEL) * 100) };
+  return { level, intoLevel, pct: Math.round((intoLevel / XP_PER_LEVEL) * 100) };
 }
 
 export default async function ProfilePage() {
@@ -57,22 +46,16 @@ export default async function ProfilePage() {
   const crews = groups.length;
   const cls = archetype(interests);
   const { level, intoLevel, pct } = levelFrom(adventures, crews, interests.length);
-
-  const badges = [
-    { id: "first", label: "First Steps", desc: "Log your first adventure", icon: Footprints, got: adventures >= 1 },
-    { id: "crew", label: "Found a crew", desc: "Join or start a crew", icon: Users, got: crews >= 1 },
-    { id: "curious", label: "Curious mind", desc: "Pick 5+ interests", icon: Star, got: interests.length >= 5 },
-    { id: "five", label: "Trailblazer", desc: "5 adventures done", icon: Flame, got: adventures >= 5 },
-    { id: "ten", label: "Seasoned", desc: "10 adventures done", icon: Trophy, got: adventures >= 10 },
-    { id: "social", label: "Connector", desc: "Run 3 crews", icon: Heart, got: crews >= 3 },
-  ];
-  const earned = badges.filter((b) => b.got).length;
+  const { earned, locked } = splitBadges({ adventures, crews, interests: interests.length });
 
   return (
     <div>
       {/* character hero */}
       <AuroraField stars className="rounded-2xl border-2 border-ink p-5 shadow-hard">
-        <div className="absolute right-3 top-3">
+        <div className="absolute right-3 top-3 flex items-center gap-2">
+          <Link href="/profile/edit" aria-label="Edit profile" className="grid h-8 w-8 place-items-center rounded-md border-2 border-ink bg-white/15 text-white transition active:translate-x-[2px] active:translate-y-[2px]">
+            <Pencil size={15} />
+          </Link>
           {me?.is_paid ? (
             <Pill tone="accent"><Sparkles size={13} /> Plus</Pill>
           ) : (
@@ -83,15 +66,14 @@ export default async function ProfilePage() {
           <div className="shrink-0 rounded-full border-2 border-ink shadow-hard-sm">
             <Avatar name={name} src={me?.avatar} size={72} />
           </div>
-          <div className="min-w-0 flex-1 pr-12 text-white">
-            <h1 className="truncate font-display text-2xl font-bold leading-tight">{name}</h1>
+          <div className="min-w-0 flex-1 pr-16 text-white">
+            <h1 className="font-display text-xl font-bold leading-tight">{name}</h1>
             <div className="mt-0.5 flex items-center gap-1.5 text-sm font-bold text-white/90">
               <Burst size={13} className="text-accent" /> {cls}
             </div>
           </div>
         </div>
 
-        {/* level + xp */}
         <div className="relative mt-4 text-white">
           <div className="flex items-end justify-between">
             <span className="inline-flex items-center gap-1.5 font-display text-lg font-bold">
@@ -113,28 +95,39 @@ export default async function ProfilePage() {
         <Stat icon={<Heart size={18} />} value={interests.length} label="Affinities" />
       </div>
 
-      {/* badges */}
-      <div className="mt-7 flex items-center justify-between">
-        <h2 className="font-heading text-lg font-bold">Badges</h2>
-        <span className="text-sm font-bold text-muted">{earned}/{badges.length} earned</span>
-      </div>
-      <div className="mt-3 grid grid-cols-3 gap-3">
-        {badges.map((b) => (
-          <Card key={b.id} hard={b.got} className={`p-3 text-center ${b.got ? "" : "opacity-55"}`}>
-            <div className={`mx-auto grid h-11 w-11 place-items-center rounded-md border-2 border-ink ${b.got ? "bg-accent-soft text-[#8a6512] shadow-hard-sm" : "bg-surface-2 text-muted"}`}>
-              {b.got ? <b.icon size={20} /> : <Lock size={18} />}
+      {/* badges — earned in one row, full set on its own page */}
+      <SectionHead icon={<Trophy size={17} className="text-accent" />} title="Badges">
+        <Link href="/profile/badges" className="inline-flex items-center gap-0.5 text-sm font-bold text-primary">
+          See all <ChevronRight size={15} />
+        </Link>
+      </SectionHead>
+      <Card hard className="mt-3 p-4">
+        {earned.length > 0 ? (
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {earned.map((b) => (
+              <div key={b.id} className="flex w-16 shrink-0 flex-col items-center gap-1.5">
+                <BadgeMedal badge={b} got />
+                <span className="text-center text-[11px] font-bold leading-tight">{b.label}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <BadgeMedal badge={locked[0]} got={false} />
+            <div className="text-sm">
+              <p className="font-bold">No badges yet.</p>
+              <p className="text-muted">{locked[0].how} to earn your first.</p>
             </div>
-            <div className="mt-2 text-xs font-bold leading-tight">{b.label}</div>
-            <div className="mt-0.5 text-[11px] leading-tight text-muted">{b.desc}</div>
-          </Card>
-        ))}
-      </div>
+          </div>
+        )}
+      </Card>
 
       {/* adventure log */}
-      <Link href="/log" className="mt-7 block">
+      <Link href="/log" className="mt-6 block">
         <Card hard className="flex items-center gap-4 p-4 transition active:translate-x-1 active:translate-y-1 active:shadow-none">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/img/tiles/log.png" alt="" className="pixelated h-14 w-14 shrink-0 rounded-md border-2 border-ink object-cover" />
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-md border-2 border-ink bg-secondary-soft text-secondary shadow-hard-sm">
+            <NotebookText size={26} />
+          </span>
           <div className="flex-1">
             <h3 className="font-display text-lg font-bold">Your adventure log</h3>
             <p className="text-sm text-muted">{adventures} adventure{adventures === 1 ? "" : "s"} stacked up</p>
@@ -143,11 +136,10 @@ export default async function ProfilePage() {
         </Card>
       </Link>
 
-      {/* affinities (interests) */}
-      <div className="mt-7 flex items-center justify-between">
-        <h2 className="font-heading text-lg font-bold">Affinities</h2>
+      {/* affinities */}
+      <SectionHead icon={<Heart size={17} className="text-primary" />} title="Affinities">
         <Link href="/profile/edit" className="inline-flex items-center gap-1 text-sm font-bold text-primary"><Pencil size={14} /> Edit</Link>
-      </div>
+      </SectionHead>
       {interests.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {interests.map((t) => <Pill key={t} tone="neutral">{t}</Pill>)}
@@ -156,16 +148,25 @@ export default async function ProfilePage() {
         <p className="mt-3 text-sm text-muted">No affinities yet — add a few so we can tune your adventures.</p>
       )}
       {me?.interest_notes && (
-        <p className="mt-3 rounded-xl bg-surface-2 px-4 py-3 text-sm text-muted">{me.interest_notes}</p>
+        <p className="mt-3 rounded-xl border-2 border-line bg-surface-2 px-4 py-3 text-sm text-muted">{me.interest_notes}</p>
       )}
 
-      {/* upgrade */}
+      {/* pay to win */}
       {!me?.is_paid && (
-        <Card className="mt-7 !bg-ink p-6 text-white">
-          <h3 className="font-heading text-lg font-extrabold">Go Plus</h3>
-          <p className="mt-1 text-sm text-white/70">Unlimited AI drops, deeper personalisation, trip mode. One Plus member unlocks AI for everyone on a plan.</p>
-          <Link href="/plus"><Button variant="primary" className="mt-4">See plans</Button></Link>
-        </Card>
+        <Link href="/plus" className="mt-7 block">
+          <AuroraField className="rounded-2xl border-2 border-ink p-5 shadow-hard transition active:translate-x-1 active:translate-y-1 active:shadow-none">
+            <div className="relative flex items-center gap-4 text-white">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-md border-2 border-ink bg-accent text-ink shadow-hard-sm">
+                <Zap size={24} />
+              </span>
+              <div className="flex-1">
+                <h3 className="font-display text-xl font-bold">Pay to Win</h3>
+                <p className="text-sm text-white/80">Unlock unlimited AI, trip mode + the full power-up.</p>
+              </div>
+              <ChevronRight size={22} className="text-white/80" />
+            </div>
+          </AuroraField>
+        </Link>
       )}
 
       {/* account */}
@@ -185,7 +186,16 @@ export default async function ProfilePage() {
   );
 }
 
-function Stat({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
+function SectionHead({ icon, title, children }: { icon: ReactNode; title: string; children?: ReactNode }) {
+  return (
+    <div className="mt-7 flex items-center justify-between">
+      <h2 className="flex items-center gap-1.5 font-display text-lg font-bold">{icon} {title}</h2>
+      {children}
+    </div>
+  );
+}
+
+function Stat({ icon, value, label }: { icon: ReactNode; value: number; label: string }) {
   return (
     <Card hard className="p-4 text-center">
       <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center text-primary">{icon}</div>

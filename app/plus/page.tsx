@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, Sparkles, Zap, PartyPopper } from "lucide-react";
 import { Button } from "@/components/ui";
 import { PixelScene } from "@/components/PixelScene";
 
@@ -20,18 +20,17 @@ const PLANS = [
 
 export default function PlusPage() {
   const [plan, setPlan] = React.useState("year");
-  const [joined, setJoined] = React.useState(false);
+  const [gotcha, setGotcha] = React.useState(false);
 
   return (
     <main className="flex flex-1 flex-col">
       <PixelScene image="/img/cover-gig.png" className="min-h-[30vh] rounded-b-2xl">
         <div className="flex min-h-[30vh] flex-col items-center justify-center px-6 text-center text-white">
           <span className="inline-flex items-center gap-2 rounded-md border-2 border-white/25 bg-black/25 px-3 py-1 font-display text-sm font-bold text-accent backdrop-blur-sm">
-            <Sparkles size={14} /> AIventure Plus
+            <Zap size={14} /> AIventure+
           </span>
-          <h1 className="mt-4 font-display text-3xl font-bold drop-shadow">
-            Go further together
-          </h1>
+          <h1 className="mt-4 font-display text-4xl font-bold drop-shadow">Pay to Win</h1>
+          <p className="mt-2 font-display text-sm font-bold text-white/85">Unlock the full power-up.</p>
         </div>
       </PixelScene>
 
@@ -43,8 +42,8 @@ export default function PlusPage() {
         <ul className="mt-6 space-y-3">
           {PERKS.map((p) => (
             <li key={p} className="flex items-start gap-3 text-[15px]">
-              <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 border-ink bg-success-soft text-success">
-                <Check size={14} />
+              <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 border-ink bg-accent-soft text-[#8a6512] shadow-hard-sm">
+                <Sparkles size={13} />
               </span>
               {p}
             </li>
@@ -66,7 +65,7 @@ export default function PlusPage() {
                   <div className="flex items-center gap-2">
                     <span className="font-display text-lg font-bold">{p.label}</span>
                     {p.best && (
-                      <span className="rounded-md bg-accent px-2 py-0.5 text-xs font-bold text-ink">
+                      <span className="rounded-md border-2 border-ink bg-accent px-2 py-0.5 text-xs font-bold text-ink">
                         Best value
                       </span>
                     )}
@@ -79,23 +78,24 @@ export default function PlusPage() {
           })}
         </div>
 
-        {joined ? (
-          <div className="mt-6 rounded-xl border-2 border-ink bg-success-soft p-5 text-center shadow-hard">
-            <span className="inline-grid h-12 w-12 place-items-center rounded-md border-2 border-ink bg-success text-white">
-              <Check size={24} />
+        {gotcha ? (
+          <div className="mt-6 rounded-xl border-2 border-ink bg-accent-soft p-5 text-center shadow-hard">
+            <span className="inline-grid h-12 w-12 place-items-center rounded-md border-2 border-ink bg-accent text-ink shadow-hard-sm">
+              <PartyPopper size={24} />
             </span>
-            <p className="mt-3 font-display text-lg font-bold">You&apos;re on the early list</p>
+            <p className="mt-3 font-display text-xl font-bold">Just kidding!</p>
             <p className="mt-1 text-sm text-muted">
-              Plus is coming soon — we&apos;ll be in touch before billing ever starts. No charge today.
+              No payments accepted at this time. It&apos;s all free — go have an adventure. (The Plus stuff really is coming; we&apos;ll never spring a charge on you.)
             </p>
+            <Link href="/plans"><Button variant="primary" className="mt-4">Back to your plans</Button></Link>
           </div>
         ) : (
           <>
-            <Button variant="primary" size="lg" className="mt-6 w-full" onClick={() => setJoined(true)}>
-              Join the early list
+            <Button variant="primary" size="lg" className="mt-6 w-full" onClick={() => setGotcha(true)}>
+              <Zap size={18} /> Pay to Win
             </Button>
             <p className="mt-3 text-center text-xs text-muted">
-              Plus isn&apos;t live yet — this just adds you to the early list. No charge, no card needed.
+              Tap it. We dare you.
             </p>
           </>
         )}

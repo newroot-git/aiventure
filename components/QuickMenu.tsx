@@ -1,5 +1,6 @@
 "use client";
 import * as React from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { Plus, Route, Hand, Sparkles, X } from "lucide-react";
@@ -13,6 +14,8 @@ const ACTIONS = [
 export function QuickMenu({ variant = "fab" }: { variant?: "fab" | "side" }) {
   const [open, setOpen] = React.useState(false);
   const [nudgeOpen, setNudgeOpen] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
 
   return (
     <>
@@ -33,6 +36,7 @@ export function QuickMenu({ variant = "fab" }: { variant?: "fab" | "side" }) {
         </button>
       )}
 
+      {mounted && createPortal(
       <AnimatePresence>
         {open && (
           <>
@@ -41,7 +45,7 @@ export function QuickMenu({ variant = "fab" }: { variant?: "fab" | "side" }) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
-              className="fixed inset-0 z-40 bg-transparent"
+              className="fixed inset-0 z-40 bg-ink/20 backdrop-blur-[1px]"
               onClick={() => setOpen(false)}
             />
             <motion.div
@@ -98,7 +102,9 @@ export function QuickMenu({ variant = "fab" }: { variant?: "fab" | "side" }) {
             </motion.div>
           </>
         )}
-      </AnimatePresence>
+      </AnimatePresence>,
+        document.body,
+      )}
 
       {nudgeOpen && <NudgeSheet onClose={() => setNudgeOpen(false)} />}
     </>

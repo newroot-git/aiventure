@@ -42,7 +42,7 @@ export function NudgeSheet({ friend, onClose }: { friend?: Profile; onClose: () 
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-night/30" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-ink/20 backdrop-blur-[1px]" onClick={onClose} />
       <div className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-md p-4">
         <div className="rounded-xl border-2 border-ink bg-surface p-4 shadow-hard">
           {sent ? (
