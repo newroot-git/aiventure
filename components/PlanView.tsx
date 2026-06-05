@@ -260,12 +260,25 @@ export function PlanView({
       body: JSON.stringify({ optionId: id }),
     }).then(() => router.refresh()).catch(() => {});
   }
-  const onRefine = React.useCallback(async (slotKey: string, day: number, feedback: string) => {
+  // Ask AI: append=true adds more ideas (keeps existing); append=false re-rolls the slot
+  const onRefine = React.useCallback(async (slotKey: string, day: number, feedback: string, append = true) => {
     setWorking(`${day}:${slotKey}:refine`);
     try {
       await fetch("/api/plans/refine", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: plan.slug, slotKey, day, feedback }),
+        body: JSON.stringify({ slug: plan.slug, slotKey, day, feedback, append }),
+      });
+      router.refresh();
+    } finally { setWorking(null); }
+  }, [plan.slug, router]);
+  // "Ask AI to find <text>" — resolve a typed name to a real venue and add it
+  const onResolveAdd = React.useCallback(async (slotKey: string, day: number, query: string) => {
+    if (!query.trim()) return;
+    setWorking(`${day}:${slotKey}:add`);
+    try {
+      await fetch("/api/plans/add-option", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: plan.slug, title: query, slotKey, day, ai: true }),
       });
       router.refresh();
     } finally { setWorking(null); }
@@ -458,6 +471,20 @@ export function PlanView({
         </Section>
       </div>
 
+      {/* recurring — part of choosing the when (right under the date pickers) */}
+      {isOwner && planning && (
+        <div className="mt-3">
+          <RecurringControl recurrence={recurrence} defaultStart={plan.starts_at} onChange={toggleRecurring} />
+        </div>
+      )}
+      {!isOwner && recurrence && (
+        <div className="mt-3">
+          <Section icon={<Repeat size={15} />} label="Recurring" tone="secondary">
+            <p className="text-sm font-bold">{recurrence.cadence === "monthly" ? "Repeats monthly" : recurrence.cadence === "biweekly" ? "Repeats fortnightly" : "Repeats weekly"}</p>
+          </Section>
+        </div>
+      )}
+
       {/* multi-pin map for itineraries */}
       {pins.length >= 1 && <div className="mt-3"><PlanMap pins={pins} area={plan.place_address} /></div>}
 
@@ -500,20 +527,6 @@ export function PlanView({
                 <p className="mt-1 text-xs text-muted">Tap the days that work — anyone can add, everyone marks what suits.</p>
               </div>
             )}
-          </Section>
-        </div>
-      )}
-
-      {/* recurring — sits with the dates */}
-      {isOwner && planning && (
-        <div className="mt-3">
-          <RecurringControl recurrence={recurrence} defaultStart={plan.starts_at} onChange={toggleRecurring} />
-        </div>
-      )}
-      {!isOwner && recurrence && (
-        <div className="mt-3">
-          <Section icon={<Repeat size={15} />} label="Recurring" tone="secondary">
-            <p className="text-sm font-bold">{recurrence.cadence === "monthly" ? "Repeats monthly" : recurrence.cadence === "biweekly" ? "Repeats fortnightly" : "Repeats weekly"}</p>
           </Section>
         </div>
       )}
@@ -589,7 +602,7 @@ export function PlanView({
                           slot={s} index={i} isOwner={isOwner} planning={planning} working={working}
                           votes={votes} voted={voted} placeArea={plan.place_address}
                           onVote={vote} onChoose={choose} onDeleteOpt={deleteOpt}
-                          onRefine={onRefine} onAddOwn={onAddOwn} onSetSlotTime={onSetSlotTime}
+                          onRefine={onRefine} onAddOwn={onAddOwn} onResolveAdd={onResolveAdd} onSetSlotTime={onSetSlotTime}
                         />
                       </Reveal>
                     );
@@ -819,21 +832,20 @@ function AddStepBox({ onAdd }: { onAdd: (label: string) => void }) {
    refine-text state. Lives outside PlanView so React can bail re-renders. */
 const PlanSlot = React.memo(function PlanSlot({
   slot, index, isOwner, planning, working, votes, voted, placeArea,
-  onVote, onChoose, onDeleteOpt, onRefine, onAddOwn, onSetSlotTime,
+  onVote, onChoose, onDeleteOpt, onRefine, onAddOwn, onResolveAdd, onSetSlotTime,
 }: {
   slot: Slot; index: number; isOwner: boolean; planning: boolean; working: string | null;
   votes: Record<string, number>; voted: Record<string, boolean>; placeArea: string | null;
   onVote: (id: string) => void; onChoose: (id: string) => void; onDeleteOpt: (id: string) => void;
-  onRefine: (slotKey: string, day: number, feedback: string) => void;
+  onRefine: (slotKey: string, day: number, feedback: string, append?: boolean) => void;
   onAddOwn: (slotKey: string, day: number, title: string, area?: string) => void;
+  onResolveAdd: (slotKey: string, day: number, query: string) => void;
   onSetSlotTime: (slotKey: string, day: number, time: string | null) => void;
 }) {
   const [expanded, setExpanded] = React.useState(false);
-  const [refineText, setRefineText] = React.useState("");
   const decided = !!slot.chosen;
   const empty = slot.options.length === 0;
-  const refineKey = `${slot.id}:refine`;
-  const refining = working === refineKey;
+  const refining = working === `${slot.id}:refine`;
   const pick = (id: string) => { setExpanded(false); onChoose(id); };
 
   if (slot.fixed && slot.options[0]) {
@@ -890,30 +902,83 @@ const PlanSlot = React.memo(function PlanSlot({
       )}
 
       {planning && (
-        <>
-          <div className="mt-3">
-            <PlaceSearch area={placeArea} onPick={(title, area) => onAddOwn(slot.key, slot.day, title, area)} />
-          </div>
-          {isOwner && !empty && (
-            <div className="mt-2 flex gap-2">
-              <input
-                value={refineText}
-                onChange={(e) => setRefineText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { onRefine(slot.key, slot.day, refineText); setRefineText(""); } }}
-                placeholder="Ask AI for different ideas — e.g. more chill, cheaper…"
-                aria-label="Ask AI for different ideas"
-                className="w-full rounded-md border-2 border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-primary"
-              />
-              <Button variant="secondary" disabled={refining} onClick={() => { onRefine(slot.key, slot.day, refineText); setRefineText(""); }}>
-                {refining ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
-              </Button>
-            </div>
-          )}
-        </>
+        <SlotAddMenu
+          slot={slot} isOwner={isOwner} empty={empty} placeArea={placeArea} refining={refining}
+          onAddOwn={onAddOwn} onResolveAdd={onResolveAdd} onRefine={onRefine}
+        />
       )}
     </SlotShell>
   );
 });
+
+/* One consolidated "+ Add to this step" control: search a place, ask AI to find a
+   specific venue, or ask AI for ideas (which ADD to the step). Re-roll is separate. */
+function SlotAddMenu({
+  slot, isOwner, empty, placeArea, refining, onAddOwn, onResolveAdd, onRefine,
+}: {
+  slot: Slot; isOwner: boolean; empty: boolean; placeArea: string | null; refining: boolean;
+  onAddOwn: (slotKey: string, day: number, title: string, area?: string) => void;
+  onResolveAdd: (slotKey: string, day: number, query: string) => void;
+  onRefine: (slotKey: string, day: number, feedback: string, append?: boolean) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-3 inline-flex items-center gap-1.5 rounded-md border-2 border-dashed border-line px-3 py-2 text-sm font-bold text-primary transition hover:border-primary"
+      >
+        <Plus size={15} /> Add to this step
+      </button>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-xl border-2 border-line bg-surface-2/40 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-xs font-bold uppercase tracking-wider text-muted">Add to this step</span>
+        <button onClick={() => setOpen(false)} className="text-muted" aria-label="Close"><X size={16} /></button>
+      </div>
+      <PlaceSearch
+        area={placeArea}
+        onPick={(title, area) => onAddOwn(slot.key, slot.day, title, area)}
+        onAiFind={(q) => onResolveAdd(slot.key, slot.day, q)}
+      />
+      {isOwner && (
+        <SlotAskAi refining={refining} onAsk={(text) => onRefine(slot.key, slot.day, text, true)} />
+      )}
+      {isOwner && !empty && (
+        <button
+          onClick={() => onRefine(slot.key, slot.day, "", false)}
+          disabled={refining}
+          className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-muted underline hover:text-ink disabled:opacity-60"
+        >
+          <RotateCw size={11} /> Replace all with fresh ideas
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* self-stating "ask AI for ideas" input (adds to the step) */
+function SlotAskAi({ refining, onAsk }: { refining: boolean; onAsk: (text: string) => void }) {
+  const [text, setText] = React.useState("");
+  const ask = () => { onAsk(text); setText(""); };
+  return (
+    <div className="mt-2 flex gap-2">
+      <input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && ask()}
+        placeholder="Ask AI for ideas — adds to this step…"
+        aria-label="Ask AI for more ideas"
+        className="w-full rounded-md border-2 border-line bg-surface px-3 py-2.5 text-[15px] outline-none focus:border-secondary"
+      />
+      <Button variant="secondary" disabled={refining} onClick={ask}>
+        {refining ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+      </Button>
+    </div>
+  );
+}
 
 /* recurrence control — weekly / fortnightly / monthly */
 const CADENCES: { id: PlanRecurrence["cadence"]; label: string }[] = [

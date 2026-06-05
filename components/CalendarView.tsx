@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, MapPin, Clock, Repeat } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Clock, Repeat, Lock, Sparkles } from "lucide-react";
 import { Card, Pill, AvatarStack } from "./ui";
 import type { PlanCard } from "@/lib/db";
 
@@ -117,8 +117,10 @@ export function CalendarView({ plans }: { plans: PlanCard[] }) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={p.cover} alt="" className="h-32 w-full border-b-2 border-ink/10 object-cover" />
                   <div className="p-4">
-                    <div className="mb-2 flex items-center gap-2">
+                    <div className="mb-2 flex flex-wrap items-center gap-2">
                       <Pill tone="secondary">{p.groupName}</Pill>
+                      {p.phase === "locked" ? <Pill tone="success"><Lock size={12} /> Locked in</Pill>
+                        : p.phase === "open" ? <Pill tone="accent"><Sparkles size={12} /> Planning</Pill> : null}
                       {p.recurrence && <Pill tone="primary"><Repeat size={12} /> {cadenceLabel(p.recurrence.cadence)}</Pill>}
                       {timeOf(p) && <span className="inline-flex items-center gap-1 text-sm font-bold text-muted"><Clock size={13} /> {timeOf(p)}</span>}
                     </div>

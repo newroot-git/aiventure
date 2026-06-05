@@ -1,8 +1,8 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { PlanView } from "@/components/PlanView";
 import { getPlanBySlug, getFriends } from "@/lib/db";
-import { MOCK_PLAN, MOCK_OPTIONS, MOCK_MEMBERS } from "@/lib/mock";
 
 export default async function PlanPage({
   params,
@@ -11,15 +11,12 @@ export default async function PlanPage({
 }) {
   const { slug } = await params;
 
-  // live plan from the DB; fall back to the mock demo plan for seeded slugs
-  const [live, friends] = await Promise.all([
+  // a plan must exist in the DB — no mock fallback (a fake plan can't vote/refine/save)
+  const [data, friends] = await Promise.all([
     getPlanBySlug(slug).catch(() => null),
     getFriends().catch(() => []),
   ]);
-  const data = live ?? {
-    plan: { ...MOCK_PLAN, slug }, options: MOCK_OPTIONS, members: MOCK_MEMBERS,
-    scaffold: [], recurrence: null, dateOptions: [], myRsvp: null, isOwner: true, currentUserId: "",
-  };
+  if (!data) notFound();
 
   return (
     <div className="mx-auto w-full max-w-lg">

@@ -3,9 +3,9 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { supabaseAdmin } from "./supabase/admin";
 import { supabaseServer } from "./supabase/server";
-import { generateDrop, generateSlotOptions, mapsUrl, type DropInput, type DropSlot } from "./ai";
+import { generateDrop, generateSlotOptions, resolvePlace, mapsUrl, type DropInput, type DropSlot } from "./ai";
 import { planSlug } from "./slug";
-import type { Plan, PlanOption, PlanMember, Profile, RSVP, Visibility } from "./types";
+import type { Plan, PlanOption, PlanMember, Profile, RSVP, Visibility, PlanStatus } from "./types";
 
 // Map a Supabase auth user → our profile id (link by auth_id, then email, else create).
 async function resolveAuthProfile(authId: string, email: string | null): Promise<string> {
@@ -348,7 +348,7 @@ function fmtDateLabel(iso?: string | null): string {
 
 export interface PlanCard {
   id: string; slug: string; activity: string; dateLabel: string; date: string; startsAtISO: string; place: string;
-  groupName: string; members: Profile[]; status: "upcoming" | "past"; adventureNo?: number;
+  groupName: string; members: Profile[]; status: "upcoming" | "past"; phase: PlanStatus; adventureNo?: number;
   cover: string; tile: string; recurrence?: PlanRecurrence | null;
 }
 
@@ -368,6 +368,7 @@ function mapPlanCard(r: Row): PlanCard {
     groupName: ((r.group as Row)?.name as string) || "You",
     members,
     status: r.completed_at ? "past" : "upcoming",
+    phase: ((r.status as PlanStatus) ?? "open"),
     adventureNo: (r.adventure_no as number) ?? undefined,
     cover: deriveCover(hue) || "/img/cover-hike.png",
     tile: hue,
@@ -500,6 +501,7 @@ function slotMetaFrom(scaffold: ScaffoldSlot[], optRows: Row[], slotKey: string,
 async function regenSlotOptions(
   planId: string, intent: string, location: string,
   slotKey: string, day: number, allRows: Row[], scaffold: ScaffoldSlot[], feedback?: string,
+  append = false,
 ): Promise<void> {
   const db = supabaseAdmin();
   const { label, order } = slotMetaFrom(scaffold, allRows, slotKey, day);
@@ -509,8 +511,11 @@ async function regenSlotOptions(
   });
   const fresh = await generateSlotOptions(label, `${intent} (the "${label}" step)`, location, feedback);
   if (!fresh.length) return;
-  const ids = slotRows.map((o) => o.id as string);
-  if (ids.length) await db.from("plan_options").delete().in("id", ids);
+  // append = keep existing options and add these; otherwise replace the slot's options
+  if (!append) {
+    const ids = slotRows.map((o) => o.id as string);
+    if (ids.length) await db.from("plan_options").delete().in("id", ids);
+  }
   const rows = fresh.map((o) => ({
     plan_id: planId, kind: "activity", source: "ai",
     title: o.title, subtitle: o.subtitle ?? null, why: o.why ?? null,
@@ -540,11 +545,11 @@ async function refineContext(slug: string) {
   };
 }
 
-/** Regenerate the voteable options for ONE slot, optionally steered by feedback. */
-export async function refineSlot(slug: string, slotKey: string, day: number, feedback?: string): Promise<void> {
+/** Regenerate the voteable options for ONE slot. append=true adds to them instead of replacing. */
+export async function refineSlot(slug: string, slotKey: string, day: number, feedback?: string, append = false): Promise<void> {
   await assertOwner(slug);
   const { planId, intent, location, allRows, meta } = await refineContext(slug);
-  await regenSlotOptions(planId, intent, location, slotKey, day, allRows, meta.scaffold, feedback);
+  await regenSlotOptions(planId, intent, location, slotKey, day, allRows, meta.scaffold, feedback, append);
   await deriveHeadline(planId, slug);
 }
 
@@ -705,6 +710,31 @@ export async function addCustomOption(slug: string, title: string, slotKey: stri
     payload: {
       slot: slotKey, slot_label: label, slot_order: order, day, fixed: false, chosen: false,
       tile: "city", place_name: title.trim().slice(0, 140), time: null,
+    },
+  } as never);
+  return true;
+}
+
+/** "Ask AI to find <text>" — resolve a typed name to a real venue, add it as an option. */
+export async function addResolvedPlace(slug: string, query: string, slotKey: string, day: number): Promise<boolean> {
+  const db = supabaseAdmin();
+  const { planId } = await assertParticipant(slug);
+  if (!query.trim()) return false;
+  const { data: plan } = await db.from("plans").select("place_address").eq("id", planId).maybeSingle();
+  const location = ((plan as Row | null)?.place_address as string) || "London, UK";
+  const resolved = await resolvePlace(query, location);
+  if (!resolved) return false;
+  const { data: existing } = await db.from("plan_options").select("payload, title").eq("plan_id", planId);
+  const allRows = (existing as Row[]) ?? [];
+  const meta = readMeta(allRows);
+  const { label, order } = slotMetaFrom(meta.scaffold, allRows, slotKey, day);
+  await db.from("plan_options").insert({
+    plan_id: planId, kind: "activity", source: "ai",
+    title: resolved.title.slice(0, 140), subtitle: resolved.subtitle ?? null, why: resolved.why ?? null,
+    source_url: mapsUrl(resolved.map_query) ?? null, source_label: "AI + Maps",
+    payload: {
+      slot: slotKey, slot_label: label, slot_order: order, day, fixed: false, chosen: false,
+      tile: resolved.tile, place_name: resolved.place_name ?? resolved.title, time: null,
     },
   } as never);
   return true;
@@ -1025,22 +1055,28 @@ export interface NudgeCard { id: string; from: Profile; message: string; when: s
 export interface InviteCard { id: string; fromLabel: string; kind: string; activity: string; slug: string; dateLabel: string; cover: string }
 export interface NotificationCard { id: string; text: string; when: string; slug?: string; kind?: string }
 
+// Discovery (communities + open events) is DISABLED for now: the seed rows point at
+// demo plans that don't exist as real DB plans, so their cards led to broken pages.
+// Returning [] hides the surfaces; the query code below is kept for the real rebuild
+// (when communities back onto real open-visibility plans). See PICKUP / issue #7.
 export async function getCommunities(): Promise<CommunityCard[]> {
-  const db = supabaseAdmin();
-  const { data } = await db.from("communities").select("*").order("created_at");
-  return ((data as Row[]) ?? []).map((c) => ({
-    id: c.id as string, name: c.name as string, tag: (c.tag as string) ?? "", members: (c.members_label as string) ?? "0",
-  }));
+  return [];
+  // const db = supabaseAdmin();
+  // const { data } = await db.from("communities").select("*").order("created_at");
+  // return ((data as Row[]) ?? []).map((c) => ({
+  //   id: c.id as string, name: c.name as string, tag: (c.tag as string) ?? "", members: (c.members_label as string) ?? "0",
+  // }));
 }
 
 export async function getOpenEvents(): Promise<OpenEventCard[]> {
-  const db = supabaseAdmin();
-  const { data } = await db.from("open_events").select("*").order("created_at");
-  return ((data as Row[]) ?? []).map((e) => ({
-    id: e.id as string, community: (e.community_name as string) ?? "", activity: e.activity as string,
-    place: (e.place as string) ?? "", dateLabel: (e.date_label as string) ?? "", cover: (e.cover as string) ?? "/img/cover-park.png",
-    going: (e.going as number) ?? 0, slug: (e.plan_slug as string) ?? "wild-otter-42",
-  }));
+  return [];
+  // const db = supabaseAdmin();
+  // const { data } = await db.from("open_events").select("*").order("created_at");
+  // return ((data as Row[]) ?? []).map((e) => ({
+  //   id: e.id as string, community: (e.community_name as string) ?? "", activity: e.activity as string,
+  //   place: (e.place as string) ?? "", dateLabel: (e.date_label as string) ?? "", cover: (e.cover as string) ?? "/img/cover-park.png",
+  //   going: (e.going as number) ?? 0, slug: (e.plan_slug as string) ?? "wild-otter-42",
+  // }));
 }
 
 export async function getNudges(): Promise<NudgeCard[]> {

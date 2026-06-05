@@ -1,20 +1,23 @@
 "use client";
 import * as React from "react";
-import { Plus, Loader2, MapPin } from "lucide-react";
+import { Plus, Loader2, MapPin, Sparkles } from "lucide-react";
 import { Button } from "./ui";
 
-// Maps-style place picker (OSM Nominatim). Type → pick a real place, or use what
-// you typed as a custom spot (e.g. "John's house") with no map location.
+// Maps-style place picker (OSM Nominatim). Type → pick a real place, use what you
+// typed as a custom spot, or (if onAiFind given) ask AI to resolve a specific venue
+// that OSM can't surface (e.g. a named coffee shop).
 export function PlaceSearch({
-  area, onPick, placeholder = "Add a place — search, or type your own…",
+  area, onPick, onAiFind, placeholder = "Add a place — search, or type your own…",
 }: {
   area?: string | null;
   onPick: (title: string, area?: string) => void;
+  onAiFind?: (query: string) => Promise<void> | void;
   placeholder?: string;
 }) {
   const [q, setQ] = React.useState("");
   const [results, setResults] = React.useState<{ name: string; label: string }[]>([]);
   const [busy, setBusy] = React.useState(false);
+  const [aiBusy, setAiBusy] = React.useState(false);
 
   React.useEffect(() => {
     const s = q.trim();
@@ -44,6 +47,13 @@ export function PlaceSearch({
     onPick(title.trim(), area || undefined);
     setQ(""); setResults([]);
   }
+  async function aiFind() {
+    const s = q.trim();
+    if (!s || !onAiFind) return;
+    setAiBusy(true);
+    try { await onAiFind(s); setQ(""); setResults([]); }
+    finally { setAiBusy(false); }
+  }
 
   return (
     <div className="relative">
@@ -67,6 +77,11 @@ export function PlaceSearch({
               <MapPin size={14} className="shrink-0 text-primary" /> <span className="truncate">{r.label}</span>
             </button>
           ))}
+          {onAiFind && (
+            <button onClick={aiFind} disabled={aiBusy} className="flex w-full items-center gap-2 border-t border-line px-3 py-2.5 text-left text-sm font-bold text-secondary hover:bg-surface-2 disabled:opacity-60">
+              {aiBusy ? <Loader2 size={14} className="shrink-0 animate-spin" /> : <Sparkles size={14} className="shrink-0" />} Ask AI to find &ldquo;{q.trim()}&rdquo;
+            </button>
+          )}
           <button onClick={() => pick(q)} className="flex w-full items-center gap-2 border-t border-line px-3 py-2.5 text-left text-sm font-bold text-primary hover:bg-surface-2">
             <Plus size={14} className="shrink-0" /> Use &ldquo;{q.trim()}&rdquo; as a custom spot
           </button>

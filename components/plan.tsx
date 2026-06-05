@@ -177,17 +177,13 @@ export function WhenPicker({
   });
   const [day, setDay] = React.useState<number | null>(init ? init.getDate() : null);
   const [time, setTime] = React.useState<string>(init ? `${pad2(init.getHours())}:${pad2(init.getMinutes())}` : "19:00");
-  const [picked, setPicked] = React.useState<string[]>([]); // multiple mode
+  const [picked, setPicked] = React.useState<{ y: number; m: number; d: number }[]>([]); // multiple mode — time applied at Done
 
   const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
   const firstWk = (new Date(view.y, view.m, 1).getDay() + 6) % 7;
   const cells: (number | null)[] = [...Array(firstWk).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
   const isToday = (d: number) => view.y === now.getFullYear() && view.m === now.getMonth() && d === now.getDate();
-  const sameDay = (iso: string, d: number) => {
-    const x = new Date(iso);
-    return x.getFullYear() === view.y && x.getMonth() === view.m && x.getDate() === d;
-  };
-  const isPicked = (d: number) => multiple && picked.some((iso) => sameDay(iso, d));
+  const isPicked = (d: number) => multiple && picked.some((p) => p.y === view.y && p.m === view.m && p.d === d);
 
   function shift(dir: number) {
     setView((v) => {
@@ -203,15 +199,27 @@ export function WhenPicker({
   }
   function clickDay(d: number) {
     if (multiple) {
-      // toggle + highlight; nothing is committed until "Done"
-      setPicked((p) => (p.some((iso) => sameDay(iso, d)) ? p.filter((iso) => !sameDay(iso, d)) : [...p, isoFor(d, time)]));
+      // toggle the day; the selected TIME is applied to every picked day at "Done",
+      // so changing the time afterwards updates them all (fixes time-after-date loss).
+      setPicked((p) => {
+        const has = p.some((x) => x.y === view.y && x.m === view.m && x.d === d);
+        return has
+          ? p.filter((x) => !(x.y === view.y && x.m === view.m && x.d === d))
+          : [...p, { y: view.y, m: view.m, d }];
+      });
     } else {
       setDay(d);
       onChange?.(isoFor(d, time));
     }
   }
   function done() {
-    if (multiple) { if (picked.length) onPickMany?.(picked); setPicked([]); }
+    if (multiple) {
+      if (picked.length) {
+        const [h, min] = time.split(":").map(Number);
+        onPickMany?.(picked.map((p) => new Date(p.y, p.m, p.d, h, min).toISOString()));
+      }
+      setPicked([]);
+    }
     setOpen(false);
   }
 
@@ -267,7 +275,7 @@ export function WhenPicker({
               )}
             </div>
             <div className="mt-4 border-t-2 border-line pt-3">
-              <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Time{multiple ? " (applies to days you tap next)" : ""}</div>
+              <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted">Time{multiple ? " (applies to all selected)" : ""}</div>
               <div className="flex flex-wrap gap-2">
                 {TIMES.map((t) => (
                   <button

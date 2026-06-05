@@ -15,6 +15,22 @@ export function ExploreView({ communities, events }: { communities: CommunityCar
   const [joined, setJoined] = React.useState<string[]>([]);
   const toggle = (id: string) => setJoined((j) => (j.includes(id) ? j.filter((x) => x !== id) : [...j, id]));
 
+  const empty = events.length === 0 && communities.length === 0;
+  if (empty) {
+    return (
+      <div>
+        <h1 className="font-display text-3xl font-bold">Explore</h1>
+        <p className="mt-1 text-[15px] text-muted">Find communities, open plans, and things to get in on near you.</p>
+        <Card className="mt-6 flex flex-col items-center gap-2 p-8 text-center">
+          <span className="grid h-12 w-12 place-items-center rounded-md border-2 border-ink/10 bg-secondary-soft text-secondary"><Compass size={24} /></span>
+          <h2 className="mt-1 font-display text-lg font-bold">Communities are coming</h2>
+          <p className="max-w-xs text-sm text-muted">Open plans and communities near you will show up here. For now, start your own plan or nudge a mate.</p>
+          <Link href="/new" className="mt-2"><Button variant="primary" size="sm">Create a plan</Button></Link>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div>
       <h1 className="font-display text-3xl font-bold">Explore</h1>
@@ -22,7 +38,7 @@ export function ExploreView({ communities, events }: { communities: CommunityCar
 
       <div className="mt-5 flex items-center gap-2 rounded-md border-2 border-line bg-surface px-3 focus-within:border-primary">
         <Search size={18} className="text-muted" />
-        <input placeholder="Search communities, activities, places…" className="w-full bg-transparent py-3 text-[15px] outline-none placeholder:text-muted" />
+        <input placeholder="Search communities, activities, places…" aria-label="Search communities, activities, places" className="w-full bg-transparent py-3 text-[15px] outline-none placeholder:text-muted" />
       </div>
 
       <Heading icon={<Sparkles size={20} className="text-primary" />}>For your interests</Heading>

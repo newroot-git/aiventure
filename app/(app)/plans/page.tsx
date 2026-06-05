@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MapPin, CalendarDays, ChevronRight, Sparkles, Users } from "lucide-react";
+import { MapPin, CalendarDays, ChevronRight, Sparkles, Users, Lock } from "lucide-react";
 import { Card, Pill, AvatarStack } from "@/components/ui";
 import { Countdown } from "@/components/Countdown";
 import { LocalDateTime } from "@/components/LocalDateTime";
@@ -65,31 +65,36 @@ export default async function HomePage() {
       )}
 
       {/* around you — placeholder discovery */}
-      <h2 className="mt-7 mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted">
-        <Sparkles size={14} className="text-primary" /> Around you
-      </h2>
-      <p className="mb-3 text-sm text-muted">Open plans near you, picked for your interests.</p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {openEvents.map((op) => (
-          <Link key={op.id} href={`/p/${op.slug}`} className="block">
-            <Card hard className="overflow-hidden p-0 transition active:scale-[0.99]">
-              <div className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={op.cover} alt="" className="h-32 w-full border-b-2 border-ink/10 object-cover" />
-                <div className="absolute left-3 top-3"><Pill tone="secondary" className="border-2 border-ink/10"><Users size={12} /> {op.community}</Pill></div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-heading font-bold leading-snug">{op.activity}</h3>
-                <div className="mt-1.5 flex flex-wrap gap-x-3 text-sm text-muted">
-                  <span className="inline-flex items-center gap-1"><CalendarDays size={13} /> {op.dateLabel}</span>
-                  <span className="inline-flex items-center gap-1"><MapPin size={13} /> {op.place}</span>
-                </div>
-                <p className="mt-2 text-sm font-bold text-primary">{op.going} going · tap to join</p>
-              </div>
-            </Card>
-          </Link>
-        ))}
-      </div>
+      {/* around you — discovery hidden until real community plans exist (see #7) */}
+      {openEvents.length > 0 && (
+        <>
+          <h2 className="mt-7 mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted">
+            <Sparkles size={14} className="text-primary" /> Around you
+          </h2>
+          <p className="mb-3 text-sm text-muted">Open plans near you, picked for your interests.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {openEvents.map((op) => (
+              <Link key={op.id} href={`/p/${op.slug}`} className="block">
+                <Card hard className="overflow-hidden p-0 transition active:scale-[0.99]">
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={op.cover} alt="" className="h-32 w-full border-b-2 border-ink/10 object-cover" />
+                    <div className="absolute left-3 top-3"><Pill tone="secondary" className="border-2 border-ink/10"><Users size={12} /> {op.community}</Pill></div>
+                  </div>
+                  <div className="p-4">
+                    <h3 className="font-heading font-bold leading-snug">{op.activity}</h3>
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 text-sm text-muted">
+                      <span className="inline-flex items-center gap-1"><CalendarDays size={13} /> {op.dateLabel}</span>
+                      <span className="inline-flex items-center gap-1"><MapPin size={13} /> {op.place}</span>
+                    </div>
+                    <p className="mt-2 text-sm font-bold text-primary">{op.going} going · tap to join</p>
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -102,6 +107,11 @@ function PlanRow({ plan }: { plan: PlanCard }) {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={plan.cover} alt="" className="h-40 w-full border-b-2 border-ink/10 object-cover" />
           <div className="absolute left-3 top-3"><Pill tone="secondary" className="border-2 border-ink/10">{plan.groupName}</Pill></div>
+          {plan.phase === "locked" ? (
+            <div className="absolute right-3 top-3"><Pill tone="success" className="border-2 border-ink/10"><Lock size={12} /> Locked in</Pill></div>
+          ) : plan.phase === "open" ? (
+            <div className="absolute right-3 top-3"><Pill tone="accent" className="border-2 border-ink/10"><Sparkles size={12} /> Planning</Pill></div>
+          ) : null}
         </div>
         <div className="p-4">
           <h3 className="font-heading text-lg font-bold leading-snug">{plan.activity}</h3>

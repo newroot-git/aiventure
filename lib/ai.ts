@@ -202,4 +202,23 @@ Return STRICT JSON only: {"options":[{"title","subtitle","why","place_name","map
   }
 }
 
+// Resolve a free-typed place/business into ONE real, specific venue (the "ask AI
+// to find this exact place" path — when OSM search can't surface a named spot).
+export async function resolvePlace(query: string, location = "London, UK"): Promise<DropOptionOut | null> {
+  const q = (query || "").trim().slice(0, 200);
+  if (!q) return null;
+  const user = `In ${location}, the user typed: "${q}".
+Resolve it to ONE real, specific, named place/venue/business that best matches (fix spelling; pick the most likely real place in or near ${location}).
+Return STRICT JSON only: {"title","subtitle","why","place_name","map_query","tile"}.
+"tile" = best-fit from: ${TILES.join(", ")}. "subtitle" = short detail (type · area). "why" = one short, warm line.`;
+  try {
+    const raw = await callOpenRouter(SYSTEM, user, 500);
+    const o = parseJson(raw) as DropOptionOut;
+    if (!o?.title) return null;
+    return cleanOption(o);
+  } catch {
+    return null;
+  }
+}
+
 export { mapsUrl };
