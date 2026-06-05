@@ -496,12 +496,14 @@ const DEMO_CREW = [
   { name: "Priya", interests: ["Coffee", "Galleries", "Yoga"] },
   { name: "Leo", interests: ["Football", "Board games", "BBQ"] },
 ];
-export async function seedDemoAccount(name: string): Promise<{ userId: string }> {
+export async function seedDemoAccount(name: string, avatar?: string | null): Promise<{ userId: string }> {
   const db = supabaseAdmin();
   const clean = (name || "").trim().slice(0, 40) || "Explorer";
+  // only accept a path into our own avatar set — never arbitrary URLs
+  const av = avatar && /^\/img\/avatars\/avatar-\d+\.png$/.test(avatar) ? avatar : null;
 
   const { data: user } = await db.from("profiles")
-    .insert({ name: clean, email: null, interests: [] } as never).select("id").single();
+    .insert({ name: clean, email: null, interests: [], avatar_emoji: av } as never).select("id").single();
   const userId = (user as unknown as Row).id as string;
 
   // the crew — each demo account gets its own copies so nobody shares state

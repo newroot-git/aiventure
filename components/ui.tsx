@@ -1,4 +1,5 @@
 import * as React from "react";
+import { avatarFor } from "@/lib/avatars";
 
 function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
@@ -109,18 +110,10 @@ export function SelectTag({
   );
 }
 
-/* ---------------- Avatar (pixel character, no emoji) ----------------
-   Default profile photo = a little pixel character silhouette on a per-profile
-   colour (deterministic from the name, so it's stable + varied across people).
-   A real image src overrides it. */
-// Default profile photo = one of 16 generated character portraits, picked
-// deterministically from the name so it's stable + varied across people.
-const AVATAR_COUNT = 16;
-function avatarFor(seed?: string) {
-  let h = 0;
-  for (const c of seed ?? "?") h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return `/img/avatars/avatar-${(h % AVATAR_COUNT) + 1}.png`;
-}
+/* ---------------- Avatar ----------------
+   Default profile photo = one of the generated character portraits, picked
+   deterministically from the name. A real `src` (a chosen avatar path or an
+   uploaded image) overrides it. See lib/avatars.ts for the registry. */
 
 export function Avatar({
   name,

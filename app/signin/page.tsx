@@ -2,9 +2,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mail, ArrowLeft, Loader2, Sparkles, Lock } from "lucide-react";
+import { Mail, ArrowLeft, Loader2, Sparkles, Lock, Check } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { ALL_AVATARS } from "@/lib/avatars";
 
 type Mode = "password" | "code";
 
@@ -20,6 +21,12 @@ export default function SignIn() {
   const [error, setError] = React.useState("");
   const [showReal, setShowReal] = React.useState(false);
   const [demoName, setDemoName] = React.useState("");
+  // chosen avatar (a path from our set). Default deterministic to avoid hydration
+  // mismatch, then shuffle to a random one once mounted so it feels fresh.
+  const [avatar, setAvatar] = React.useState<string>(ALL_AVATARS[0]);
+  React.useEffect(() => {
+    setAvatar(ALL_AVATARS[Math.floor(Math.random() * ALL_AVATARS.length)]);
+  }, []);
 
   // a real session must win — drop any leftover guest cookie so it can't mask it,
   // then route new accounts (no interests yet) into onboarding.
@@ -91,7 +98,7 @@ export default function SignIn() {
     try {
       const res = await fetch("/api/demo", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: demoName.trim() }),
+        body: JSON.stringify({ name: demoName.trim(), avatar }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || "Couldn't create a demo account"); }
       go(false); // keep the demo cookie; go() routes into onboarding to pick interests
@@ -182,8 +189,37 @@ export default function SignIn() {
         ) : (
           <div className="mt-6">
             <h1 className="font-display text-2xl font-bold">Try AIventure</h1>
-            <p className="mt-1 text-[15px] text-muted">A demo account, ready to go — a crew, a plan and an adventure already set up. Just pick a name.</p>
+            <p className="mt-1 text-[15px] text-muted">A demo account, ready to go — a crew, a plan and an adventure already set up. Pick a name and a face.</p>
             <Input autoFocus value={demoName} onChange={(e) => setDemoName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && createDemo()} placeholder="Your name" className="mt-4" />
+
+            <p className="mb-2 mt-4 text-xs font-bold uppercase tracking-wider text-muted">Pick your avatar</p>
+            <div className="grid max-h-52 grid-cols-5 gap-2 overflow-y-auto rounded-xl border-2 border-ink bg-night/[0.03] p-2.5">
+              {ALL_AVATARS.map((src) => {
+                const sel = src === avatar;
+                return (
+                  <button
+                    key={src}
+                    type="button"
+                    onClick={() => setAvatar(src)}
+                    aria-pressed={sel}
+                    className={`relative aspect-square overflow-hidden rounded-md border-2 transition ${
+                      sel ? "border-primary ring-2 ring-primary" : "border-ink/15 hover:border-ink/40"
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt="" className="h-full w-full object-cover" />
+                    {sel && (
+                      <span className="absolute inset-0 grid place-items-center bg-primary/25">
+                        <span className="grid h-5 w-5 place-items-center rounded-full border-2 border-ink bg-primary text-white">
+                          <Check size={12} strokeWidth={3} />
+                        </span>
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
             <Button variant="primary" size="lg" className="mt-3 w-full" disabled={busy || !demoName.trim()} onClick={createDemo}>
               {busy ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />} That&apos;s me — jump in
             </Button>
