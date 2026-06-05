@@ -3,13 +3,18 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
-import { Inbox, X, Check, Loader2 } from "lucide-react";
+import { Inbox, X, Check, Loader2, Mail, Hand, Bell, type LucideIcon } from "lucide-react";
 import { Button } from "./ui";
 import type { InviteCard, NudgeCard, NotificationCard } from "@/lib/db";
 
+const NOTIF_ICONS: Record<string, { Icon: LucideIcon; cls: string }> = {
+  invite: { Icon: Mail, cls: "bg-secondary-soft text-secondary" },
+  nudge: { Icon: Hand, cls: "bg-primary-soft text-primary-deep" },
+  bell: { Icon: Bell, cls: "bg-accent-soft text-[#8a6512]" },
+};
 function PixelIcon({ name }: { name: string }) {
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img src={`/img/icons/${name}.png`} alt="" className="pixelated h-9 w-9 shrink-0 rounded-md border-2 border-ink object-cover" />;
+  const { Icon, cls } = NOTIF_ICONS[name] ?? NOTIF_ICONS.bell;
+  return <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-md border-2 border-ink ${cls}`}><Icon size={18} /></span>;
 }
 
 export interface NotifData {
