@@ -273,7 +273,7 @@ export default function Home() {
 
       {/* HERO */}
       <header className="hero">
-        <img className="hero-img" ref={heroRef} src="/img/hero-forest.png" alt="" />
+        <img className="hero-img" ref={heroRef} src="/img/hero-cliff.png" alt="" />
         <div className="hero-scrim" />
         <div className="stars" aria-hidden="true">
           {Array.from({ length: 26 }).map((_, i) => (
