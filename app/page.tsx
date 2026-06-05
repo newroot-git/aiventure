@@ -27,6 +27,16 @@ const CSS = `
 .lp *{box-sizing:border-box}
 .lp::before{content:""; position:fixed; inset:0; pointer-events:none; z-index:1; opacity:.45;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.04 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+/* CRT scanlines over everything — subtle arcade screen */
+.lp::after{content:""; position:fixed; inset:0; pointer-events:none; z-index:9; opacity:.45;
+  background:repeating-linear-gradient(to bottom, rgba(0,0,0,.045) 0 1px, transparent 1px 3px)}
+/* twinkling pixel stars in the hero sky */
+.lp .stars{position:absolute; inset:0 0 38% 0; z-index:2; pointer-events:none}
+.lp .star{position:absolute; width:2px; height:2px; background:#fff;
+  box-shadow:0 0 5px 1px rgba(255,255,255,.6); animation:lptwinkle 3s ease-in-out infinite}
+@keyframes lptwinkle{0%,100%{opacity:.18; transform:scale(1)} 50%{opacity:.95; transform:scale(1.6)}}
+.lp .pressstart{margin-top:16px; font-family:var(--font-display); font-weight:600; font-size:14px;
+  letter-spacing:1px; color:var(--gold); text-shadow:2px 2px 0 rgba(0,0,0,.55); animation:lpblink 1.1s steps(2) infinite}
 .lp a{color:inherit; text-decoration:none}
 .lp h1,.lp h2,.lp h3{font-family:var(--font-display), ui-monospace, monospace; line-height:1.02; letter-spacing:.5px; margin:0}
 .lp .wrap{max-width:1100px; margin:0 auto; padding:0 22px; position:relative; z-index:2}
@@ -36,7 +46,8 @@ const CSS = `
   border:2px solid var(--ink); border-radius:8px; font-weight:800; font-size:16px; cursor:pointer;
   box-shadow:var(--shadow); transition:transform .08s ease, box-shadow .08s ease}
 .lp .btn:active{transform:translate(4px,4px); box-shadow:0 0 0 var(--ink)}
-.lp .btn-gold{background:var(--gold); color:var(--ink)}
+.lp .btn-gold{background:var(--gold); color:var(--ink);
+  box-shadow:var(--shadow), inset 0 3px 0 rgba(255,255,255,.45), inset 0 -3px 0 rgba(0,0,0,.16)}
 
 .lp .hero{position:relative; min-height:92vh; display:flex; align-items:center; justify-content:center;
   border-bottom-left-radius:26px; border-bottom-right-radius:26px; overflow:hidden; background:#241F33}
@@ -58,8 +69,11 @@ const CSS = `
   text-shadow:0 1px 6px rgba(0,0,0,.6)}
 
 .lp section.band{padding:96px 0; position:relative; z-index:2}
-.lp .kicker{font-weight:800; font-size:13px; letter-spacing:2px; text-transform:uppercase; color:var(--terra)}
-.lp h2.big{font-size:clamp(34px,5vw,56px); margin-top:14px}
+.lp .kicker{display:inline-flex; align-items:center; gap:7px; font-family:var(--font-display); font-weight:600;
+  font-size:12px; letter-spacing:1.5px; text-transform:uppercase; color:var(--ink); background:var(--surface);
+  border:2px solid var(--ink); border-radius:6px; padding:6px 12px; box-shadow:var(--shadow-sm)}
+.lp .kicker::before{content:"▸"; color:var(--terra); font-size:13px}
+.lp h2.big{font-size:clamp(34px,5vw,56px); margin-top:16px; text-shadow:3px 3px 0 rgba(30,27,22,.07)}
 .lp .lede{font-size:clamp(18px,2.2vw,22px); color:var(--muted); font-weight:500; margin-top:18px; line-height:1.55}
 
 .lp .probs{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-top:44px; text-align:left}
@@ -226,6 +240,11 @@ export default function Home() {
       <header className="hero">
         <img className="hero-img" ref={heroRef} src="/img/hero-forest.png" alt="" />
         <div className="hero-scrim" />
+        <div className="stars" aria-hidden="true">
+          {Array.from({ length: 26 }).map((_, i) => (
+            <i key={i} className="star" style={{ left: `${(i * 41 + 7) % 100}%`, top: `${(i * 23 + 5) % 62}%`, animationDelay: `${(i % 7) * 0.42}s` }} />
+          ))}
+        </div>
         <div className="hero-inner">
           <span className="eyebrow">◇ The anti-social-media app</span>
           <h1>Less scrolling.<br />More <b>living</b>.</h1>
@@ -233,6 +252,7 @@ export default function Home() {
           <div className="cta">
             <Link className="btn btn-gold" href="/signin">Start an adventure</Link>
           </div>
+          <div className="pressstart">▶ Press start</div>
           <p className="trust">Free to join any plan · No download · No feed</p>
         </div>
       </header>
