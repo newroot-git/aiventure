@@ -51,7 +51,7 @@ const CSS = `
 
 .lp .hero{position:relative; min-height:92vh; display:flex; align-items:center; justify-content:flex-start;
   border-bottom-left-radius:26px; border-bottom-right-radius:26px; overflow:hidden; background:#241F33}
-.lp .hero-img{position:absolute; inset:-8% 0 0 0; width:100%; height:116%; object-fit:cover;
+.lp .hero-img{position:absolute; inset:-4% 0 0 0; width:100%; height:108%; object-fit:cover;
   object-position:center 46%; z-index:0}
 /* hero copy lives in a left-weighted retro screen over the full-colour image */
 .lp .hero-screen{position:relative; z-index:4; margin:0 0 0 clamp(16px,6vw,96px); width:min(90vw,520px)}
@@ -260,7 +260,7 @@ export default function Home() {
       ticking = true;
       requestAnimationFrame(() => {
         const y = scroller instanceof Window ? window.scrollY : scroller.scrollTop;
-        if (heroRef.current) heroRef.current.style.transform = `translateY(${y * 0.18}px)`;
+        if (heroRef.current) heroRef.current.style.transform = `translateY(${y * 0.08}px)`;
         ticking = false;
       });
     };
@@ -274,7 +274,7 @@ export default function Home() {
 
       {/* HERO */}
       <header className="hero">
-        <img className="hero-img" ref={heroRef} src="/img/hero-cliff.png" alt="" />
+        <img className="hero-img" ref={heroRef} src="/img/hero-cliff-2.png" alt="" />
         <div className="stars" aria-hidden="true">
           {Array.from({ length: 16 }).map((_, i) => (
             <i key={i} className="star" style={{ left: `${(i * 53 + 9) % 100}%`, top: `${(i * 29 + 4) % 36}%`, animationDelay: `${(i % 7) * 0.42}s` }} />

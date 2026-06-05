@@ -28,7 +28,7 @@ const scene =
   "A small group of 3 to 4 friends sitting close together on a low sturdy fallen log that rests flat on a solid granite ledge at a cliff-top viewpoint — the log is safely on the ground, NOT overhanging or near the edge — positioned in the right third of the frame, seen from behind, gazing out over a vast Yosemite-style valley filling the centre and left: deep green pine forest, sweeping granite cliffs, a distant waterfall and far blue mountains, soft warm golden-hour sunlight and gentle haze, calm open sky.";
 
 const prompt = `GENERATE A NEW IMAGE (do not describe it). ${scene} ${STYLE} ${CHAR} ${SIMPLE} ${FRAME}`;
-const out = join(root, "public/img/hero-cliff.png");
+const out = join(root, "public/img/hero-cliff-2.png");
 
 let img;
 for (let attempt = 1; attempt <= 5 && !img; attempt++) {
@@ -58,6 +58,7 @@ writeFileSync(out, Buffer.from(img.split(",")[1], "base64"));
 try {
   execFileSync("magick", [out,
     "-bordercolor", "white", "-border", "2", "-fuzz", "10%", "-trim", "+repage",
-    "-resize", "1600x900^", "-gravity", "center", "-extent", "1600x900", out]);
+    "-filter", "Lanczos", "-resize", "2400x1350^", "-gravity", "center", "-extent", "2400x1350",
+    "-unsharp", "0x0.7+0.7+0", out]);
 } catch (e) { console.error("magick trim skipped:", e.message); }
 console.log("saved public/img/hero-cliff.png");
