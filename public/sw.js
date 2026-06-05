@@ -1,7 +1,7 @@
 // AIventure service worker — app-shell offline caching. Bundler-independent
 // (plain SW; Next 16 builds with Turbopack, which @serwist/next's webpack
 // injection doesn't run under). Bump VERSION to invalidate caches on deploy.
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL_CACHE = `aiventure-shell-${VERSION}`;
 const RUNTIME_CACHE = `aiventure-runtime-${VERSION}`;
 
