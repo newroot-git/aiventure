@@ -344,7 +344,7 @@ export default function Home() {
                 <div>
                   <div className="vague"><span className="tag">you type</span>something with the boys Saturday, hike then a pint<span className="cursor" /></div>
                   <div className="plan">
-                    <div className="cover"><img src="/img/styletest/hike.png" alt="" /><b>Something with the boys, Saturday</b></div>
+                    <div className="cover"><img src="/img/cover-hike.png" alt="" /><b>Something with the boys, Saturday</b></div>
                     <div className="body">
                       <div className="meta"><span>◷ Sat 6 Jun · 4pm</span><span>◎ Hampstead Heath</span></div>
                       <div className="opts">
@@ -395,9 +395,9 @@ export default function Home() {
                 <div className="vizframe vf-green">
                   <div className="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="19" r="3" /><circle cx="18" cy="5" r="3" /><path d="M9 19h6a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6" /></svg>A day out · 3 stops</div>
                   <div className="itin">
-                    <div className="row"><span className="num">1</span><img src="/img/styletest/cafe.png" alt="" /><div className="t"><b>Coffee &amp; pastries</b><small>10am · Climpson &amp; Sons</small></div></div>
-                    <div className="row"><span className="num">2</span><img src="/img/styletest/hike.png" alt="" /><div className="t"><b>Canal walk to the marsh</b><small>11:30am · 5km</small></div></div>
-                    <div className="row"><span className="num">3</span><img src="/img/styletest/pub.png" alt="" /><div className="t"><b>Late lunch &amp; a pint</b><small>1pm · The Anchor</small></div></div>
+                    <div className="row"><span className="num">1</span><img src="/img/cover-coffee.png" alt="" /><div className="t"><b>Coffee &amp; pastries</b><small>10am · Climpson &amp; Sons</small></div></div>
+                    <div className="row"><span className="num">2</span><img src="/img/cover-hike.png" alt="" /><div className="t"><b>Canal walk to the marsh</b><small>11:30am · 5km</small></div></div>
+                    <div className="row"><span className="num">3</span><img src="/img/cover-pub.png" alt="" /><div className="t"><b>Late lunch &amp; a pint</b><small>1pm · The Anchor</small></div></div>
                   </div>
                 </div>
                 </div></div>
@@ -415,9 +415,9 @@ export default function Home() {
                 <div className="vizframe vf-yellow">
                   <div className="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20" /></svg>Near you · for your interests</div>
                   <div className="disc">
-                    <div className="d"><img src="/img/styletest/climb.png" alt="" /><div><b>Bouldering meetup</b><small>2.3km · Thu 7pm · 4 going</small></div></div>
-                    <div className="d"><img src="/img/styletest/town.png" alt="" /><div><b>Sunday market wander</b><small>1.1km · this weekend</small></div></div>
-                    <div className="d"><img src="/img/styletest/gig.png" alt="" /><div><b>Open-air gig in the park</b><small>4km · Sat · 12 going</small></div></div>
+                    <div className="d"><img src="/img/cover-climb.png" alt="" /><div><b>Bouldering meetup</b><small>2.3km · Thu 7pm · 4 going</small></div></div>
+                    <div className="d"><img src="/img/cover-market.png" alt="" /><div><b>Sunday market wander</b><small>1.1km · this weekend</small></div></div>
+                    <div className="d"><img src="/img/cover-gig.png" alt="" /><div><b>Open-air gig in the park</b><small>4km · Sat · 12 going</small></div></div>
                   </div>
                 </div>
                 </div></div>
@@ -435,10 +435,10 @@ export default function Home() {
                 <div className="vizframe vf-red">
                   <div className="vh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="6" /><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12" /></svg>Your adventure log</div>
                   <div className="loggrid">
-                    <div className="minicard"><img src="/img/styletest/hike.png" alt="" /><b>Heath hike</b></div>
-                    <div className="minicard"><img src="/img/styletest/climb.png" alt="" /><b>Bouldering</b></div>
-                    <div className="minicard"><img src="/img/styletest/pub.png" alt="" /><b>Sunday roast</b></div>
-                    <div className="minicard"><img src="/img/styletest/beach.png" alt="" /><b>Coast day</b></div>
+                    <div className="minicard"><img src="/img/cover-hike.png" alt="" /><b>Heath hike</b></div>
+                    <div className="minicard"><img src="/img/cover-climb.png" alt="" /><b>Bouldering</b></div>
+                    <div className="minicard"><img src="/img/cover-roast.png" alt="" /><b>Sunday roast</b></div>
+                    <div className="minicard"><img src="/img/cover-beach.png" alt="" /><b>Coast day</b></div>
                   </div>
                 </div>
                 </div></div>
@@ -456,10 +456,10 @@ export default function Home() {
           <h2 className="big reveal">A year of this beats a year of scrolling.</h2>
           <p className="lede reveal narrow" style={{ marginLeft: "auto", marginRight: "auto" }}>Every plan you finish becomes an Adventure card. Stack them up and you’ve a real record of a life lived outside — not a history of things you watched other people do.</p>
           <div className="cards">
-            <div className="acard reveal"><img src="/img/styletest/hike.png" alt="" /><b>Sunset hike, Hampstead Heath</b><small>Jun · 5 of you</small></div>
-            <div className="acard reveal"><img src="/img/styletest/climb.png" alt="" /><b>Bouldering at The Castle</b><small>May · 2 of you</small></div>
-            <div className="acard reveal"><img src="/img/styletest/pub.png" alt="" /><b>Sunday roast, Richmond</b><small>May · 6 of you</small></div>
-            <div className="acard reveal"><img src="/img/styletest/cabin.png" alt="" /><b>Camping weekend away</b><small>Apr · 4 of you</small></div>
+            <div className="acard reveal"><img src="/img/cover-hike.png" alt="" /><b>Sunset hike, Hampstead Heath</b><small>Jun · 5 of you</small></div>
+            <div className="acard reveal"><img src="/img/cover-climb.png" alt="" /><b>Bouldering at The Castle</b><small>May · 2 of you</small></div>
+            <div className="acard reveal"><img src="/img/cover-roast.png" alt="" /><b>Sunday roast, Richmond</b><small>May · 6 of you</small></div>
+            <div className="acard reveal"><img src="/img/cover-camp.png" alt="" /><b>Camping weekend away</b><small>Apr · 4 of you</small></div>
           </div>
         </div>
       </section>
